@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Výsledky hľadania „{{ q }}“</h2>
+  {% if cands %}
+  <ul>
+    {% for t, cik, title in cands %}
+      <li><a href="{{ url_for('company', ticker=t) }}"><strong>{{ t }}</strong></a> – {{ title }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>Nenašla sa žiadna firma. Skús ticker (napr. AAPL) alebo časť anglického názvu.</p>
+  {% endif %}
+</div>
+{% endblock %}

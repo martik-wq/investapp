@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Investičná analýza{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <a href="{{ url_for('index') }}">📊 Investičná analýza</a>
+  <form action="{{ url_for('search') }}" method="get">
+    <input name="q" placeholder="Ticker alebo názov (napr. AAPL)" required>
+    <button>Hľadať</button>
+  </form>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -1,0 +1,15 @@
+AKO SPUSTIŤ APLIKÁCIU (bez programovania)
+
+1. Nainštaluj Python: https://www.python.org/downloads/
+   Windows: pri inštalácii ZASKRTNI "Add python.exe to PATH".
+2. Rozbaľ celý priečinok investapp (pravý klik na ZIP -> Extract All / Rozbaliť všetko).
+3. Dvojklikni na:
+     Windows:  spustit.bat
+     Mac:      spustit.command  (ak to nepôjde: pravý klik -> Otvoriť)
+4. Pri prvom spustení sa nainštaluje všetko potrebné a opýta sa ťa na meno a e-mail
+   (vyžaduje to SEC, nič sa nikam neposiela okrem SEC). Napíš napr.: Jan Novak jan@email.sk
+5. Otvorí sa prehliadač s aplikáciou. Zadaj ticker (napr. AAPL, SOFI, NU, JPM).
+6. Vypnutie: zatvor čierne okno.
+
+Nabudúce stačí znova dvojklik na spustit.bat / spustit.command.
+Ak niečo nejde, skopíruj text chyby z čierneho okna a pošli mi ho.

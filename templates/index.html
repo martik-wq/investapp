@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Analýza verejne obchodovaných firiem</h1>
+  <p class="sub">Dáta zo SEC EDGAR (XBRL). Zadaj ticker a zobrazí sa súvaha, výkaz ziskov a strát, cash flow a metriky podľa typu biznisu.</p>
+  <form action="{{ url_for('search') }}" method="get" class="controls">
+    <label>Ticker alebo názov firmy
+      <input name="q" size="32" placeholder="napr. AAPL, JPM, O, SoFi" required autofocus></label>
+    <button>Analyzovať</button>
+  </form>
+  <p class="sample note">Skús:
+    {% for t in ['AAPL','MSFT','JPM','SOFI','NU','O','ALL','DEMOCO','DEMOBANK'] %}
+      <a href="{{ url_for('company', ticker=t) }}">{{ t }}</a>
+    {% endfor %}
+    (DEMOCO a DEMOBANK sú fiktívne ukážkové firmy, ktoré fungujú aj bez internetu)</p>
+</div>
+<div class="card">
+  <h2>Podporované typy biznisu</h2>
+  <ul>{% for k,v in types.items() %}<li>{{ v }}</li>{% endfor %}</ul>
+  <p class="note">Typ sa určí automaticky podľa SIC kódu firmy a dostupných dát, môžeš ho ručne prepnúť na stránke firmy.</p>
+</div>
+{% endblock %}
