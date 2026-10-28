@@ -119,6 +119,76 @@ check("cost of risk existuje", ib["cor"]["vals"][y(2025)] is not None)
 vb = metrics.valuation(cb, bb, rb, 20.0)
 check("banka: P/TBV", vb and any("P/TBV" in l for l, _, _ in vb["items"]))
 
+# ----------------------------------------------- podrobné výkazy z podaní (R*.htm)
+import filings  # noqa: E402
+import make_demo_filings as mf  # noqa: E402
+
+check("parse_number: záporné v zátvorkách", filings.parse_number("$ (1,234)") == -1234.0)
+check("parse_number: poznámka pod čiarou sa ignoruje", filings.parse_number("$ 574,785 [1]") == 574785.0)
+check("parse_number: pomlčka = prázdne", filings.parse_number("—") is None)
+check("parse_months: týždne", filings.parse_months("39 Weeks Ended") == 9 and
+      filings.parse_months("52 Weeks Ended") == 12 and filings.parse_months("12 Months Ended") == 12)
+check("parse_date: Sep. 30, 2025", filings.parse_date("Sep. 30, 2025") == date(2025, 9, 30))
+check("classify: výkazy",
+      filings.classify("CONSOLIDATED STATEMENTS OF OPERATIONS") == "income" and
+      filings.classify("CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME") is None and
+      filings.classify("CONSOLIDATED BALANCE SHEETS (Parenthetical)") is None and
+      filings.classify("CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS") == "cashflow" and
+      filings.classify("CONSOLIDATED STATEMENTS OF INCOME AND COMPREHENSIVE INCOME") == "income")
+check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")
+      == (1e6, 1e3))
+
+dm, _ = edgar.find_company("DEMOCO")
+dc = edgar.load_company(*dm)
+fl = filings.list_filings(dc["filings"], filings.ANNUAL_FORMS)
+ld = filings.load_filing(dc, fl[0])
+check("podanie 10-K: nájdené všetky tri výkazy", all(ld[k] for k in filings.KINDS))
+inc_rep = ld["income"]
+check("výkaz: stĺpce s trvaním 12 mesiacov", [c["months"] for c in inc_rep["cols"]] == [12, 12, 12])
+check("výkaz: súvaha má okamžité hodnoty", [c["months"] for c in ld["balance"]["cols"]] == [None, None])
+prod = next(r for r in inc_rep["rows"] if r["label"] == "Net product sales")
+check("riadok tovaru: odsadený pod hlavičkou a prepočítaný z tisícov",
+      prod["indent"] == 1 and close(prod["vals"][0], mf.quarter(2025, 4)["prod"] * 0 + sum(
+          mf.quarter(2025, q)["prod"] for q in range(1, 5)), 1e-3), prod["vals"][0])
+check("concept sa načíta z odkazu", prod["concept"] == "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax")
+
+da = filings.get_detailed(dc, "annual", 5)
+get = lambda stm, label: next(r for r in da[stm] if r["label"] == label)  # noqa: E731
+check("annual detail: 5 rokov", len(da["ends"]) == 5, da["ends"])
+pr, sv, tot = get("income", "Net product sales"), get("income", "Net service sales"), get("income", "Total net sales")
+check("annual detail: tovar + služby = tržby (všetky roky)",
+      all(close(pr["vals"][e] + sv["vals"][e], tot["vals"][e], 1e-6) for e in da["ends"]))
+check("annual detail: zlúčenie 10-K z rokov 2025 a 2023 (rok 2021 z 10-K FY2023)",
+      get("income", "Total net sales")["vals"][date(2021, 12, 31)] is not None)
+check("annual detail: súvaha sedí (aktíva = pasíva)",
+      all(abs(get("balance", "Total assets")["vals"][e] -
+              get("balance", "Total liabilities and stockholders' equity")["vals"][e]) < 2e3
+          for e in da["ends"]))
+check("annual detail: cash flow zachováva znamienko firmy (CapEx záporný)",
+      get("cashflow", "Purchases of property and equipment")["vals"][date(2025, 12, 31)] < 0)
+check("annual detail: hlavičky skupín sú zachované",
+      any(r["header"] and r["label"] == "Operating expenses:" for r in da["income"]))
+check("annual detail: EPS bez prepočtu", 0.1 < get("income", "Diluted earnings per share")["vals"][date(2025, 12, 31)] < 5)
+
+dq = filings.get_detailed(dc, "quarterly", 3)
+getq = lambda stm, label: next(r for r in dq[stm] if r["label"] == label)  # noqa: E731
+qchk = lambda stm, label, key, fn: all(  # noqa: E731
+    v is not None and abs(v - fn((e.month - 1) // 3 + 1, e.year)[key]) < 2e3
+    for e, v in getq(stm, label)["vals"].items())
+check("quarterly detail: 12 kvartálov", len(dq["ends"]) == 12, len(dq["ends"]))
+check("quarterly detail: tržby každého kvartálu (vrátane Q4 = rok − 9M)",
+      qchk("income", "Total net sales", "rev", lambda q, y: mf.quarter(y, q)))
+check("quarterly detail: tovar každého kvartálu",
+      qchk("income", "Net product sales", "prod", lambda q, y: mf.quarter(y, q)))
+check("quarterly detail: cash flow z prevádzky = rozdiely kumulatívnych hodnôt",
+      qchk("cashflow", "Net cash provided by operating activities", "cfo", lambda q, y: mf.quarter(y, q)))
+check("quarterly detail: CapEx každého kvartálu",
+      qchk("cashflow", "Purchases of property and equipment", "capex", lambda q, y: mf.quarter(y, q)))
+check("quarterly detail: aktíva na konci každého kvartálu",
+      qchk("balance", "Total assets", "assets", lambda q, y: mf.balance(y, q)))
+check("quarterly detail: priemerný počet akcií sa neodčítava",
+      all(v in (None, 101e6) for v in getq("income", "Diluted")["vals"].values()))
+
 # ------------------------------------------------------- rozhranie (Flask klient)
 import app as appmod  # noqa: E402
 
@@ -129,6 +199,8 @@ urls = ["/", "/search?q=DEMOCO", "/company/DEMOCO", "/company/DEMOCO/overview",
         "/company/DEMOCO/charts?mode=quarterly&years=10", "/company/DEMOCO/fundamental",
         "/company/DEMOCO/technical", "/company/DEMOBANK", "/company/DEMOBANK/statements?price=20",
         "/company/DEMOBANK/charts", "/company/DEMOBANK/export.csv"]
+urls += ["/company/DEMOCO/statements?detail=1", "/company/DEMOCO/statements?detail=1&mode=quarterly&years=5",
+         "/company/DEMOBANK/statements?detail=1"]
 for url in urls:
     r = cl.get(url, follow_redirects=True)
     check(f"HTTP 200 {url}", r.status_code == 200, r.status_code)
@@ -142,6 +214,10 @@ check("úvod: bočný panel so všetkými záložkami",
 q = cl.get("/company/DEMOCO/statements?mode=quarterly&years=5").get_data(as_text=True)
 check("nastavenia sa prenášajú medzi záložkami", "section=" not in q and "mode=quarterly" in q and "years=5" in q)
 check("graf: dáta pre grafy", 'id="trend-data"' in cl.get("/company/DEMOCO/charts").get_data(as_text=True))
+dh = cl.get("/company/DEMOCO/statements?detail=1").get_data(as_text=True)
+check("podrobné výkazy v stránke", "Net product sales" in dh and "Net service sales" in dh)
+check("banka bez podaní: zrozumiteľná chyba a zjednodušené údaje",
+      "Zobrazujem zjednodušené údaje" in cl.get("/company/DEMOBANK/statements?detail=1").get_data(as_text=True))
 check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)

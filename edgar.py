@@ -116,6 +116,7 @@ def load_company(ticker, cik, title):
     fye = str(subs.get("fiscalYearEnd") or "")
     fiscal = f"{fye[2:]}.{fye[:2]}." if len(fye) == 4 and fye.isdigit() else ""
     return {
+        "filings": (subs.get("filings") or {}).get("recent") or {},
         "sec": {"exchanges": subs.get("exchanges") or [], "website": subs.get("website"),
                 "description": subs.get("description"), "place": place,
                 "fiscal_year_end": fiscal, "category": subs.get("category"),

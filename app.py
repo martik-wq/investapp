@@ -9,6 +9,7 @@ from datetime import date
 from flask import Flask, Response, abort, redirect, render_template, request, url_for
 
 import edgar
+import filings
 import metrics
 import prices
 import trends
@@ -115,7 +116,8 @@ def _params():
     typ = request.args.get("type", "auto")
     typ = typ if typ in BUSINESS_TYPES else "auto"
     return {"mode": mode, "typ": typ, "price_raw": request.args.get("price", ""),
-            "years": parse_years(request.args.get("years"))}
+            "years": parse_years(request.args.get("years")),
+            "detail": request.args.get("detail") == "1"}
 
 
 def _qs(p):
@@ -129,6 +131,8 @@ def _qs(p):
         q["type"] = p["typ"]
     if p["price_raw"]:
         q["price"] = p["price_raw"]
+    if p["detail"]:
+        q["detail"] = "1"
     return q
 
 
@@ -138,7 +142,7 @@ def build_context(ticker, section):
     if not match:
         raise edgar.EdgarError(f"Ticker „{ticker}“ sa nenašiel.")
     ctx = {"ticker": match[0], "name": match[2], "section": section, "mode": p["mode"],
-           "typ": p["typ"], "price": p["price_raw"], "years": p["years"],
+           "typ": p["typ"], "price": p["price_raw"], "years": p["years"], "detail": p["detail"],
            "years_options": YEARS_OPTIONS, "types": BUSINESS_TYPES, "sections": SECTIONS,
            "qs": _qs(p), "today": date.today()}
     if section in ("fundamental", "technical"):
@@ -168,6 +172,11 @@ def build_context(ticker, section):
         ctx["profile"] = profile
     elif section == "statements":
         ctx["stm"] = statements.all_statements(built)
+        if p["detail"]:
+            try:
+                ctx["det"] = filings.get_detailed(comp, p["mode"], p["years"])
+            except edgar.EdgarError as e:
+                ctx["det_error"] = str(e)
     elif section == "charts":
         ctx["trend"] = trends.build_trends(comp, btype, p["mode"], min(p["years"], 20))
     return ctx

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import stmt_table, warnings %}
+{% from "_macros.html" import stmt_table, detail_table, warnings %}
 {% block title %}{{ comp.ticker }} – Výkazy{% endblock %}
 {% block content %}
 {% set ends = built.display|reverse|list %}
@@ -8,7 +8,7 @@
   <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong>{% if typ == 'auto' %} (určený automaticky){% endif %}{% if comp.is_demo %} · <strong>fiktívne ukážkové dáta</strong>{% endif %}</div>
 </div>
 <div class="card">
-  {% with show = ['mode','years','type','price','export'] %}{% include "_toolbar.html" %}{% endwith %}
+  {% with show = ['mode','years','detail','type','price','export'] %}{% include "_toolbar.html" %}{% endwith %}
   {% if mode=='quarterly' %}
   <p class="note" style="margin-bottom:0">Kvartálny režim: výkazy ukazujú samostatné kvartály (štvrtý kvartál sa dopočíta ako rok − 9 mesiacov), metriky sú počítané z posledných 12 mesiacov (TTM).</p>
   {% endif %}
@@ -22,18 +22,23 @@
     <button data-t="cashflow">Cash flow</button>
     <button data-t="metrics">Metriky</button>
   </div>
-  <div class="scrollbtns">
-    <button type="button" class="ghost" data-scroll="-1" title="Novšie obdobia">◀ Novšie</button>
-    <button type="button" class="ghost" data-scroll="1" title="Staršie obdobia">Staršie ▶</button>
   </div>
-  </div>
-  <p class="note" style="margin:0 0 8px">Tabuľku môžeš posúvať do strán: ťahaním myšou, tlačidlami vpravo, Shift + kolieskom alebo posuvníkom pod tabuľkou. Naľavo sú najnovšie obdobia, doprava sa dostaneš k starším. Viac rokov nastavíš v poli História.</p>
+  <p class="note" style="margin:0 0 8px">Tabuľku môžeš posúvať do strán ťahaním myšou (alebo Shift + kolieskom). Naľavo sú najnovšie obdobia, doprava sa dostaneš k starším. Viac rokov nastavíš v poli História.</p>
+  {% if det_error %}<div class="warn">Podrobné výkazy sa nepodarilo načítať: {{ det_error }} Zobrazujem zjednodušené údaje.</div>{% endif %}
+  {% if det %}
+  {% set dends = det.ends|reverse|list %}
+  <p class="note" style="margin:0 0 8px"><strong>Podrobné výkazy:</strong> riadky a znamienka sú presne tak, ako ich firma uvádza vo svojich podaniach ({{ det.filings }} podaní zo SEC){% if det.capped %}, zobrazených je najviac {{ det.years }} rokov{% endif %}. Výdavky v cash flow sú preto záporné. Kvartály, ktoré firma neuvádza samostatne (štvrtý kvartál, cash flow), sú dopočítané z rozdielov.</p>
+  <div class="pane on" id="p-income">{{ detail_table(det.income, dends, built.currency) }}</div>
+  <div class="pane" id="p-balance">{{ detail_table(det.balance, dends, built.currency) }}</div>
+  <div class="pane" id="p-cashflow">{{ detail_table(det.cashflow, dends, built.currency) }}</div>
+  {% else %}
   <div class="pane on" id="p-income">{{ stmt_table(stm.income, ends, built.currency) }}</div>
   <div class="pane" id="p-balance">{{ stmt_table(stm.balance, ends, built.currency) }}</div>
   <div class="pane" id="p-cashflow">
     {{ stmt_table(stm.cashflow, ends, built.currency) }}
     <p class="note">Výdavky (CapEx, dividendy, odkupy, splátky dlhu) sú uvedené ako kladné čísla tak, ako ich vykazuje firma.</p>
   </div>
+  {% endif %}
   <div class="pane" id="p-metrics">
     {% for g in result.groups %}
       <h3>{{ g.title }}</h3>

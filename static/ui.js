@@ -1,4 +1,4 @@
-/* Posúvanie tabuliek: ťahanie myšou a tlačidlá ◀ ▶ */
+/* Posúvanie tabuliek ťahaním myšou */
 (function () {
   document.querySelectorAll('.tablewrap').forEach(function (w) {
     var down = false, sx = 0, sl = 0, moved = false;
@@ -16,11 +16,9 @@
       down = false; w.classList.remove('dragging');
     });
   });
-  document.querySelectorAll('[data-scroll]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var w = document.querySelector('.pane.on .tablewrap') || document.querySelector('.tablewrap');
-      if (!w) return;
-      w.scrollBy({left: +b.dataset.scroll * Math.max(300, w.clientWidth * 0.7), behavior: 'smooth'});
-    });
+  document.addEventListener('submit', function () { document.body.classList.add('loading'); });
+  window.addEventListener('pageshow', function () { document.body.classList.remove('loading'); });
+  document.querySelectorAll('.nav a, .recent a').forEach(function (a) {
+    a.addEventListener('click', function () { document.body.classList.add('loading'); });
   });
 })();

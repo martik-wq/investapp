@@ -107,4 +107,6 @@ table.plain th,table.plain td{text-align:left;position:static}
 .tablewrap::-webkit-scrollbar{height:12px}
 .tablewrap::-webkit-scrollbar-thumb{background:#c3cad6;border-radius:6px}
 .tabsrow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.scrollbtns{display:flex;gap:6px;margin:6px 0 14px}
+
+tr.hdr td{text-align:left;background:#f6f7f9;color:#3b4656;font-size:13px;padding-top:9px}
+body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prvom načítaní sťahujú zo SEC, môže to trvať aj minútu)";position:fixed;inset:0;background:rgba(255,255,255,.82);display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:18px;font-weight:600;color:#1c2430;z-index:99}

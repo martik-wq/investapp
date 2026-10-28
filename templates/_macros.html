@@ -22,3 +22,23 @@
 <div class="warn">Firma vykazuje v mene {{ built.currency }}. Všetky hodnoty sú v tejto mene, cena akcie musí byť zadaná v tej istej mene.</div>
 {% endif %}
 {% endmacro %}
+
+{% macro detail_table(rows, ends, currency) %}
+<div class="tablewrap"><table>
+  <thead><tr><th>{{ 'mil. ' ~ currency }}</th>{% for e in ends %}<th>{{ e.strftime('%d.%m.%Y') }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in rows %}
+    {% if r.header %}
+      <tr class="bold hdr"><td colspan="{{ ends|length + 1 }}">{{ r.label }}</td></tr>
+    {% else %}
+    <tr class="{{ 'bold' if r.bold }} {{ 'ind1' if r.indent }}">
+      <td>{{ r.label }}</td>
+      {% for e in ends %}{% set v = r.vals[e] %}
+        <td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|fmt(unit_to_fmt({'money':'cur','shares':'shares','eps':'eps'}[r.kind])) }}</td>
+      {% endfor %}
+    </tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endmacro %}

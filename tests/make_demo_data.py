@@ -283,9 +283,16 @@ def build_demobank():
 
 
 def main():
+    import shutil
+    import make_demo_filings
     os.makedirs(OUT, exist_ok=True)
+    froot = os.path.join(OUT, "filings", "DEMOCO")
+    shutil.rmtree(froot, ignore_errors=True)
+    recent = make_demo_filings.generate(froot)
     for t, fn in (("DEMOCO", build_democo), ("DEMOBANK", build_demobank)):
         facts, subs, _ = fn()
+        if t == "DEMOCO":
+            subs["filings"] = {"recent": recent}
         with open(os.path.join(OUT, f"{t}_facts.json"), "w", encoding="utf-8") as fh:
             json.dump(facts, fh)
         with open(os.path.join(OUT, f"{t}_subs.json"), "w", encoding="utf-8") as fh:

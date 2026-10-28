@@ -20,6 +20,13 @@
       {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
     </select></label>
   {% endif %}
+  {% if 'detail' in show %}
+  <label>Zobrazenie výkazov
+    <select name="detail" onchange="this.form.submit()">
+      <option value="0" {{ 'selected' if not detail }}>Zjednodušené (štandardizované)</option>
+      <option value="1" {{ 'selected' if detail }}>Podrobné (ako firma uvádza)</option>
+    </select></label>
+  {% endif %}
   {% if 'price' in show %}
   <label>Cena akcie ({{ built.currency }})
     <input name="price" value="{{ price }}" size="9" placeholder="prázdne = z Yahoo"></label>

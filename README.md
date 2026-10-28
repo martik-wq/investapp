@@ -54,3 +54,11 @@ Bez internetu si môžeš vyskúšať fiktívne firmy `DEMOCO` a `DEMOBANK`
 - Aplikácia nebola testovaná na živých dátach SEC (vývojové prostredie k nim nemalo prístup),
   iba na simulovaných dátach v rovnakom formáte. Pri prvom spustení si skontroluj niekoľko
   firiem, ktoré poznáš.
+
+## Podrobné výkazy
+
+V záložke Výkazy je voľba „Zobrazenie výkazov“: zjednodušené (štandardizované, z companyfacts)
+alebo podrobné (riadky presne ako ich firma uvádza v podaniach, napr. tržby zvlášť za tovar a služby).
+Podrobné výkazy sa čítajú zo stránok R*.htm v podaniach SEC (`filings.py`), kvartály sa dopočítavajú
+(Q4 = rok − 9M, cash flow = rozdiely kumulatívnych hodnôt). Podania sa cachujú natrvalo v `cache/filings/`.
+Kvartálne podrobné údaje sú obmedzené na 5 rokov, ročné na 12.
