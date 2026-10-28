@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ comp.ticker }} – {{ comp.name }}{% endblock %}
+{% block content %}
+{% set last = built.display[-1] %}
+<div class="pagehead">
+  <h1>{{ comp.name }} <span class="badge">{{ comp.ticker }}</span></h1>
+  <div class="sub">
+    {% if profile and profile.sector %}{{ profile.sector }}{% if profile.industry %} · {{ profile.industry }}{% endif %}{% elif comp.sic_desc %}{{ comp.sic_desc }}{% endif %}
+    {% if quote and quote.exchange %} · {{ quote.exchange }}{% elif comp.sec.exchanges %} · {{ comp.sec.exchanges|join(', ') }}{% endif %}
+    {% if comp.is_demo %} · <strong>fiktívne ukážkové dáta</strong>{% endif %}
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Cena akcie</h2>
+    {% if quote and not quote.mismatch %}
+      <div class="bigprice">{{ '%.2f'|format(quote.price) }} <span class="cur">{{ quote.currency }}</span></div>
+      {% if quote.change is not none %}
+        <div class="chg {{ 'up' if quote.change >= 0 else 'down' }}">{{ '▲ +' if quote.change >= 0 else '▼ ' }}{{ '%.2f'|format(quote.change) }} ({{ '%+.2f'|format(quote.change_pct * 100) }} %) za posledný deň</div>
+      {% endif %}
+      <div class="note">Yahoo Finance, {{ quote.time }}</div>
+      <table class="facts">
+        {% if quote.low52 and quote.high52 %}<tr><td>52-týždňové rozpätie</td><td>{{ '%.2f'|format(quote.low52) }} – {{ '%.2f'|format(quote.high52) }}</td></tr>{% endif %}
+        {% set mc = (profile.market_cap if profile and profile.market_cap else (val['items'][0][1] if val else none)) %}
+        {% if mc %}<tr><td>Trhová kapitalizácia</td><td>{{ mc|fmt('big') }} {{ quote.currency }}</td></tr>{% endif %}
+        {% if profile and profile.dividend_yield %}<tr><td>Dividendový výnos</td><td>{{ (profile.dividend_yield*100)|round(2) }} %</td></tr>{% endif %}
+        {% if profile and profile.beta %}<tr><td>Beta</td><td>{{ '%.2f'|format(profile.beta) }}</td></tr>{% endif %}
+      </table>
+    {% elif quote and quote.mismatch %}
+      <div class="warn">Yahoo uvádza cenu v {{ quote.currency }}, firma vykazuje v {{ built.currency }}: <strong>{{ '%.2f'|format(quote.price) }} {{ quote.currency }}</strong></div>
+    {% else %}
+      <p class="note">Cenu z Yahoo Finance sa nepodarilo načítať. Môžeš ju zadať ručne nižšie.</p>
+    {% endif %}
+    <form method="get" class="controls" style="margin-top:10px">
+      <label>Vlastná cena ({{ built.currency }}, voliteľné)
+        <input name="price" value="{{ price }}" size="9" placeholder="prázdne = z Yahoo"></label>
+      <button>Použiť</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>O firme</h2>
+    {% if profile and profile.summary %}
+      <p class="desc" lang="en">{{ profile.summary }}</p>
+      <p class="note">Popis pochádza z Yahoo Finance v angličtine.</p>
+    {% elif comp.sec.description %}
+      <p class="desc" lang="en">{{ comp.sec.description }}</p>
+    {% else %}
+      <p class="note">Popis činnosti sa nepodarilo načítať{% if not profile %} (Yahoo Finance neodpovedal){% endif %}. Zo SEC máme aspoň základné údaje nižšie.</p>
+    {% endif %}
+    <table class="facts">
+      {% if comp.sic_desc %}<tr><td>Odvetvie (SEC)</td><td>{{ comp.sic_desc }}{% if comp.sic %} · SIC {{ comp.sic }}{% endif %}</td></tr>{% endif %}
+      <tr><td>Typ biznisu v aplikácii</td><td>{{ result.type_label }}</td></tr>
+      {% set place = (profile.city ~ ', ' ~ profile.country) if profile and profile.city and profile.country else comp.sec.place %}
+      {% if place %}<tr><td>Sídlo</td><td>{{ place }}</td></tr>{% endif %}
+      {% if profile and profile.employees %}<tr><td>Zamestnanci</td><td>{{ '{:,}'.format(profile.employees).replace(',', ' ') }}</td></tr>{% endif %}
+      {% set web = (profile.website if profile and profile.website else comp.sec.website) %}
+      {% if web %}<tr><td>Web</td><td><a href="{{ web if web.startswith('http') else 'https://' ~ web }}" target="_blank" rel="noopener noreferrer">{{ web }}</a></td></tr>{% endif %}
+      {% if comp.sec.fiscal_year_end %}<tr><td>Koniec fiškálneho roka</td><td>{{ comp.sec.fiscal_year_end }}</td></tr>{% endif %}
+      <tr><td>Mena výkazov</td><td>{{ built.currency }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Vedenie</h2>
+  {% if profile and profile.officers %}
+  <div class="tablewrap"><table class="plain">
+    <thead><tr><th>Meno</th><th>Pozícia</th><th>Vek</th></tr></thead>
+    <tbody>
+    {% for o in profile.officers %}
+      <tr><td>{{ o.name }}</td><td>{{ o.title or '–' }}</td><td>{{ o.age or '–' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p class="note">Údaje o vedení sa nepodarilo načítať (zdrojom je Yahoo Finance, SEC ich v štruktúrovanej podobe neposkytuje).</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Kľúčové metriky <span class="note">(posledné obdobie: {{ last.strftime('%d.%m.%Y') }}{{ ', TTM' if result.ttm }})</span></h2>
+  <div class="kpis">
+    {% for r in result.headline %}
+      <div class="kpi"><div class="l">{{ r.label }}</div><div class="v">{{ r.vals[last]|fmt(r.fmt) }}</div></div>
+    {% endfor %}
+  </div>
+  {% if val %}
+  <h3>Valuácia pri cene {{ '%.2f'|format(price_used) }} {{ built.currency }}</h3>
+  <div class="kpis">
+    {% for l, v, f in val['items'] %}
+      <div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v|fmt(f) }}</div></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="note">Podrobné výkazy nájdeš v záložke Výkazy, vývoj v čase v záložke Grafy.</p>
+</div>
+{% endblock %}

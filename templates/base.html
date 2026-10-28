@@ -7,13 +7,53 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<header class="top">
-  <a href="{{ url_for('index') }}">📊 Investičná analýza</a>
-  <form action="{{ url_for('search') }}" method="get">
-    <input name="q" placeholder="Ticker alebo názov (napr. AAPL)" required>
-    <button>Hľadať</button>
+<div class="app">
+<aside class="side">
+  <a class="brand" href="{{ url_for('index') }}">📊 Investičná analýza</a>
+  <form action="{{ url_for('search') }}" method="get" class="sideSearch">
+    <input name="q" placeholder="Ticker alebo názov" required>
+    <button aria-label="Hľadať">🔍</button>
   </form>
-</header>
-<main>{% block content %}{% endblock %}</main>
+  {% if ticker %}
+  <div class="coBox">
+    <div class="coTick">{{ ticker }}</div>
+    <div class="coName">{{ name }}</div>
+  </div>
+  <nav class="nav">
+    {% for key, label, icon in sections %}
+      <a href="{{ url_for('section_view', ticker=ticker, section=key, **qs) }}"
+         class="{{ 'on' if key == section }}"><span class="ic">{{ icon }}</span>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+  <div class="recentBox">
+    <div class="sideH">Naposledy otvorené</div>
+    <div id="recent" class="recent"></div>
+  </div>
+</aside>
+<main class="content">{% block content %}{% endblock %}</main>
+</div>
+<script>
+(function(){
+  try {
+    var KEY = 'investapp_recent', list = JSON.parse(localStorage.getItem(KEY) || '[]');
+    {% if ticker %}
+    list = list.filter(function(x){ return x.t !== {{ ticker|tojson }}; });
+    list.unshift({t: {{ ticker|tojson }}, n: {{ name|tojson }}});
+    list = list.slice(0, 10);
+    localStorage.setItem(KEY, JSON.stringify(list));
+    {% endif %}
+    var box = document.getElementById('recent');
+    if (!list.length) { box.textContent = 'zatiaľ nič'; box.className += ' empty'; }
+    list.forEach(function(x){
+      var a = document.createElement('a');
+      a.href = '/company/' + encodeURIComponent(x.t);
+      var b = document.createElement('b'); b.textContent = x.t;
+      a.appendChild(b); a.appendChild(document.createTextNode(' ' + (x.n || '')));
+      box.appendChild(a);
+    });
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>

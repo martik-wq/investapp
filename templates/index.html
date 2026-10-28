@@ -10,7 +10,7 @@
   </form>
   <p class="sample note">Skús:
     {% for t in ['AAPL','MSFT','JPM','SOFI','NU','O','ALL','DEMOCO','DEMOBANK'] %}
-      <a href="{{ url_for('company', ticker=t) }}">{{ t }}</a>
+      <a href="{{ url_for('section_view', ticker=t, section='overview') }}">{{ t }}</a>
     {% endfor %}
     (DEMOCO a DEMOBANK sú fiktívne ukážkové firmy, ktoré fungujú aj bez internetu)</p>
 </div>

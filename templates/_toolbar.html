@@ -1,0 +1,31 @@
+{# Spoločný panel nastavení. Parametre: show = množina polí #}
+<form method="get" class="controls toolbar">
+  {% if 'mode' in show %}
+  <label>Obdobie
+    <select name="mode">
+      <option value="annual" {{ 'selected' if mode=='annual' }}>Ročné</option>
+      <option value="quarterly" {{ 'selected' if mode=='quarterly' }}>Kvartálne</option>
+    </select></label>
+  {% endif %}
+  {% if 'years' in show %}
+  <label>História
+    <select name="years">
+      {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ y }} rokov</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  {% if 'type' in show %}
+  <label>Typ biznisu
+    <select name="type">
+      <option value="auto" {{ 'selected' if typ=='auto' }}>Automaticky ({{ types[auto_type] }})</option>
+      {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  {% if 'price' in show %}
+  <label>Cena akcie ({{ built.currency }})
+    <input name="price" value="{{ price }}" size="9" placeholder="prázdne = z Yahoo"></label>
+  {% endif %}
+  <button>Prepočítať</button>
+  {% if 'export' in show %}
+  <a href="{{ url_for('export', ticker=ticker, **qs) }}"><button type="button" class="ghost">Export CSV</button></a>
+  {% endif %}
+</form>

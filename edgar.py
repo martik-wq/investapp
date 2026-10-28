@@ -110,7 +110,16 @@ def load_company(ticker, cik, title):
         except EdgarError:
             subs = {}
     sic = subs.get("sic")
+    addr = (subs.get("addresses") or {}).get("business") or {}
+    place = ", ".join(x for x in (addr.get("city"), addr.get("stateOrCountryDescription")
+                                  or addr.get("stateOrCountry")) if x)
+    fye = str(subs.get("fiscalYearEnd") or "")
+    fiscal = f"{fye[2:]}.{fye[:2]}." if len(fye) == 4 and fye.isdigit() else ""
     return {
+        "sec": {"exchanges": subs.get("exchanges") or [], "website": subs.get("website"),
+                "description": subs.get("description"), "place": place,
+                "fiscal_year_end": fiscal, "category": subs.get("category"),
+                "former": [f.get("name") for f in (subs.get("formerNames") or [])][:3]},
         "ticker": ticker,
         "cik": cik,
         "name": facts.get("entityName") or title,

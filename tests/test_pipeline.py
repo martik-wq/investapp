@@ -108,18 +108,34 @@ check("banka: P/TBV", vb and any("P/TBV" in l for l, _, _ in vb["items"]))
 import app as appmod  # noqa: E402
 
 cl = appmod.app.test_client()
-for url in ["/", "/search?q=DEMOCO", "/company/DEMOCO", "/company/DEMOCO?mode=quarterly",
-            "/company/DEMOCO?type=reit&price=50", "/company/DEMOBANK?price=20",
-            "/company/DEMOBANK/export.csv"]:
+urls = ["/", "/search?q=DEMOCO", "/company/DEMOCO", "/company/DEMOCO/overview",
+        "/company/DEMOCO/statements", "/company/DEMOCO/statements?mode=quarterly&years=5",
+        "/company/DEMOCO/statements?type=reit&price=50", "/company/DEMOCO/charts",
+        "/company/DEMOCO/charts?mode=quarterly&years=10", "/company/DEMOCO/fundamental",
+        "/company/DEMOCO/technical", "/company/DEMOBANK", "/company/DEMOBANK/statements?price=20",
+        "/company/DEMOBANK/charts", "/company/DEMOBANK/export.csv"]
+for url in urls:
     r = cl.get(url, follow_redirects=True)
     check(f"HTTP 200 {url}", r.status_code == 200, r.status_code)
-html = cl.get("/company/DEMOCO?price=50").get_data(as_text=True)
-check("stránka obsahuje súvahu a metriky", "Súvaha" in html and "Rule of 40" in html)
+check("neexistujúca záložka -> 404", cl.get("/company/DEMOCO/blabla").status_code == 404)
+html = cl.get("/company/DEMOCO/statements?price=50").get_data(as_text=True)
+check("výkazy: súvaha a metriky", "Súvaha" in html and "Rule of 40" in html)
+ov = cl.get("/company/DEMOCO").get_data(as_text=True)
+check("úvod: popis, vedenie, cena", "Jana Ukážková" in ov and "50.00" in ov and "Vedenie" in ov)
+check("úvod: bočný panel so všetkými záložkami",
+      all(x in ov for x in ["Úvod", "Výkazy", "Grafy", "Fundamentálna analýza", "Technická analýza"]))
+q = cl.get("/company/DEMOCO/statements?mode=quarterly&years=5").get_data(as_text=True)
+check("nastavenia sa prenášajú medzi záložkami", "section=" not in q and "mode=quarterly" in q and "years=5" in q)
+check("graf: dáta pre grafy", 'id="trend-data"' in cl.get("/company/DEMOCO/charts").get_data(as_text=True))
+check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
-r = cl.get("/search?q=AAPL")
-check("bez SEC_USER_AGENT zrozumiteľná chyba", b"SEC_USER_AGENT" in r.data, r.status_code)
+cfgp = os.path.join(ROOT, "config.txt")
+had_cfg = os.path.exists(cfgp)
+if not had_cfg:
+    r = cl.get("/search?q=AAPL")
+    check("bez SEC_USER_AGENT zrozumiteľná chyba", b"SEC_USER_AGENT" in r.data, r.status_code)
 
 print("\nVýsledok:", "VŠETKO PREŠLO" if not fails else f"{len(fails)} zlyhaní: {fails}")
 sys.exit(1 if fails else 0)

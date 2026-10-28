@@ -129,8 +129,8 @@
     this.sel = all;
     var old = this.wrap.querySelector('svg');
     if (old) this.wrap.removeChild(old);
-    var W = Math.max(320, this.wrap.clientWidth || 700), H = 300;
-    var L = 62, R = 14, T = 12, B = 34, n = d.labels.length;
+    var W = Math.max(300, this.wrap.clientWidth || 440), H = 215;
+    var L = 50, R = 10, T = 8, B = 28, n = d.labels.length;
     var vals = [];
     all.forEach(function (x) { x.values.forEach(function (v) { if (v != null) vals.push(v); }); });
     var lo = Math.min.apply(null, vals.concat([0])), hi = Math.max.apply(null, vals.concat([0]));
@@ -146,10 +146,10 @@
       tx.textContent = tickLabel(t, self.g);
       svg.appendChild(tx);
     });
-    var every = band < 34 ? 2 : 1;
+    var every = band < 30 ? (band < 16 ? 4 : 2) : 1;
     d.labels.forEach(function (lb, i) {
       if (i % every !== (n - 1) % every) return;
-      var tx = s('text', {x: L + band * (i + 0.5), y: H - 12, 'text-anchor': 'middle', class: 'ax'});
+      var tx = s('text', {x: L + band * (i + 0.5), y: H - 9, 'text-anchor': 'middle', class: 'ax'});
       tx.textContent = lb;
       svg.appendChild(tx);
     });
@@ -233,7 +233,7 @@
       var tw = self.tip.offsetWidth, px = cx * (self.wrap.clientWidth / W);
       var left = px + 14; if (left + tw > self.wrap.clientWidth - 4) left = px - tw - 14;
       self.tip.style.left = Math.max(4, left) + 'px';
-      self.tip.style.top = '10px';
+      self.tip.style.top = '4px';
       highlightCol(i);
     }
     function hide() {

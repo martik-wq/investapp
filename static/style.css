@@ -1,13 +1,9 @@
 :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--mute:#6b7585;--line:#e3e7ee;--acc:#1f5eff;--neg:#c62828;--pos:#1b7a3d}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
-header.top{background:#101828;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:24px}
-header.top a{color:#fff;text-decoration:none;font-weight:600}
-header.top form{margin-left:auto;display:flex;gap:8px}
 input,select,button{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
 button{background:var(--acc);color:#fff;border-color:var(--acc);cursor:pointer}
 button.ghost{background:#fff;color:var(--acc)}
-main{max-width:1200px;margin:0 auto;padding:24px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px}
 h1{margin:0 0 4px;font-size:26px}h2{margin:0 0 12px;font-size:18px}h3{margin:18px 0 6px;font-size:14px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
 .sub{color:var(--mute);margin-bottom:12px}
@@ -48,12 +44,58 @@ canvas{max-height:260px}
 .key{display:inline-block;width:14px;height:3px;border-radius:2px;flex:none}
 .cwrap{position:relative}
 .cwrap svg{display:block;width:100%;height:auto;touch-action:pan-y}
-text.ax{font-size:11px;fill:#52514e}
-.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.14);padding:8px 10px;min-width:190px;max-width:300px;font-size:13px;z-index:5}
+text.ax{font-size:10px;fill:#52514e}
+.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.14);padding:8px 10px;min-width:170px;max-width:260px;font-size:12px;z-index:5}
 .tip .th{font-weight:700;margin-bottom:4px}.tip .td{color:var(--mute);font-weight:400;margin-left:8px;font-size:12px}
 .tip .tr{display:flex;gap:8px;align-items:flex-start;margin-top:6px}.tip .tr .key{margin-top:7px}
-.tip .tl strong{font-size:15px}.tip .tn{color:#52514e}.tip .tc{color:#52514e;font-size:12px}
+.tip .tl strong{font-size:14px}.tip .tn{color:#52514e}.tip .tc{color:#52514e;font-size:12px}
 .ttable td,.ttable th{font-size:13px}.ttable tr.sec td{background:#f3f5f9;font-weight:700;text-align:left;color:#3b4656}
 .ttable tr.chg td{color:#6b7585;font-size:12px;border-bottom-color:#f0f2f6}
 .ttable td.hl,.ttable th.hl{background:#eaf0ff}
 .ttable td.neg{color:var(--neg)}
+
+/* ---- layout s bočným panelom ---- */
+.app{display:flex;min-height:100vh}
+.side{width:250px;flex:none;background:#101828;color:#d5dbe6;padding:16px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.side .brand{color:#fff;text-decoration:none;font-weight:700;font-size:16px}
+.sideSearch{display:flex;gap:6px}
+.sideSearch input{flex:1;min-width:0;background:#1b2538;border-color:#2a3650;color:#fff;padding:7px 9px}
+.sideSearch input::placeholder{color:#8b96ab}
+.sideSearch button{padding:6px 10px;background:#1f5eff}
+.coBox{border-top:1px solid #243049;padding-top:12px}
+.coTick{font-size:20px;font-weight:800;color:#fff;letter-spacing:.02em}
+.coName{font-size:12px;color:#9fb0cc;margin-top:2px}
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav a{color:#d5dbe6;text-decoration:none;padding:9px 10px;border-radius:8px;font-size:14px;display:flex;gap:9px;align-items:center}
+.nav a:hover{background:#1b2538}
+.nav a.on{background:#1f5eff;color:#fff;font-weight:600}
+.nav .ic{width:20px;text-align:center}
+.recentBox{margin-top:auto;border-top:1px solid #243049;padding-top:12px}
+.sideH{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8b96ab;margin-bottom:6px}
+.recent{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.recent a{color:#c3cde0;text-decoration:none;padding:4px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent a:hover{background:#1b2538}.recent a b{color:#fff}
+.recent.empty{color:#7b869b}
+.content{flex:1;min-width:0;max-width:1400px;padding:22px 26px}
+.pagehead{margin-bottom:14px}.pagehead h1{margin:0}
+.toolbar{margin:0}
+.grid2{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1.4fr);gap:18px;align-items:start}
+.bigprice{font-size:38px;font-weight:800;line-height:1.1}.bigprice .cur{font-size:15px;color:var(--mute);font-weight:600}
+.chg{font-weight:600;margin:2px 0 4px}.chg.up{color:var(--pos)}.chg.down{color:var(--neg)}
+table.facts{width:100%;margin-top:10px;font-size:14px}
+table.facts td{text-align:left;white-space:normal;position:static;background:none;padding:5px 4px;border-bottom:1px solid var(--line)}
+table.facts td:first-child{color:var(--mute);width:42%;min-width:0}
+table.facts td:last-child{text-align:right}
+table.plain th,table.plain td{text-align:left;position:static}
+.desc{font-size:14px;margin:0 0 6px;max-height:11.5em;overflow:auto}
+.card.empty{text-align:center;padding:60px 20px;color:var(--mute)}
+@media(max-width:900px){.app{flex-direction:column}.side{position:static;width:auto;height:auto}.grid2{grid-template-columns:1fr}.content{padding:14px}}
+
+/* ---- kompaktné grafy v mriežke ---- */
+#trend-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px;margin-bottom:6px}
+#trend-charts .tcard{margin:0;padding:10px 12px}
+#trend-charts .ttitle{font-size:13px;margin-bottom:6px}
+#trend-charts .chips{gap:4px;margin-bottom:4px}
+#trend-charts .chip{font-size:11.5px;padding:2px 8px;gap:5px}
+#trend-charts .key{width:11px}
+@media(max-width:560px){#trend-charts{grid-template-columns:1fr}}

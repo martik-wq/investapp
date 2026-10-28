@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import warnings %}
+{% block title %}{{ comp.ticker }} – Grafy{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Grafy <span class="badge">{{ comp.ticker }}</span></h1>
+  <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong></div>
+</div>
+<div class="card">
+  {% with show = ['years','type'] %}{% include "_toolbar.html" %}{% endwith %}
+</div>
+{{ warnings(built, n_req, mode, quote) }}
+{% if trend %}
+<div class="card" id="trends">
+  <div class="controls" style="margin-bottom:10px">
+    <label>Obdobie<div class="seg" id="trend-mode"></div></label>
+    <label>Typ grafu<div class="seg" id="trend-kind"></div></label>
+    <span class="note">Klikni na položky nad grafom (max. 4 naraz). Prejdi kurzorom nad graf a uvidíš hodnotu a zmenu oproti predchádzajúcemu obdobiu a oproti minulému roku.</span>
+  </div>
+  <div id="trend-charts"></div>
+  <h3>Tabuľka vývoja (zľava doprava od najstaršieho obdobia)</h3>
+  <div id="trend-table"></div>
+</div>
+<script type="application/json" id="trend-data">{{ trend|tojson }}</script>
+<script src="{{ url_for('static', filename='trends.js') }}"></script>
+{% else %}
+<div class="warn">Pre túto firmu sa nepodarilo vytvoriť grafy (chýbajú údaje vo výkazoch).</div>
+{% endif %}
+{% endblock %}

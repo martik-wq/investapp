@@ -196,7 +196,9 @@ def build_democo():
     }
     facts = {"cik": 9000001, "entityName": "Demo Software Inc.", "facts": f.f}
     subs = {"name": "Demo Software Inc.", "sic": "7372",
-            "sicDescription": "Services-Prepackaged Software", "tickers": ["DEMOCO"]}
+            "sicDescription": "Services-Prepackaged Software", "tickers": ["DEMOCO"],
+            "exchanges": ["Nasdaq"], "fiscalYearEnd": "1231",
+            "addresses": {"business": {"city": "Demo City", "stateOrCountryDescription": "Fiktívny štát"}}}
     return facts, subs, truth
 
 
@@ -261,7 +263,8 @@ def build_demobank():
              "assets": assets}
     facts = {"cik": 9000002, "entityName": "Demo Bank Corp.", "facts": f.f}
     subs = {"name": "Demo Bank Corp.", "sic": "6022",
-            "sicDescription": "State Commercial Banks", "tickers": ["DEMOBANK"]}
+            "sicDescription": "State Commercial Banks", "tickers": ["DEMOBANK"],
+            "exchanges": ["NYSE"], "fiscalYearEnd": "1231"}
     return facts, subs, truth
 
 

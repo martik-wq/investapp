@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stmt_table, warnings %}
+{% block title %}{{ comp.ticker }} – Výkazy{% endblock %}
+{% block content %}
+{% set ends = built.display|reverse|list %}
+<div class="pagehead">
+  <h1>Výkazy <span class="badge">{{ comp.ticker }}</span></h1>
+  <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong>{% if typ == 'auto' %} (určený automaticky){% endif %}{% if comp.is_demo %} · <strong>fiktívne ukážkové dáta</strong>{% endif %}</div>
+</div>
+<div class="card">
+  {% with show = ['mode','years','type','price','export'] %}{% include "_toolbar.html" %}{% endwith %}
+  {% if mode=='quarterly' %}
+  <p class="note" style="margin-bottom:0">Kvartálny režim: výkazy ukazujú samostatné kvartály (štvrtý kvartál sa dopočíta ako rok − 9 mesiacov), metriky sú počítané z posledných 12 mesiacov (TTM).</p>
+  {% endif %}
+</div>
+{{ warnings(built, n_req, mode, quote) }}
+<div class="card">
+  <div class="tabs">
+    <button class="on" data-t="income">Výkaz ziskov a strát</button>
+    <button data-t="balance">Súvaha</button>
+    <button data-t="cashflow">Cash flow</button>
+    <button data-t="metrics">Metriky</button>
+  </div>
+  <div class="pane on" id="p-income">{{ stmt_table(stm.income, ends, built.currency) }}</div>
+  <div class="pane" id="p-balance">{{ stmt_table(stm.balance, ends, built.currency) }}</div>
+  <div class="pane" id="p-cashflow">
+    {{ stmt_table(stm.cashflow, ends, built.currency) }}
+    <p class="note">Výdavky (CapEx, dividendy, odkupy, splátky dlhu) sú uvedené ako kladné čísla tak, ako ich vykazuje firma.</p>
+  </div>
+  <div class="pane" id="p-metrics">
+    {% for g in result.groups %}
+      <h3>{{ g.title }}</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th></th>{% for e in ends %}<th>{{ e.strftime('%d.%m.%Y') }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for r in g.rows %}
+          <tr><td>{{ r.label }}{% if r.note %}<span class="info" title="{{ r.note }}">ⓘ</span>{% endif %}</td>
+            {% for e in ends %}{% set v = r.vals[e] %}
+              <td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|fmt(r.fmt) }}</td>
+            {% endfor %}</tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    {% endfor %}
+    <p class="note">Metriky využívajú priemerné zostatky (začiatok a koniec obdobia) tam, kde je to zvykom. Ak chýba predchádzajúce obdobie alebo vstupný údaj, zobrazí sa „–“.</p>
+  </div>
+</div>
+{% if val %}
+<div class="card">
+  <h2>Valuácia pri cene {{ '%.2f'|format(price_used) }} {{ built.currency }}</h2>
+  <div class="kpis">
+    {% for l, v, f in val['items'] %}
+      <div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v|fmt(f) }}</div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+<p class="note">Zdroj: SEC EDGAR (XBRL companyfacts), dáta sa cachujú 24 hodín. Nejde o investičné odporúčanie. Údaje sú automaticky mapované z XBRL tagov, pri dôležitých rozhodnutiach ich porovnaj s originálnym podaním (10-K / 10-Q / 20-F).</p>
+<script>
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
+});
+</script>
+{% endblock %}
