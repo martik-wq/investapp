@@ -87,6 +87,21 @@ check("quarterly: TTM rast tržieb", close(idq["rev_g"]["vals"][date(2026, 6, 30
 vq = metrics.valuation(comp, bq, resq, 50.0)
 check("quarterly: valuácia funguje", vq is not None)
 
+# --- TTM záznamy z 10-Q nesmú znečistiť ročné ani kvartálne údaje
+check("annual: všetky obdobia sú konce fiškálneho roka",
+      all(e.month == 12 and e.day == 31 for e in built["display"]), built["display"])
+check("annual: čistý zisk bez TTM", all(
+    close(d["net_income"].get(y(yr)), truth["ni_fy"][yr]) for yr in range(2019, 2026)))
+ni_q = {k: v for k, v in zip(range(0), [])}
+check("quarterly: čistý zisk Q2 2024 je samostatný kvartál (nie TTM)",
+      dq["net_income"].get(date(2024, 6, 30)) is not None and
+      dq["net_income"][date(2024, 6, 30)] < truth["ni_fy"][2024] * 0.5,
+      dq["net_income"].get(date(2024, 6, 30)))
+check("quarterly: čistý zisk Q4 2024 = FY − 9M",
+      close(dq["net_income"].get(date(2024, 12, 31)),
+            truth["ni_fy"][2024] - sum(dq["net_income"][date(2024, m, 30 if m in (6, 9) else 31)]
+                                       for m in (3, 6, 9))))
+
 # ---------------------------------------------------------------- DEMOBANK
 mb, _ = edgar.find_company("DEMOBANK")
 cb = edgar.load_company(*mb)

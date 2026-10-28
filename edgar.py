@@ -213,28 +213,38 @@ def _annual(m):
     return {e: v for (s, e), v in m.items() if 340 <= (e - s).days <= 390}
 
 
-def _quarters(m, additive=True):
-    """Samostatné kvartály. Ak 10-Q uvádza len kumulatívne (6M, 9M) alebo
-    ročné hodnoty, kvartál sa dopočíta odčítaním predchádzajúceho kumulatívu."""
+def _is_fy(e):
+    """Záznam pochádza z ročného výkazu (10-K, 20-F, 40-F), nie z 10-Q."""
+    return e.get("fp") == "FY" or str(e.get("form", "")).startswith(("10-K", "20-F", "40-F"))
+
+
+def _quarters(m, fy, additive=True):
+    """Samostatné kvartály. Ak 10-Q uvádza len kumulatívne (6M, 9M) hodnoty,
+    kvartál sa dopočíta odčítaním; štvrtý kvartál = rok − 9M. 12-mesačné (TTM)
+    hodnoty z 10-Q sa ignorujú."""
     q = {}
     for (s, e), v in m.items():
         if 80 <= (e - s).days <= 100:
             q[e] = v
     if not additive:
         # vážený priemer akcií sa neodčítava; pre Q4 použijeme ročnú hodnotu
-        for (s, e), v in m.items():
+        for (s, e), v in fy.items():
             if 340 <= (e - s).days <= 390 and e not in q:
                 q[e] = v
         return q
+    cands = dict(fy)
     for (s, e), v in m.items():
+        d = (e - s).days
+        if 170 <= d <= 195 or 260 <= d <= 285:
+            cands[(s, e)] = v
+    for (s, e), v in cands.items():
         if e in q:
             continue
         d = (e - s).days
-        if 170 <= d <= 195 or 260 <= d <= 285 or 340 <= d <= 390:
-            for (s2, e2), v2 in m.items():
-                if s2 == s and 80 <= (e - e2).days <= 100 and (e2 - s2).days < d:
-                    q[e] = v - v2
-                    break
+        for (s2, e2), v2 in m.items():
+            if s2 == s and 80 <= (e - e2).days <= 100 and (e2 - s2).days < d:
+                q[e] = v - v2
+                break
     return q
 
 
@@ -255,7 +265,8 @@ def item_series(facts, item, mode, cur):
             continue
         if item["kind"] == "flow":
             m = _flow_map(ents)
-            s = _annual(m) if mode == "annual" else _quarters(m, item["additive"])
+            fy = _flow_map([e for e in ents if _is_fy(e)])
+            s = _annual(fy) if mode == "annual" else _quarters(m, fy, item["additive"])
         else:
             s = _instant_map(ents)
         for k, v in s.items():

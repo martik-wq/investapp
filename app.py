@@ -69,7 +69,7 @@ SECTIONS = [
     ("technical", "Technická analýza", "📉"),
 ]
 SECTION_KEYS = {k for k, _, _ in SECTIONS}
-YEARS_OPTIONS = (5, 8, 10, 15, 20)
+YEARS_OPTIONS = (5, 8, 10, 15, 20, 30)  # 30 = všetko dostupné
 
 DEMO_PROFILES = {
     "DEMOCO": {
@@ -162,14 +162,14 @@ def build_context(ticker, section):
     val = metrics.valuation(comp, built, result, price)
     ctx.update(comp=comp, built=built, auto_type=auto_type, btype=btype, result=result,
                val=val, quote=quote, price_used=price, user_price=user_price,
-               n_req=n, name=comp["name"])
+               n_req=0 if p["years"] == 30 else n, name=comp["name"])
     if section == "overview":
         profile = DEMO_PROFILES.get(match[0]) if is_demo else prices.get_profile(match[0])
         ctx["profile"] = profile
     elif section == "statements":
         ctx["stm"] = statements.all_statements(built)
     elif section == "charts":
-        ctx["trend"] = trends.build_trends(comp, btype, p["mode"], p["years"])
+        ctx["trend"] = trends.build_trends(comp, btype, p["mode"], min(p["years"], 20))
     return ctx
 
 

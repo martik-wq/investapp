@@ -2,20 +2,20 @@
 <form method="get" class="controls toolbar">
   {% if 'mode' in show %}
   <label>Obdobie
-    <select name="mode">
+    <select name="mode" onchange="this.form.submit()">
       <option value="annual" {{ 'selected' if mode=='annual' }}>Ročné</option>
       <option value="quarterly" {{ 'selected' if mode=='quarterly' }}>Kvartálne</option>
     </select></label>
   {% endif %}
   {% if 'years' in show %}
   <label>História
-    <select name="years">
-      {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ y }} rokov</option>{% endfor %}
+    <select name="years" onchange="this.form.submit()">
+      {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ 'Všetko dostupné' if y == 30 else y ~ ' rokov' }}</option>{% endfor %}
     </select></label>
   {% endif %}
   {% if 'type' in show %}
   <label>Typ biznisu
-    <select name="type">
+    <select name="type" onchange="this.form.submit()">
       <option value="auto" {{ 'selected' if typ=='auto' }}>Automaticky ({{ types[auto_type] }})</option>
       {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
     </select></label>

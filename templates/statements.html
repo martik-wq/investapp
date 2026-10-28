@@ -15,12 +15,19 @@
 </div>
 {{ warnings(built, n_req, mode, quote) }}
 <div class="card">
+  <div class="tabsrow">
   <div class="tabs">
     <button class="on" data-t="income">Výkaz ziskov a strát</button>
     <button data-t="balance">Súvaha</button>
     <button data-t="cashflow">Cash flow</button>
     <button data-t="metrics">Metriky</button>
   </div>
+  <div class="scrollbtns">
+    <button type="button" class="ghost" data-scroll="-1" title="Novšie obdobia">◀ Novšie</button>
+    <button type="button" class="ghost" data-scroll="1" title="Staršie obdobia">Staršie ▶</button>
+  </div>
+  </div>
+  <p class="note" style="margin:0 0 8px">Tabuľku môžeš posúvať do strán: ťahaním myšou, tlačidlami vpravo, Shift + kolieskom alebo posuvníkom pod tabuľkou. Naľavo sú najnovšie obdobia, doprava sa dostaneš k starším. Viac rokov nastavíš v poli História.</p>
   <div class="pane on" id="p-income">{{ stmt_table(stm.income, ends, built.currency) }}</div>
   <div class="pane" id="p-balance">{{ stmt_table(stm.balance, ends, built.currency) }}</div>
   <div class="pane" id="p-cashflow">

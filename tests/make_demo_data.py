@@ -7,7 +7,7 @@ a firma v čase mení XBRL tag pre tržby.
 """
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "demo_data")
@@ -138,6 +138,20 @@ def build_democo():
     f.flow("IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", pretax)
     f.flow("IncomeTaxExpenseBenefit", tax)
     f.flow("NetIncomeLoss", ni)
+    # 10-Q niektorých firiem (napr. Amazon) uvádzajú aj 12-mesačné (TTM) hodnoty
+    pk = list(all_periods())
+    for i, (y, q) in enumerate(pk):
+        if i >= 3 and q < 4:
+            e = qrange(y, q)[1]
+            f._put("us-gaap", "NetIncomeLoss", "USD", Facts._rec(
+                sum(ni[k] for k in pk[i - 3:i + 1]), e, filed(y, q), "10-Q",
+                date(e.year - 1, e.month, e.day) + timedelta(days=1), f"Q{q}"))
+    for i, (y, q) in enumerate(pk):
+        if i >= 3 and q < 4:
+            e = qrange(y, q)[1]
+            f._put("us-gaap", "NetCashProvidedByUsedInOperatingActivities", "USD", Facts._rec(
+                sum(cfo[k] for k in pk[i - 3:i + 1]), e, filed(y, q), "10-Q",
+                date(e.year - 1, e.month, e.day) + timedelta(days=1), f"Q{q}"))
     f.flow("EarningsPerShareDiluted", eps, unit="USD/shares")
     f.flow("WeightedAverageNumberOfDilutedSharesOutstanding", shares, unit="shares",
            agg="avg")
