@@ -4,7 +4,7 @@
   if (!el) return;
   var D = JSON.parse(el.textContent);
   var CUR = D.currency;
-  var COLORS = ['#f26a1b', '#334155', '#f5a524', '#9a3412', '#94a3b8', '#b45309', '#64748b', '#fbbf77'];
+  var COLORS = ['#c4570f', '#334155', '#d99a2b', '#9a3412', '#94a3b8', '#b45309', '#64748b', '#e0a96f'];
   var NS = 'http://www.w3.org/2000/svg';
   var mode = D.start, kind = 'bar';
   var selected = {money: new Set(D.defaults.money || []), pct: new Set(D.defaults.pct || []),

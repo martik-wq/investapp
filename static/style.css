@@ -1,4 +1,4 @@
-:root{--bg:#fffaf5;--card:#fff;--ink:#1c2430;--mute:#7a7268;--line:#f0e6dc;--acc:#f26a1b;--acc2:#d9560b;--tint:#fff1e6;--neg:#c62828;--pos:#1b7a3d}
+:root{--bg:#fffaf5;--card:#fff;--ink:#1c2430;--mute:#7a7268;--line:#f0e6dc;--acc:#c4570f;--acc2:#9c420a;--tint:#fbeee2;--neg:#c62828;--pos:#1b7a3d}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
 input,select,button{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
@@ -32,7 +32,7 @@ canvas{max-height:260px}
 .sample a{margin-right:10px}
 .info{cursor:help;color:var(--mute);margin-left:4px}
 /* ---- vývoj v čase ---- */
-:root{--surface:#fcfcfb;--grid:#f0e8df;--axis:#9aa3b2;--muted:#8a93a3;--hover:rgba(242,106,27,.08)}
+:root{--surface:#fcfcfb;--grid:#f0e8df;--axis:#9aa3b2;--muted:#8a93a3;--hover:rgba(196,87,15,.08)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .segbtn{background:#fff;color:var(--ink);border:0;border-radius:0;padding:6px 14px}
 .segbtn.on{background:var(--acc);color:#fff}
@@ -51,7 +51,7 @@ text.ax{font-size:10px;fill:#52514e}
 .tip .tl strong{font-size:14px}.tip .tn{color:#52514e}.tip .tc{color:#52514e;font-size:12px}
 .ttable td,.ttable th{font-size:13px}.ttable tr.sec td{background:#fff6ee;font-weight:700;text-align:left;color:#3b4656}
 .ttable tr.chg td{color:#6b7585;font-size:12px;border-bottom-color:#f0f2f6}
-.ttable td.hl,.ttable th.hl{background:#fff1e6}
+.ttable td.hl,.ttable th.hl{background:#fbeee2}
 .ttable td.neg{color:var(--neg)}
 
 /* ---- layout s bočným panelom ---- */
@@ -163,7 +163,7 @@ body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prv
 .pfk .s{font-size:12.5px;margin-top:2px}.up{color:var(--pos)}.down{color:var(--neg)}
 .alloc{display:flex;flex-direction:column;gap:5px}
 .arow{display:grid;grid-template-columns:130px 1fr 150px;gap:10px;align-items:center;font-size:13px}
-.arow .bar{height:14px;background:#eef1f6;border-radius:7px;overflow:hidden}.arow .bar i{display:block;height:100%;background:#f2822b;border-radius:7px}
+.arow .bar{height:14px;background:#eef1f6;border-radius:7px;overflow:hidden}.arow .bar i{display:block;height:100%;background:#cf6f25;border-radius:7px}
 .arow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arow .vv{text-align:right;color:#3b4656;font-variant-numeric:tabular-nums}
 table.sortable th{cursor:pointer;user-select:none}table.sortable th:after{content:"";margin-left:4px;color:#9aa3b2}
 table.sortable th.asc:after{content:"▲"}table.sortable th.desc:after{content:"▼"}
@@ -197,9 +197,9 @@ h2{font-weight:700;letter-spacing:-.01em;font-size:18px}
 h3{color:var(--acc2)}
 a{color:var(--acc2)}
 input,select,button{border-radius:10px;border:1px solid var(--line);transition:border-color .18s var(--ease),box-shadow .18s var(--ease),background .18s var(--ease),color .18s var(--ease),transform .12s var(--ease)}
-input:focus,select:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 3px rgba(242,106,27,.16)}
-button{background:linear-gradient(180deg,#f57a2e,var(--acc));border-color:var(--acc);font-weight:600;box-shadow:0 1px 2px rgba(217,86,11,.25)}
-button:hover{background:linear-gradient(180deg,#f26a1b,var(--acc2))}
+input:focus,select:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 3px rgba(196,87,15,.16)}
+button{background:linear-gradient(180deg,#cf6417,var(--acc));border-color:var(--acc);font-weight:600;box-shadow:0 1px 2px rgba(156,66,10,.25)}
+button:hover{background:linear-gradient(180deg,#c4570f,var(--acc2))}
 button:active{transform:translateY(1px)}
 button.ghost,.segbtn,.periodsw button,.tabs button{background:#fff;color:var(--acc2);box-shadow:none}
 button.ghost:hover,.segbtn:hover,.periodsw button:hover,.tabs button:hover{background:var(--tint)}
@@ -207,15 +207,15 @@ button.ghost:hover,.segbtn:hover,.periodsw button:hover,.tabs button:hover{backg
 .card{padding:20px 22px}
 .tcard{background:#fff}
 .kpi,.pfk{transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s var(--ease)}
-.kpi:hover,.pfk:hover,.tcard:hover{border-color:#f7cfae;box-shadow:0 2px 4px rgba(80,50,20,.05),0 10px 28px rgba(242,106,27,.10)}
+.kpi:hover,.pfk:hover,.tcard:hover{border-color:#e9c4a3;box-shadow:0 2px 4px rgba(80,50,20,.05),0 10px 28px rgba(196,87,15,.10)}
 .kpi .l,.pfk .l{letter-spacing:.01em}
 .segbtn.on,.periodsw button.on,.tabs button.on,.modeSw a.on{background:var(--acc);color:#fff;border-color:var(--acc);box-shadow:none}
-.seg,.modeSw,.periodsw{border-radius:10px;border-color:#f3d7bd;background:#fff}
+.seg,.modeSw,.periodsw{border-radius:10px;border-color:#ecd2bb;background:#fff}
 .modeSw a{color:var(--acc2);transition:background .18s var(--ease)}.modeSw a:hover{background:var(--tint)}
 .chip{border-color:var(--line);transition:all .15s var(--ease)}
-.chip.on{border-color:#f3b88d;background:#fffaf5}
+.chip.on{border-color:#e6b38a;background:#fffaf5}
 table{font-size:14px}
-thead th{background:#fffaf5;color:#8a6a4f;font-weight:600;border-bottom:1px solid #f3d7bd}
+thead th{background:#fffaf5;color:#8a6a4f;font-weight:600;border-bottom:1px solid #ecd2bb}
 th,td{border-bottom:1px solid #f6efe7}
 tbody tr{transition:background .12s var(--ease)}
 tbody tr:hover td{background:#fffaf5}
@@ -227,14 +227,14 @@ tr.hdr td{color:var(--acc2);font-weight:700}
 .warn{background:#fff6e8;border-color:#fcd9a8;color:#7a4300;border-radius:12px}
 .okmsg{border-radius:12px}
 .err{border-radius:12px}
-.drop{border-color:#f3b88d;background:#fffaf5;border-radius:var(--r)}
+.drop{border-color:#e6b38a;background:#fffaf5;border-radius:var(--r)}
 .note,.sub{color:var(--mute)}
 .tip{border-radius:12px;border-color:#f3e1d0;box-shadow:0 10px 30px rgba(80,50,20,.16)}
 .cmp{border:1px solid #f7e3d0;border-radius:10px}
 .pftabs{border-bottom-color:#f3e1d0}
 .pftabs a{transition:color .15s var(--ease),border-color .15s var(--ease)}.pftabs a:hover{color:var(--acc2)}
-.ftile .fnum{color:#fde6d3}
-.arow .bar{background:#fff1e6}.arow .bar i{background:linear-gradient(90deg,#f7a062,var(--acc))}
+.ftile .fnum{color:#f5e3d3}
+.arow .bar{background:#fbeee2}.arow .bar i{background:linear-gradient(90deg,#dc8a52,var(--acc))}
 .linkbtn{color:#a58b74}.linkbtn:hover{color:var(--acc2)}
 .danger{color:#c62828;border-color:#efc2bf;background:#fff}
 

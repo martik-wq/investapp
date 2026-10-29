@@ -8,7 +8,7 @@
   var tip = document.getElementById('perf-tip');
   var N = D.dates.length;
   var days = D.dates.map(function (d) { return Date.parse(d + 'T00:00:00Z') / 864e5; });
-  var series = [{id: 'portfolio', label: 'Moje portfólio', color: '#f26a1b', width: 2.8, values: D.portfolio, on: true}]
+  var series = [{id: 'portfolio', label: 'Moje portfólio', color: '#c4570f', width: 2.8, values: D.portfolio, on: true}]
     .concat(D.bench.map(function (b) { return {id: b.id, label: b.label, color: b.color, width: 1.8, values: b.values, on: true}; }));
   var period = 'ytd', s0 = 0, s1 = N - 1;
 
