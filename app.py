@@ -79,7 +79,7 @@ app.jinja_env.filters["spct"] = signed_pct
 def signed_pp(v):
     if v is None:
         return "–"
-    return f"{'+' if v >= 0 else '−'}{abs(v) * 100:.1f} p. b.".replace(".", ",")
+    return f"{'+' if v >= 0 else '−'}{abs(v) * 100:.1f}".replace(".", ",") + " p. b."
 
 
 app.jinja_env.filters["samt"] = signed_amt
