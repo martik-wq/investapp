@@ -189,6 +189,91 @@ check("quarterly detail: aktíva na konci každého kvartálu",
 check("quarterly detail: priemerný počet akcií sa neodčítava",
       all(v in (None, 101e6) for v in getq("income", "Diluted")["vals"].values()))
 
+# ------------------------------------------------ tok od tržieb k zisku (Sankey)
+import flow  # noqa: E402
+
+
+def conserved(fl):
+    for n in fl["nodes"]:
+        inn = sum(l["v"] for l in fl["links"] if l["t"] == n["id"])
+        out = sum(l["v"] for l in fl["links"] if l["s"] == n["id"])
+        tol = 1e-6 * max(1, n["value"]) + 1
+        if inn and abs(inn - n["value"]) > tol:
+            return f"vstup {n['id']} {inn} != {n['value']}"
+        if out and abs(out - n["value"]) > tol:
+            return f"výstup {n['id']} {out} != {n['value']}"
+    return None
+
+
+def fake_built(rows, currency="USD"):
+    e1, e0 = date(2025, 12, 31), date(2024, 12, 31)
+    data = {k: {e0: v[0], e1: v[1]} for k, v in rows.items()}
+    return {"data": data, "ends": [e0, e1], "display": [e0, e1], "currency": currency}
+
+
+b_ok = statements.build(comp, "annual", 8)
+fl_ok = flow.build_flow(b_ok, b_ok["display"][-1], "tech")
+check("flow: uzly aj prepojenia sa zachovávajú (tech)", conserved(fl_ok) is None, conserved(fl_ok))
+ids = {n["id"] for n in fl_ok["nodes"]}
+check("flow: tržby, hrubý zisk, prevádzkový zisk, čistý zisk, dane", {"revenue", "gp", "oi", "ni", "tax"} <= ids)
+check("flow: tri kľúčové čísla", len(fl_ok["tiles"]) == 3)
+check("flow: rast tržieb 12 %", abs(fl_ok["tiles"][0]["value"] - 0.12) < 1e-6)
+
+streams = [{"label": "A", "value": 500e6, "prev": 450e6}, {"label": "B", "value": 289.5e6, "prev": 250e6}]
+fl_s = flow.build_flow(b_ok, b_ok["display"][-1], "tech", streams)
+check("flow: členenie tržieb sa pridá a súčty sedia", any(n["id"] == "stream0" for n in fl_s["nodes"])
+      and conserved(fl_s) is None, conserved(fl_s))
+fl_bad = flow.build_flow(b_ok, b_ok["display"][-1], "tech", [{"label": "A", "value": 1e6, "prev": None},
+                                                             {"label": "B", "value": 2e6, "prev": None}])
+check("flow: členenie, ktoré nesedí s tržbami, sa ignoruje", not any(n["id"].startswith("stream") for n in fl_bad["nodes"]))
+
+# strata: prevádzková aj čistá
+loss = fake_built({"revenue": (80e6, 100e6), "cost_of_revenue": (50e6, 60e6), "gross_profit": (30e6, 40e6),
+                   "rnd": (40e6, 45e6), "sga": (30e6, 30e6), "op_income": (-40e6, -35e6),
+                   "tax": (1e6, 1e6), "net_income": (-45e6, -38e6)})
+fl_l = flow.build_flow(loss, loss["display"][-1], "general")
+check("flow: strata - bez uzla zisku, zachované súčty", fl_l and not any(n["id"] in ("oi", "ni") for n in fl_l["nodes"])
+      and any(n["id"] == "loss" for n in fl_l["nodes"]) and conserved(fl_l) is None, conserved(fl_l) if fl_l else None)
+check("flow: strata - poznámka o strate", fl_l and "strata" in fl_l["note"].lower())
+# ostatné výnosy: čistý zisk vyšší ako prevádzkový
+oth = fake_built({"revenue": (900e6, 1000e6), "cost_of_revenue": (500e6, 500e6), "gross_profit": (400e6, 500e6),
+                  "rnd": (100e6, 100e6), "sga": (100e6, 100e6), "op_income": (200e6, 300e6),
+                  "tax": (40e6, 60e6), "net_income": (260e6, 380e6)})
+fl_o = flow.build_flow(oth, oth["display"][-1], "general")
+check("flow: ostatné výnosy sú zdroj a súčty sedia", fl_o and any(n["id"] == "other_inc" for n in fl_o["nodes"])
+      and conserved(fl_o) is None, conserved(fl_o) if fl_o else None)
+# bez nákladov na tržby (napr. REIT): tržby -> prevádzkový zisk / náklady
+nogp = fake_built({"revenue": (400e6, 500e6), "op_income": (100e6, 150e6), "tax": (5e6, 8e6),
+                   "net_income": (80e6, 120e6)})
+fl_n = flow.build_flow(nogp, nogp["display"][-1], "reit")
+check("flow: bez hrubého zisku", fl_n and not any(n["id"] == "gp" for n in fl_n["nodes"]) and conserved(fl_n) is None,
+      conserved(fl_n) if fl_n else None)
+check("flow: bez tržieb sa nič nevyrobí", flow.build_flow(fake_built({"net_income": (1e6, 2e6)}),
+                                                         date(2025, 12, 31), "general") is None)
+b_bank = statements.build(cb, "annual", 8)
+fl_b = flow.build_flow(b_bank, b_bank["display"][-1], "bank")
+check("flow: banka - úroky, čisté výnosy, rezervy, čistý zisk", fl_b and {"int_income", "net_rev", "prov", "ni", "tax"}
+      <= {n["id"] for n in fl_b["nodes"]} and conserved(fl_b) is None, conserved(fl_b) if fl_b else None)
+
+# členenie tržieb z podaní (poznámka aj výkaz, Q4 dopočítané)
+rev25 = sum(mf.quarter(2025, q)["rev"] for q in range(1, 5))
+bd12 = filings.revenue_breakdown(dc, date(2025, 12, 31), 12, rev25)
+check("členenie tržieb 12M z poznámky (3 položky)", bd12 and [i["label"] for i in bd12] ==
+      ["Subscriptions", "Licenses", "Support and services"], bd12)
+bd_q3 = filings.revenue_breakdown(dc, date(2025, 9, 30), 3, mf.quarter(2025, 3)["rev"])
+check("členenie tržieb Q3 z 10-Q", bd_q3 and abs(sum(i["value"] for i in bd_q3) - mf.quarter(2025, 3)["rev"]) < 3e3)
+bd_q4 = filings.revenue_breakdown(dc, date(2025, 12, 31), 3, mf.quarter(2025, 4)["rev"],
+                                  rev25, sum(mf.quarter(2025, q)["rev"] for q in range(1, 4)))
+check("členenie tržieb Q4 = rok − 9M", bd_q4 and abs(sum(i["value"] for i in bd_q4) - mf.quarter(2025, 4)["rev"]) < 3e3
+      and abs(bd_q4[0]["value"] - 0.55 * mf.quarter(2025, 4)["rev"]) < 3e3, bd_q4)
+check("členenie tržieb: medziročná predchádzajúca hodnota", bd_q3 and all(i["prev"] for i in bd_q3))
+check("členenie tržieb: nesprávny celkový súčet sa odmietne",
+      filings.revenue_breakdown(dc, date(2025, 12, 31), 12, rev25 * 3) is None)
+face = filings.extract_breakdown(filings.load_filing(dc, filings.list_filings(dc["filings"], filings.ANNUAL_FORMS)[0])["income"],
+                                 date(2025, 12, 31), 12, rev25)
+check("členenie tržieb priamo z výkazu (tovar a služby)", face and [i["label"] for i in face["items"]] ==
+      ["Net product sales", "Net service sales"])
+
 # ------------------------------------------------------- rozhranie (Flask klient)
 import app as appmod  # noqa: E402
 
@@ -218,6 +303,10 @@ dh = cl.get("/company/DEMOCO/statements?detail=1").get_data(as_text=True)
 check("podrobné výkazy v stránke", "Net product sales" in dh and "Net service sales" in dh)
 check("banka bez podaní: zrozumiteľná chyba a zjednodušené údaje",
       "Zobrazujem zjednodušené údaje" in cl.get("/company/DEMOBANK/statements?detail=1").get_data(as_text=True))
+chh = cl.get("/company/DEMOCO/charts").get_data(as_text=True)
+check("grafy: Sankey diagram a výber obdobia", 'id="flow-data"' in chh and 'id="flow-period"' in chh and "Subscriptions" in chh)
+chq = cl.get("/company/DEMOCO/charts?mode=quarterly&flow=2025-12-31").get_data(as_text=True)
+check("grafy: kvartálny Sankey (Q4)", 'id="flow-data"' in chq and "Licenses" in chq)
 check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)

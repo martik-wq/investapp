@@ -10,6 +10,27 @@
   {% with show = ['years','type'] %}{% include "_toolbar.html" %}{% endwith %}
 </div>
 {{ warnings(built, n_req, mode, quote) }}
+{% if flow %}
+<div class="card" id="flowcard">
+  <div class="flowhead">
+    <h2>Od tržieb k zisku</h2>
+    <label>Obdobie
+      <select id="flow-period">
+        {% for iso, lab in flow_opts %}<option value="{{ iso }}" {{ 'selected' if iso == flow_end }}>{{ lab }}</option>{% endfor %}
+      </select></label>
+  </div>
+  <div class="sub">{{ comp.name }} · obdobie končiace {{ flow.end }} · medziročné zmeny sú voči rovnakému obdobiu vlani</div>
+  <div class="legend"><span><i style="background:#4f8df5"></i>Tržby</span><span><i style="background:#3db07f"></i>Zisk</span><span><i style="background:#e8564f"></i>Náklady</span></div>
+  <div id="sankey" class="sankey"><div id="sankey-tip" class="tip" style="display:none"></div></div>
+  <h3>3 najdôležitejšie čísla</h3>
+  <div id="flow-tiles" class="ftiles"></div>
+  {% if flow.note %}<p class="note">{{ flow.note }}</p>{% endif %}
+  {% if not flow.has_streams and btype != 'bank' %}<p class="note">Členenie tržieb podľa produktov sa v podaniach tejto firmy za zvolené obdobie nenašlo, preto sú tržby jedným prúdom.</p>{% endif %}
+  <p class="note">Hodnoty sú z výkazov firmy, drobné rozdiely v súčtoch môže spôsobovať zaokrúhľovanie. „Ostatné náklady (netto)“ zahŕňajú neprevádzkové položky, napríklad úroky a ostatné výnosy a náklady. Nejde o investičné odporúčanie.</p>
+</div>
+<script type="application/json" id="flow-data">{{ flow|tojson }}</script>
+<script src="{{ url_for('static', filename='sankey.js') }}"></script>
+{% endif %}
 {% if trend %}
 <div class="card" id="trends">
   <div class="controls" style="margin-bottom:10px">

@@ -123,26 +123,62 @@ def classify(short_name):
     return None
 
 
-def parse_filing_summary(xml_text):
-    """{'income': 'R4.htm', 'balance': 'R2.htm', 'cashflow': 'R8.htm'}"""
-    out = {}
+def _reports(xml_text):
+    """Zoznam stránok podania: [(poloha, názov, súbor, kategória)] podľa polohy."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
-        return out
-    reports = []
+        return []
+    out = []
     for rep in root.iter("Report"):
         g = lambda tag: (rep.findtext(tag) or "").strip()  # noqa: E731
-        reports.append((int(g("Position") or 9999), g("ShortName"), g("HtmlFileName"),
-                        g("MenuCategory")))
-    reports.sort()
-    for _, short, fname, cat in reports:
+        try:
+            pos = int(g("Position") or 9999)
+        except ValueError:
+            pos = 9999
+        out.append((pos, g("ShortName"), g("HtmlFileName"), g("MenuCategory")))
+    out.sort()
+    return out
+
+
+def parse_filing_summary(xml_text):
+    """{'income': 'R4.htm', 'balance': 'R2.htm', 'cashflow': 'R8.htm'}"""
+    out = {}
+    for _, short, fname, cat in _reports(xml_text):
         if cat and cat.lower() != "statements":
             continue
         kind = classify(short)
         if kind and kind not in out and fname:
             out[kind] = fname
     return out
+
+
+DETAIL_GOOD = (("disaggregat", 3), ("revenue by", 3), ("by product", 2), ("product", 2),
+               ("service", 2), ("type", 2), ("revenue", 1), ("net sales", 1), ("sales", 1),
+               ("segment", 1))
+DETAIL_BAD = ("concentration", "allowance", "contract balance", "remaining performance",
+              "deferred revenue", "unbilled", "receivable", "lease", "tax", "per share",
+              "stock", "debt", "fair value", "goodwill", "intangible", "acquisition")
+GEO_RE = re.compile(r"geograph|region|countr|international|domestic|united states|by location",
+                    re.I)
+
+
+def detail_pages(xml_text, limit=8):
+    """Stránky „(Details)“ o tržbách, od najpravdepodobnejších: [(súbor, názov, geo)]."""
+    scored = []
+    for _, short, fname, cat in _reports(xml_text):
+        if not fname or cat.lower() not in ("details", "tables"):
+            continue
+        low = short.lower()
+        if "detail" not in low or any(b in low for b in DETAIL_BAD):
+            continue
+        sc = sum(w for k, w in DETAIL_GOOD if k in low)
+        if sc <= 0:
+            continue
+        geo = bool(GEO_RE.search(low))
+        scored.append((sc - (3 if geo else 0), fname, short, geo))
+    scored.sort(key=lambda x: -x[0])
+    return [(f, s, g) for _, f, s, g in scored[:limit]]
 
 
 # ------------------------------------------------------------- parser tabuľky
@@ -512,3 +548,174 @@ def get_detailed(company, mode, years):
     for k in KINDS:
         out[k] = _build_statement(k, by_kind[k], mode, display) or []
     return out
+
+
+# ------------------------------------------------- členenie tržieb (streams)
+MEMBER_RE = re.compile(r"\s*\[(Member|Axis|Domain|Line Items|Abstract|Table)\]\s*$", re.I)
+
+
+def _clean_label(label):
+    return MEMBER_RE.sub("", label).strip()
+
+
+REV_LABEL_RE = re.compile(r"revenue|sales|\bnet sales\b|turnover", re.I)
+COST_LABEL_RE = re.compile(r"cost|expense|deferred|unearned", re.I)
+
+
+def _col_index(rep, end, months, tol=5):
+    best = None
+    for i, c in enumerate(rep["cols"]):
+        if c["months"] != months:
+            continue
+        d = abs((c["end"] - end).days)
+        if d <= tol and (best is None or d < best[0]):
+            best = (d, i)
+    return best[1] if best else None
+
+
+def _expand(rows, idx, depth=0):
+    """Ak je riadok `idx` súčtom riadkov nad ním, nahradí ho jeho zložkami."""
+    label, v, pv = rows[idx]
+    if depth < 3 and v and v > 0:
+        acc, parts = 0.0, []
+        for j in range(idx - 1, -1, -1):
+            acc += rows[j][1]
+            parts.append(j)
+            if len(parts) >= 2 and abs(acc - v) <= 0.003 * abs(v):
+                out = []
+                for k in sorted(parts):
+                    out += _expand(rows, k, depth + 1)
+                return out
+            if len(parts) > 12:
+                break
+    return [(label, v, pv)]
+
+
+def extract_breakdown(rep, end, months, expected_total=None, tol=0.012):
+    """Členenie tržieb zo stránky výkazu/poznámky: riadky, ktorých súčet sedí s
+    riadkom „Total“. Vráti {'items':[{'label','value','prev'}], 'total'} alebo None."""
+    ci = _col_index(rep, end, months)
+    if ci is None:
+        return None
+    pi = _col_index(rep, date(end.year - 1, end.month, min(end.day, 28)), months, tol=12)
+    rows = []
+    for r in rep["rows"]:
+        if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
+            continue
+        rows.append((_clean_label(r["label"]), r["vals"][ci],
+                     r["vals"][pi] if pi is not None else None))
+    best = None
+    for t, (lab, v, pv) in enumerate(rows):
+        if v <= 0 or t < 2:
+            continue
+        if expected_total:
+            if abs(v - expected_total) > tol * abs(expected_total):
+                continue
+        elif not REV_LABEL_RE.search(lab) or COST_LABEL_RE.search(lab):
+            continue  # bez očakávaných tržieb musí „súčet“ vyzerať ako tržby
+        acc, parts = 0.0, []
+        for j in range(t - 1, -1, -1):
+            acc += rows[j][1]
+            parts.append(j)
+            if len(parts) >= 2 and abs(acc - v) <= 0.003 * abs(v):
+                items = []
+                for k in sorted(parts):
+                    items += _expand(rows, k)
+                if len(items) >= 2 and (best is None or len(items) > len(best["items"])):
+                    best = {"items": [{"label": a, "value": b, "prev": c}
+                                      for a, b, c in items],
+                            "total": v, "total_prev": pv, "total_label": lab}
+                break
+            if len(parts) > 14:
+                break
+    return best
+
+
+def _filing_candidates(company, filing, end, months, expected_total):
+    """Všetky nájdené členenia tržieb v jednom podaní (výkaz + poznámky)."""
+    summary = fetch_text(company, filing["acc"], "FilingSummary.xml")
+    if not summary:
+        return []
+    pages = []
+    stm = parse_filing_summary(summary)
+    if stm.get("income"):
+        pages.append((stm["income"], "výkaz", False))
+    pages += [(f, s, g) for f, s, g in detail_pages(summary)]
+    out = []
+    for fname, short, geo in pages:
+        html = fetch_text(company, filing["acc"], fname)
+        if not html:
+            continue
+        try:
+            rep = parse_report(html)
+        except Exception:  # noqa: BLE001
+            continue
+        if not rep:
+            continue
+        bd = extract_breakdown(rep, end, months, expected_total)
+        if bd:
+            bd["geo"], bd["page"] = geo, short
+            out.append(bd)
+    return out
+
+
+def _best(cands):
+    if not cands:
+        return None
+    return sorted(cands, key=lambda c: (c["geo"], -min(len(c["items"]), 9)))[0]
+
+
+def _near_date(f, d, tol=8):
+    try:
+        y, m, dd = (int(x) for x in f["report_date"].split("-"))
+    except (ValueError, AttributeError):
+        return False
+    return abs((date(y, m, dd) - d).days) <= tol
+
+
+def revenue_breakdown(company, end, months, expected_total, expected_fy=None, expected_9m=None):
+    """Členenie tržieb za obdobie končiace `end` (months = 3 alebo 12).
+    Vráti [{'label','value','prev'}] alebo None. Q4 sa dopočíta ako rok − 9M."""
+    recent = company.get("filings") or {}
+    if not recent:
+        return None
+    allf = list_filings(recent, ANNUAL_FORMS | QUARTERLY_FORMS)
+    direct = [f for f in allf if _near_date(f, end)]
+    if months == 12:
+        k = [f for f in direct if f["form"] in ANNUAL_FORMS]
+        best = _best(_filing_candidates(company, k[0], end, 12, expected_total)) if k else None
+        return best["items"] if best else None
+    q = [f for f in direct if f["form"] in QUARTERLY_FORMS]
+    if q:
+        best = _best(_filing_candidates(company, q[0], end, 3, expected_total))
+        return best["items"] if best else None
+    k = [f for f in direct if f["form"] in ANNUAL_FORMS]
+    if not k:
+        return None
+    q3_end = end - timedelta(days=91)
+    q3 = [f for f in allf if f["form"] in QUARTERLY_FORMS and _near_date(f, q3_end, 12)]
+    if not q3:
+        return None
+    q3_date = date(*(int(x) for x in q3[0]["report_date"].split("-")))
+    fy = _filing_candidates(company, k[0], end, 12, expected_fy)
+    nine = _filing_candidates(company, q3[0], q3_date, 9, expected_9m)
+    best = None
+    for a in fy:
+        for b in nine:
+            ma = {_norm(i["label"]): i for i in a["items"]}
+            mb = {_norm(i["label"]): i for i in b["items"]}
+            if set(ma) != set(mb) or len(ma) < 2:
+                continue
+            items = []
+            for key, ia in ma.items():
+                ib = mb[key]
+                prev = (ia["prev"] - ib["prev"]) if ia["prev"] is not None and ib["prev"] is not None \
+                    else None
+                items.append({"label": ia["label"], "value": ia["value"] - ib["value"], "prev": prev})
+            total = sum(i["value"] for i in items)
+            if expected_total and abs(total - expected_total) > 0.015 * abs(expected_total):
+                continue
+            cand = {"items": items, "geo": a["geo"]}
+            if best is None or (cand["geo"], -len(items)) < (best["geo"], -len(best["items"])):
+                best = cand
+    return best["items"] if best else None

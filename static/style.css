@@ -110,3 +110,20 @@ table.plain th,table.plain td{text-align:left;position:static}
 
 tr.hdr td{text-align:left;background:#f6f7f9;color:#3b4656;font-size:13px;padding-top:9px}
 body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prvom načítaní sťahujú zo SEC, môže to trvať aj minútu)";position:fixed;inset:0;background:rgba(255,255,255,.82);display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:18px;font-weight:600;color:#1c2430;z-index:99}
+
+/* ---- Sankey ---- */
+.flowhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.flowhead h2{margin:0}.flowhead label{display:flex;flex-direction:column;font-size:12px;color:var(--mute);gap:3px}
+.legend{display:flex;gap:16px;font-size:13px;margin:8px 0 2px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.sankey{position:relative;overflow-x:auto}
+.sankey svg{display:block}
+.sk-lbl{paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+.sk-node{cursor:default}.sk-link{transition:fill-opacity .1s}
+.sankey .tip .tt{font-weight:700;margin-bottom:2px}
+.ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.ftile{position:relative;border:1px solid var(--line);border-radius:12px;padding:12px 14px 14px;background:#fff;text-align:center;overflow:hidden}
+.ftile .fnum{position:absolute;left:12px;top:6px;font-size:54px;font-weight:800;color:#e1e5ec;line-height:1}
+.ftile .flabel{font-size:14px;font-weight:600;position:relative}
+.ftile .fval{font-size:34px;font-weight:800;position:relative;margin-top:4px}
+.ftile .fval.up{color:var(--pos)}.ftile .fval.down{color:var(--neg)}

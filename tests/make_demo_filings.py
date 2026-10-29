@@ -16,21 +16,20 @@ FIRST_YEAR, LAST_Q = 2021, (2026, 2)
 
 # ------------------------------------------------------------------ čísla
 def quarter(y, q):
-    """Výsledky jedného kvartálu v dolároch."""
+    """Výsledky jedného kvartálu v dolároch (rovnaké pomery ako v DEMOCO companyfacts)."""
     w = W[q - 1]
-    prod = 120e6 * 1.10 ** (y - FIRST_YEAR) * w
-    serv = 80e6 * 1.15 ** (y - FIRST_YEAR) * w
-    rev = prod + serv
-    cogs = 0.45 * prod + 0.20 * serv
+    rev = 400e6 * 1.12 ** (y - 2019) * w
+    prod, serv = 0.6 * rev, 0.4 * rev
+    cogs = 0.35 * rev
     gross = rev - cogs
-    rnd, sm, ga = 0.12 * rev, 0.15 * rev, 0.06 * rev
+    rnd, sm, ga = 0.22 * rev, 0.15 * rev, 0.10 * rev
     opex = rnd + sm + ga
     opinc = gross - opex
     intexp = 1.5e6
     pretax = opinc - intexp
     tax = 0.21 * pretax
     ni = pretax - tax
-    da, sbc = 0.04 * rev, 0.05 * rev
+    da, sbc = 0.04 * rev, 0.06 * rev
     d_ar, d_inv, d_ap = -0.02 * rev, -0.01 * rev, 0.015 * rev
     cfo = ni + da + sbc + d_ar + d_inv + d_ap
     capex = -0.05 * rev
@@ -227,6 +226,21 @@ def balance_rows(cols):
 
 
 # ------------------------------------------------------------------ podania
+def revenue_detail_rows(cols):
+    """Členenie tržieb podľa typu (poznámka „Revenue (Details)“)."""
+    def val(y, q, m):
+        return quarter(y, q) if m == 3 else ytd(y, q)
+
+    rev = [val(y, q, m)["rev"] for (y, q, m) in cols]
+    return [
+        ("Revenue from External Customers by Type [Axis]", "us-gaap_RevenuesAbstract", None, 0, 0),
+        ("Subscriptions [Member]", "us-gaap_Revenues", [0.55 * r for r in rev], True, 0),
+        ("Licenses [Member]", "us-gaap_Revenues", [0.25 * r for r in rev], False, 0),
+        ("Support and services [Member]", "us-gaap_Revenues", [0.20 * r for r in rev], False, 0),
+        ("Total revenues", "us-gaap_Revenues", rev, False, 0),
+    ]
+
+
 def summary_xml(order):
     """order = [(R-súbor, názov, kategória)] v poradí zobrazenia."""
     parts = ['<?xml version="1.0" encoding="utf-8"?><FilingSummary><Version>3.25.1</Version>'
@@ -261,6 +275,9 @@ def make_10k(root, acc, fy):
         [("12 Months Ended", dates)],
         [("Net income", "us-gaap_NetIncomeLoss", [quarter(y, 4)["ni"] for y, _, _ in cols],
           True, 0)]))
+    write(root, acc, "R7.htm", report_html(
+        "Revenue (Details)", "$ in Thousands", [("12 Months Ended", dates)],
+        revenue_detail_rows(cols)))
     bcols = cols[:2]
     write(root, acc, "R4.htm", report_html(
         "CONSOLIDATED BALANCE SHEETS", "$ in Thousands",
@@ -298,6 +315,8 @@ def make_10q(root, acc, y, q):
     write(root, acc, "R4.htm", report_html(
         "CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS", "$ in Thousands",
         groups, income_rows(cols)))
+    write(root, acc, "R8.htm", report_html(
+        "Revenue (Details)", "$ in Thousands", groups, revenue_detail_rows(cols)))
     cfc = [(y, q, 3 * q), (y - 1, q, 3 * q)]
     write(root, acc, "R7.htm", report_html(
         "CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS", "$ in Thousands",
@@ -308,7 +327,8 @@ def make_10q(root, acc, y, q):
         ("R3.htm", "CONDENSED CONSOLIDATED BALANCE SHEETS (Parenthetical)", "Statements"),
         ("R4.htm", "CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS", "Statements"),
         ("R5.htm", "CONDENSED CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME", "Statements"),
-        ("R7.htm", "CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS", "Statements")]))
+        ("R7.htm", "CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS", "Statements"),
+        ("R8.htm", "Revenue (Details)", "Details")]))
 
 
 def generate(root):

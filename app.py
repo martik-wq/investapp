@@ -10,6 +10,7 @@ from flask import Flask, Response, abort, redirect, render_template, request, ur
 
 import edgar
 import filings
+import flow
 import metrics
 import prices
 import trends
@@ -136,6 +137,37 @@ def _qs(p):
     return q
 
 
+def _flow_streams(comp, built, end, btype, mode):
+    """Členenie tržieb z podaní (alebo None). Chyby nikdy nezhodia stránku."""
+    if btype == "bank":
+        return None
+    rev = built["data"].get("revenue", {})
+    total = rev.get(end)
+    if not total:
+        return None
+    try:
+        if mode == "annual":
+            return filings.revenue_breakdown(comp, end, 12, total)
+        qends = [e for e in built["ends"] if e <= end][-4:]
+        fy = nine = None
+        if len(qends) == 4 and 250 <= (qends[-1] - qends[0]).days <= 290 \
+                and all(rev.get(e) for e in qends):
+            fy = sum(rev[e] for e in qends)
+            nine = sum(rev[e] for e in qends[:3])
+        return filings.revenue_breakdown(comp, end, 3, total, fy, nine)
+    except Exception:  # noqa: BLE001 - členenie je doplnok, nie nutnosť
+        return None
+
+
+def _flow_options(built, mode):
+    out = []
+    for e in reversed(built["display"]):
+        lab = (f"Rok {e.year}" if mode == "annual" else
+               f"Q{(e.month - 1) // 3 + 1} {e.year}") + f" ({e.strftime('%d.%m.%Y')})"
+        out.append((e.isoformat(), lab))
+    return out
+
+
 def build_context(ticker, section):
     p = _params()
     match, _ = edgar.find_company(ticker)
@@ -179,6 +211,16 @@ def build_context(ticker, section):
                 ctx["det_error"] = str(e)
     elif section == "charts":
         ctx["trend"] = trends.build_trends(comp, btype, p["mode"], min(p["years"], 20))
+        opts = _flow_options(built, p["mode"])
+        chosen = request.args.get("flow", "")
+        flow_end = next((e for e in built["display"] if e.isoformat() == chosen),
+                        built["display"][-1])
+        streams = _flow_streams(comp, built, flow_end, btype, p["mode"])
+        fl = flow.build_flow(built, flow_end, btype, streams)
+        if fl:
+            fl["has_streams"] = any(n["id"].startswith("stream") or n["id"] == "int_income"
+                                    for n in fl["nodes"])
+        ctx.update(flow=fl, flow_opts=opts, flow_end=flow_end.isoformat())
     return ctx
 
 

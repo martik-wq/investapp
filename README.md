@@ -62,3 +62,10 @@ alebo podrobné (riadky presne ako ich firma uvádza v podaniach, napr. tržby z
 Podrobné výkazy sa čítajú zo stránok R*.htm v podaniach SEC (`filings.py`), kvartály sa dopočítavajú
 (Q4 = rok − 9M, cash flow = rozdiely kumulatívnych hodnôt). Podania sa cachujú natrvalo v `cache/filings/`.
 Kvartálne podrobné údaje sú obmedzené na 5 rokov, ročné na 12.
+
+## Od tržieb k zisku (Sankey diagram)
+
+V záložke Grafy je diagram toku od tržieb cez náklady až po čistý zisk (`flow.py`, `static/sankey.js`).
+Základ tvoria štandardizované výkazy, členenie tržieb (podľa produktov/služieb) sa hľadá v podaniach SEC:
+vo výkaze alebo v poznámkach „(Details)“, vždy len ak súčet položiek sedí s celkovými tržbami.
+Q4 sa dopočíta ako rok − 9M. Banky majú vlastné rozloženie (úroky, rezervy, neúrokové náklady).
