@@ -337,6 +337,7 @@ check("grafy: Sankey diagram a výber obdobia", 'id="flow-data"' in chh and 'id=
 chq = cl.get("/company/DEMOCO/charts?mode=quarterly&flow=2025-12-31").get_data(as_text=True)
 check("grafy: viditeľný prepínač Ročne/Kvartálne pri diagrame", 'class="modeSw"' in chh and "mode=quarterly" in chh
       and 'name="mode"' in chh)
+check("grafy: návod na porovnanie dvoch období", "Klikni v grafe na dve obdobia" in chh and "trends.js" in chh)
 check("grafy: kvartálny Sankey (Q4)", 'id="flow-data"' in chq and "Licencie" in chq)
 check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")

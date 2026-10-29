@@ -20,6 +20,7 @@
   var root = document.getElementById('trend-charts');
   var tableBox = document.getElementById('trend-table');
   var charts = [];
+  var pick = {a: null, b: null};   // vybrané obdobia na porovnanie (indexy)
 
   function h(tag, cls, text) {
     var n = document.createElement(tag);
@@ -69,6 +70,28 @@
     return v.toLocaleString('sk-SK', {maximumFractionDigits: 2});
   }
 
+  function pctTxt(g) { return (g >= 0 ? '+' : '−') + Math.abs(g * 100).toFixed(1).replace('.', ',') + ' %'; }
+
+  /* výber dvoch období: klik na prvé, klik na druhé -> rast medzi nimi */
+  function onPick(i) {
+    if (pick.a == null) pick.a = i;
+    else if (pick.b == null) { if (i === pick.a) { pick.a = null; } else pick.b = i; }
+    else { pick.a = i; pick.b = null; }
+    refreshPick();
+  }
+  function clearPick() { pick.a = null; pick.b = null; refreshPick(); }
+  function refreshPick() {
+    charts.forEach(function (c) { c.draw(); });
+    markPick();
+  }
+  function markPick() {
+    var cells = tableBox.querySelectorAll('[data-i]');
+    for (var k = 0; k < cells.length; k++) {
+      var i = +cells[k].dataset.i;
+      cells[k].classList.toggle('pk', i === pick.a || i === pick.b);
+    }
+  }
+
   /* ---------------------------------------------------------- jeden graf */
   function Chart(group) {
     var self = this;
@@ -77,6 +100,8 @@
     this.card.appendChild(h('h3', 'ttitle', group.title));
     this.chips = h('div', 'chips');
     this.card.appendChild(this.chips);
+    this.cmp = h('div', 'cmp');
+    this.card.appendChild(this.cmp);
     this.wrap = h('div', 'cwrap');
     this.card.appendChild(this.wrap);
     this.tip = h('div', 'tip');
@@ -121,6 +146,57 @@
     });
     this.draw();
   };
+  Chart.prototype.renderCmp = function () {
+    var d = D[mode], box = this.cmp, self = this;
+    box.textContent = '';
+    if (!d || pick.a == null) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+    var all = (this.sel || []);
+    if (pick.b == null) {
+      box.appendChild(h('span', null, 'Vybrané obdobie: ' + d.labels[pick.a] +
+        '. Klikni v grafe na druhé obdobie a zobrazí sa rast medzi nimi.'));
+      var x0 = h('button', 'cmpx', 'Zrušiť výber'); x0.type = 'button'; x0.onclick = clearPick;
+      box.appendChild(x0);
+      return;
+    }
+    var i0 = Math.min(pick.a, pick.b), i1 = Math.max(pick.a, pick.b), steps = i1 - i0;
+    var years = d.lag === 1 ? steps : steps / 4;
+    var head = h('div', 'cmph');
+    head.appendChild(h('strong', null, 'Porovnanie ' + d.labels[i0] + ' → ' + d.labels[i1] +
+      ' (' + (d.lag === 1 ? steps + (steps === 1 ? ' rok' : steps < 5 ? ' roky' : ' rokov')
+        : steps + (steps === 1 ? ' kvartál' : steps < 5 ? ' kvartály' : ' kvartálov')) + ')'));
+    var x = h('button', 'cmpx', 'Zrušiť výber'); x.type = 'button'; x.onclick = clearPick;
+    head.appendChild(x);
+    box.appendChild(head);
+    all.forEach(function (sr) {
+      var a = sr.values[i0], b = sr.values[i1];
+      var row = h('div', 'cmpr');
+      var key = h('span', 'key'); key.style.background = self.color(sr.id); row.appendChild(key);
+      row.appendChild(h('span', 'cmpn', sr.label + ': '));
+      row.appendChild(h('span', null, fmt(a, sr.group) + ' → ' + fmt(b, sr.group) + '  '));
+      var res;
+      if (a == null || b == null) res = h('strong', null, 'chýbajú údaje');
+      else if (sr.group === 'pct') {
+        var pp = (b - a) * 100;
+        res = h('strong', pp >= 0 ? 'up' : 'down', (pp >= 0 ? '+' : '−') + Math.abs(pp).toFixed(1).replace('.', ',') + ' p. b.');
+      } else if (a > 0) {
+        var g = b / a - 1;
+        res = h('strong', g >= 0 ? 'up' : 'down', pctTxt(g));
+      } else {
+        res = h('strong', 'muted', 'zmena v % nejde vypočítať (základ ≤ 0)');
+      }
+      row.appendChild(res);
+      if (a != null && b != null && a > 0 && b > 0 && sr.group !== 'pct' && years >= 1) {
+        var cg = Math.pow(b / a, 1 / years) - 1;
+        row.appendChild(h('span', 'cmpc', '  · priemerne ' + pctTxt(cg) + ' ročne'));
+      }
+      box.appendChild(row);
+    });
+  };
+
   Chart.prototype.draw = function () {
     var self = this, d = D[mode];
     if (!d) return;
@@ -152,6 +228,15 @@
       var tx = s('text', {x: L + band * (i + 0.5), y: H - 9, 'text-anchor': 'middle', class: 'ax'});
       tx.textContent = lb;
       svg.appendChild(tx);
+    });
+    [pick.a, pick.b].forEach(function (pi, k) {
+      if (pi == null || pi >= n) return;
+      svg.appendChild(s('rect', {x: L + band * pi, y: T, width: band, height: H - T - B,
+        fill: 'rgba(245,166,35,.18)', stroke: 'rgba(245,166,35,.7)', 'stroke-width': 1}));
+      var tag = s('text', {x: L + band * (pi + 0.5), y: T + 10, 'text-anchor': 'middle', class: 'ax',
+        'font-weight': 700, fill: '#8a5a00'});
+      tag.textContent = (pick.a != null && pick.b != null) ? (pi === Math.min(pick.a, pick.b) ? 'Od' : 'Do') : 'Od';
+      svg.appendChild(tag);
     });
     var hov = s('rect', {y: T, height: H - T - B, width: band, fill: 'var(--hover)', opacity: 0});
     svg.appendChild(hov);
@@ -243,6 +328,9 @@
     hit.addEventListener('pointermove', function (ev) { show(at(ev)); });
     hit.addEventListener('pointerleave', hide);
     hit.addEventListener('pointerdown', function (ev) { show(at(ev)); });
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('click', function (ev) { onPick(at(ev)); });
+    this.renderCmp();
   };
 
   /* -------------------------------------------------------------- tabuľka */
@@ -283,6 +371,7 @@
       });
     });
     t.appendChild(tb); wrap.appendChild(t); tableBox.appendChild(wrap);
+    markPick();
     t.addEventListener('pointerover', function (ev) {
       var c = ev.target.closest('[data-i]'); highlightCol(c ? +c.dataset.i : -1);
     });
@@ -314,7 +403,7 @@
   if (D.annual) opts.push(['annual', 'Ročne']);
   if (D.quarterly) opts.push(['quarterly', 'Kvartálne']);
   seg(modeBox, opts, function () { return mode; }, function (v) {
-    mode = v; charts.forEach(function (c) { c.render(); }); buildTable();
+    mode = v; pick = {a: null, b: null}; charts.forEach(function (c) { c.render(); }); buildTable();
   });
   seg(kindBox, [['bar', 'Stĺpce'], ['line', 'Čiary']], function () { return kind; }, function (v) {
     kind = v; charts.forEach(function (c) { c.draw(); });
