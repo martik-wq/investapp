@@ -391,6 +391,8 @@ def build_positions(txns):
     if mism:
         warnings.append("Pri " + ", ".join(sorted(mism)) + " sa mena obchodu nezhoduje s menou "
                         "pozície, suma môže byť nepresná.")
+    # spin-off, ktorý sa hneď predal, je len zisk z predaja (hodnota akcií = výnos); varuj len pri držaných
+    spin = [x for x in spin if any((q["ticker"] or q["isin"]) == x and q["shares"] > 1e-6 for q in pos.values())]
     if spin:
         warnings.append("Spin-off (" + ", ".join(sorted(set(spin))) + "): nová pozícia má nulovú "
                         "nákupnú cenu, jej zisk je preto nadhodnotený. Pôvodná cena patrí čiastočne "
