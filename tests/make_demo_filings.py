@@ -21,6 +21,7 @@ def quarter(y, q):
     rev = 400e6 * 1.12 ** (y - 2019) * w
     prod, serv = 0.6 * rev, 0.4 * rev
     cogs = 0.35 * rev
+    cogs_p, cogs_s = 0.20 * rev, 0.15 * rev
     gross = rev - cogs
     rnd, sm, ga = 0.22 * rev, 0.15 * rev, 0.10 * rev
     opex = rnd + sm + ga
@@ -34,7 +35,7 @@ def quarter(y, q):
     cfo = ni + da + sbc + d_ar + d_inv + d_ap
     capex = -0.05 * rev
     div, buy = -0.10 * ni, -0.20 * ni
-    return dict(prod=prod, serv=serv, rev=rev, cogs=cogs, gross=gross, rnd=rnd, sm=sm, ga=ga,
+    return dict(prod=prod, serv=serv, rev=rev, cogs=cogs, cogs_p=cogs_p, cogs_s=cogs_s, gross=gross, rnd=rnd, sm=sm, ga=ga,
                 opex=opex, opinc=opinc, intexp=intexp, pretax=pretax, tax=tax, ni=ni,
                 da=da, sbc=sbc, d_ar=d_ar, d_inv=d_inv, d_ap=d_ap, cfo=cfo, capex=capex,
                 cfi=capex, div=div, buy=buy, cff=div + buy, net_change=cfo + capex + div + buy)
@@ -140,7 +141,10 @@ def income_rows(cols):
         ("Net service sales", "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
          g("serv"), False, 0),
         ("Total net sales", "us-gaap_Revenues", g("rev"), False, 0),
-        ("Cost of sales", "us-gaap_CostOfRevenue", g("cogs"), False, 0),
+        ("Cost of sales:", "us-gaap_CostOfRevenue", None, 0, 0),
+        ("Products", "us-gaap_CostOfRevenue", g("cogs_p"), False, 0),
+        ("Services", "us-gaap_CostOfRevenue", g("cogs_s"), False, 0),
+        ("Total cost of sales", "us-gaap_CostOfRevenue", g("cogs"), False, 0),
         ("Gross profit", "us-gaap_GrossProfit", g("gross"), False, 0),
         ("Operating expenses:", "us-gaap_OperatingExpenses", None, 0, 0),
         ("Research and development", "us-gaap_ResearchAndDevelopmentExpense", g("rnd"), False, 0),

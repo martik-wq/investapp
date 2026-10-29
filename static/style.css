@@ -127,3 +127,7 @@ body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prv
 .ftile .flabel{font-size:14px;font-weight:600;position:relative}
 .ftile .fval{font-size:34px;font-weight:800;position:relative;margin-top:4px}
 .ftile .fval.up{color:var(--pos)}.ftile .fval.down{color:var(--neg)}
+
+.sankey .tip{min-width:210px;max-width:340px}
+.sankey .tip .th2{margin-top:6px;font-weight:700;color:#3b4656}
+.sankey .tip .li{padding-left:8px;color:#1c2430}

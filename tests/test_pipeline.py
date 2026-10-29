@@ -274,6 +274,35 @@ face = filings.extract_breakdown(filings.load_filing(dc, filings.list_filings(dc
 check("členenie tržieb priamo z výkazu (tovar a služby)", face and [i["label"] for i in face["items"]] ==
       ["Net product sales", "Net service sales"])
 
+# rozpis nákladov z výkazu firmy
+ob = statements.build(dc, "annual", 8)
+opx, cgs = flow.cost_targets(ob["data"], date(2025, 12, 31))
+oi = filings.cost_components(dc, date(2025, 12, 31), 12, opx)
+check("náklady: prevádzkové náklady z výkazu (3 položky)", oi and [i["label"] for i in oi] ==
+      ["Research and development", "Sales and marketing", "General and administrative"], oi)
+ci = filings.cost_components(dc, date(2025, 12, 31), 12, cgs)
+check("náklady: náklady na tržby (produkty, služby)", ci and [i["label"] for i in ci] == ["Products", "Services"], ci)
+qb = statements.build(dc, "quarterly", 12)
+qe = [e for e in qb["ends"] if e <= date(2025, 12, 31)][-4:]
+tq = [flow.cost_targets(qb["data"], e) for e in qe]
+oq4 = filings.cost_components(dc, date(2025, 12, 31), 3, tq[3][0], sum(x[0] for x in tq), sum(x[0] for x in tq[:3]))
+check("náklady: Q4 prevádzkových nákladov = rok − 9M", oq4 and abs(sum(i["value"] for i in oq4) - tq[3][0]) < 5e3
+      and len(oq4) == 3, oq4)
+check("náklady: odmietne zlý cieľový súčet", filings.cost_components(dc, date(2025, 12, 31), 12, opx * 2) is None)
+fl_c = flow.build_flow(ob, date(2025, 12, 31), "tech", None, oi, ci)
+check("flow: presné položky nákladov v diagrame (slovensky)", fl_c and {"opex_0", "opex_1", "opex_2", "cogs_0", "cogs_1"}
+      <= {n["id"] for n in fl_c["nodes"]} and conserved(fl_c) is None, conserved(fl_c) if fl_c else None)
+check("flow: preklad názvov", {n["label"] for n in fl_c["nodes"]} >= {"Výskum a vývoj", "Predaj a marketing", "Správna réžia",
+                                                                       "Náklady na produkty", "Náklady na služby"}
+      or {"Výskum a vývoj", "Predaj a marketing", "Správna réžia"} <= {n["label"] for n in fl_c["nodes"]},
+      [n["label"] for n in fl_c["nodes"]])
+check("flow: nesprávny súčet položiek sa ignoruje (štandardné členenie)",
+      not any(n["id"].startswith("opex_") and n["id"][5:].isdigit() for n in
+              flow.build_flow(ob, date(2025, 12, 31), "tech", None, [{"label": "x", "value": 1e6, "prev": None},
+                                                                      {"label": "y", "value": 2e6, "prev": None}])["nodes"]))
+check("sk(): preklady", flow.sk("Research and development") == "Výskum a vývoj" and flow.sk("Marketing and sales") ==
+      "Predaj a marketing" and flow.sk("Something unusual") == "Something unusual")
+
 # ------------------------------------------------------- rozhranie (Flask klient)
 import app as appmod  # noqa: E402
 
@@ -304,9 +333,9 @@ check("podrobné výkazy v stránke", "Net product sales" in dh and "Net service
 check("banka bez podaní: zrozumiteľná chyba a zjednodušené údaje",
       "Zobrazujem zjednodušené údaje" in cl.get("/company/DEMOBANK/statements?detail=1").get_data(as_text=True))
 chh = cl.get("/company/DEMOCO/charts").get_data(as_text=True)
-check("grafy: Sankey diagram a výber obdobia", 'id="flow-data"' in chh and 'id="flow-period"' in chh and "Subscriptions" in chh)
+check("grafy: Sankey diagram a výber obdobia", 'id="flow-data"' in chh and 'id="flow-period"' in chh and "Predplatn" in chh)
 chq = cl.get("/company/DEMOCO/charts?mode=quarterly&flow=2025-12-31").get_data(as_text=True)
-check("grafy: kvartálny Sankey (Q4)", 'id="flow-data"' in chq and "Licenses" in chq)
+check("grafy: kvartálny Sankey (Q4)", 'id="flow-data"' in chq and "Licencie" in chq)
 check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)

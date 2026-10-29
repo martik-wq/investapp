@@ -631,6 +631,66 @@ def extract_breakdown(rep, end, months, expected_total=None, tol=0.012):
     return best
 
 
+def extract_window(rep, end, months, target, tol=0.004):
+    """Súvislý úsek riadkov výkazu, ktorých súčet sedí s `target` (napr. prevádzkové
+    náklady). Podsúčty sa rozpadnú na zložky. Vráti {'items': [...]} alebo None."""
+    ci = _col_index(rep, end, months)
+    if ci is None or not target or target <= 0:
+        return None
+    pi = _col_index(rep, date(end.year - 1, end.month, min(end.day, 28)), months, tol=12)
+    rows = []
+    for r in rep["rows"]:
+        if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
+            continue
+        rows.append((_clean_label(r["label"]), r["vals"][ci],
+                     r["vals"][pi] if pi is not None else None))
+    cands = []
+    for i in range(len(rows)):
+        acc = 0.0
+        for j in range(i, len(rows)):
+            if rows[j][1] <= 0:
+                break
+            acc += rows[j][1]
+            if j > i and abs(acc - target) <= tol * target:
+                cands.append((i, j))
+                break
+            if acc > target * 1.01:
+                break
+    cands.sort(key=lambda c: -(c[1] - c[0]))
+    for i, j in cands:
+        items = []
+        for k in range(i, j + 1):
+            items += _expand(rows, k)
+        keys = [_norm(a) for a, _b, _c in items]
+        if len(items) >= 2 and len(set(keys)) == len(keys):  # bez zdvojených (súčet + zložky)
+            return {"items": [{"label": a, "value": b, "prev": c} for a, b, c in items]}
+    return None
+
+
+def _income_window_candidates(company, filing, end, months, target):
+    """Kandidáti na rozpis nákladov z výkazu ziskov a strát jedného podania."""
+    summary = fetch_text(company, filing["acc"], "FilingSummary.xml")
+    if not summary:
+        return []
+    fname = parse_filing_summary(summary).get("income")
+    if not fname:
+        return []
+    html = fetch_text(company, filing["acc"], fname)
+    if not html:
+        return []
+    try:
+        rep = parse_report(html)
+    except Exception:  # noqa: BLE001
+        return []
+    if not rep:
+        return []
+    bd = extract_window(rep, end, months, target)
+    if not bd:
+        return []
+    bd["geo"], bd["page"] = False, "výkaz"
+    return [bd]
+
+
 def _filing_candidates(company, filing, end, months, expected_total):
     """Všetky nájdené členenia tržieb v jednom podaní (výkaz + poznámky)."""
     summary = fetch_text(company, filing["acc"], "FilingSummary.xml")
@@ -676,6 +736,17 @@ def _near_date(f, d, tol=8):
 def revenue_breakdown(company, end, months, expected_total, expected_fy=None, expected_9m=None):
     """Členenie tržieb za obdobie končiace `end` (months = 3 alebo 12).
     Vráti [{'label','value','prev'}] alebo None. Q4 sa dopočíta ako rok − 9M."""
+    return _period_items(company, end, months, expected_total, expected_fy, expected_9m,
+                         _filing_candidates)
+
+
+def cost_components(company, end, months, target, expected_fy=None, expected_9m=None):
+    """Položky nákladov z výkazu ziskov a strát, ktorých súčet sedí s `target`."""
+    return _period_items(company, end, months, target, expected_fy, expected_9m,
+                         _income_window_candidates)
+
+
+def _period_items(company, end, months, expected_total, expected_fy, expected_9m, gather):
     recent = company.get("filings") or {}
     if not recent:
         return None
@@ -683,22 +754,22 @@ def revenue_breakdown(company, end, months, expected_total, expected_fy=None, ex
     direct = [f for f in allf if _near_date(f, end)]
     if months == 12:
         k = [f for f in direct if f["form"] in ANNUAL_FORMS]
-        best = _best(_filing_candidates(company, k[0], end, 12, expected_total)) if k else None
+        best = _best(gather(company, k[0], end, 12, expected_total)) if k else None
         return best["items"] if best else None
     q = [f for f in direct if f["form"] in QUARTERLY_FORMS]
     if q:
-        best = _best(_filing_candidates(company, q[0], end, 3, expected_total))
+        best = _best(gather(company, q[0], end, 3, expected_total))
         return best["items"] if best else None
     k = [f for f in direct if f["form"] in ANNUAL_FORMS]
     if not k:
         return None
     q3_end = end - timedelta(days=91)
     q3 = [f for f in allf if f["form"] in QUARTERLY_FORMS and _near_date(f, q3_end, 12)]
-    if not q3:
+    if not q3 or (gather is not _filing_candidates and not (expected_fy and expected_9m)):
         return None
     q3_date = date(*(int(x) for x in q3[0]["report_date"].split("-")))
-    fy = _filing_candidates(company, k[0], end, 12, expected_fy)
-    nine = _filing_candidates(company, q3[0], q3_date, 9, expected_9m)
+    fy = gather(company, k[0], end, 12, expected_fy)
+    nine = gather(company, q3[0], q3_date, 9, expected_9m)
     best = None
     for a in fy:
         for b in nine:

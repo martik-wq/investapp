@@ -166,7 +166,8 @@
     var r = box.getBoundingClientRect();
     var x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 12;
     if (x + tip.offsetWidth > r.width - 4) x = ev.clientX - r.left - tip.offsetWidth - 14;
-    tip.style.left = Math.max(4, x) + 'px'; tip.style.top = y + 'px';
+    if (y + tip.offsetHeight > r.height - 4) y = r.height - tip.offsetHeight - 4;
+    tip.style.left = Math.max(4, x) + 'px'; tip.style.top = Math.max(2, y) + 'px';
   }
   function hideTip() { tip.style.display = 'none'; }
 
@@ -201,6 +202,21 @@
           rows.push({t: 'rok predtým: ' + money(n.prev)});
           if (n.yoy != null) rows.push({t: 'medziročne: ' + pct(n.yoy)});
         }
+        var kids = D.links.filter(function (l) { return l.s === n.id; })
+          .map(function (l) { return {n: byId[l.t], v: l.v}; })
+          .sort(function (a, b) { return b.v - a.v; });
+        var srcs = D.links.filter(function (l) { return l.t === n.id; })
+          .map(function (l) { return {n: byId[l.s], v: l.v}; })
+          .sort(function (a, b) { return b.v - a.v; });
+        function list(title, arr, base) {
+          rows.push({t: title, cls: 'th2'});
+          arr.forEach(function (k) {
+            rows.push({t: k.n.label + ': ' + money(k.v) + ' (' + (k.v / base * 100).toFixed(0) + ' %)', cls: 'li'});
+          });
+        }
+        if (n.type === 'cost' && kids.length >= 2) list('Patria sem:', kids, n.value);
+        else if (kids.length >= 2 && n.type !== 'cost') list('Rozdelenie:', kids, n.value);
+        if (srcs.length >= 2) list('Skladá sa z:', srcs, n.value);
         showTip(ev, rows);
       });
       r.addEventListener('pointerleave', hideTip);

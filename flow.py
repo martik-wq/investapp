@@ -5,8 +5,67 @@ Každý uzol má typ: rev (tržby, modrá), profit (zisk, zelená), cost (nákla
 """
 from datetime import timedelta
 
+import re
+
 OTHER_MIN_SHARE = 0.01     # menšie „ostatné“ položky sa nezobrazujú
 MAX_STREAMS = 7
+MAX_ITEMS = 6
+
+# preklady najčastejších anglických názvov položiek do slovenčiny (poradie je dôležité)
+TRANS = [
+    (r"research (and|&) development|^r&d$", "Výskum a vývoj"),
+    (r"selling,? general (and|&) administrative|^sg&a", "Predaj a správna réžia"),
+    (r"(sales (and|&) marketing|marketing (and|&) sales|selling (and|&) marketing|^marketing$|"
+     r"^selling expenses?$)", "Predaj a marketing"),
+    (r"general (and|&) administrative|^administrative", "Správna réžia"),
+    (r"technology (and|&) (infrastructure|content|development)", "Technológie a infraštruktúra"),
+    (r"^fulfil+ment", "Logistika a distribúcia"),
+    (r"depreciation|amortization", "Odpisy a amortizácia"),
+    (r"restructuring", "Reštrukturalizácia"),
+    (r"impairment", "Zníženie hodnoty"),
+    (r"litigation|legal settlement", "Súdne spory"),
+    (r"other operating (expense|cost)", "Ostatné prevádzkové náklady"),
+    (r"^other( operating)? (income|revenue)", "Ostatné výnosy"),
+    (r"^other", "Ostatné"),
+    (r"^advertising( revenue)?$", "Reklama"),
+    (r"^subscriptions?( revenue)?$|^subscription", "Predplatné"),
+    (r"^licen[sc]es?|licen[sc]e revenue", "Licencie"),
+    (r"^(net )?product( sales| revenue)?s?$|^products$", "Produkty"),
+    (r"^(net )?service( sales| revenue)?s?$|^services$", "Služby"),
+    (r"support and services", "Podpora a služby"),
+    (r"^cost of (product|goods)|^products$", "Náklady na produkty"),
+    (r"^cost of services?", "Náklady na služby"),
+    (r"^total", ""),
+]
+
+
+def sk(label):
+    """Slovenský názov položky (ak ho poznáme), inak pôvodný."""
+    low = label.strip().lower()
+    for pat, out in TRANS:
+        if out and re.search(pat, low):
+            return out
+    return label.strip()
+
+
+def _valid_items(items, target, max_items=MAX_ITEMS):
+    """Zoznam položiek (label, value, prev) skontrolovaný voči cieľovému súčtu."""
+    if not items or not target or target <= 0:
+        return None
+    pos = [i for i in items if i["value"] and i["value"] > 0]
+    if len(pos) < 2 or len(pos) != len(items):
+        return None
+    total = sum(i["value"] for i in pos)
+    if abs(total - target) > 0.02 * target:
+        return None
+    pos = sorted(pos, key=lambda i: -i["value"])
+    if len(pos) > max_items:
+        rest = pos[max_items - 1:]
+        pos = pos[:max_items - 1] + [{"label": "Ostatné", "value": sum(i["value"] for i in rest),
+                                      "prev": None}]
+    scale = target / total
+    return [{"label": sk(i["label"]), "value": i["value"] * scale, "prev": i.get("prev")}
+            for i in pos]
 
 
 def _prev_end(ends, e):
@@ -46,6 +105,15 @@ def _growth(cur, prev):
     if prev < 0:
         return None  # zmena voči zápornej báze nemá zmysel
     return cur / prev - 1
+
+
+def cost_targets(data, e):
+    """(prevádzkové náklady, náklady na tržby) za obdobie e, rovnako ako ich počíta diagram."""
+    v = _vals(data, e)
+    R, GP, COGS, OI = v.get("revenue"), v.get("gp"), v.get("cogs"), v.get("oi")
+    base = GP if (GP is not None and COGS) else R
+    opex = (base - OI) if base is not None and OI is not None else None
+    return opex, COGS
 
 
 class _Flow:
@@ -89,12 +157,12 @@ def _streams(f, streams, revenue, prev_rev):
     scale = revenue / total  # drobné rozdiely (zaokrúhľovanie) sa vyrovnajú
     for i, s in enumerate(items):
         nid = f"stream{i}"
-        f.node(nid, s["label"], 0, "rev", s["value"] * scale, s.get("prev"))
+        f.node(nid, sk(s["label"]), 0, "rev", s["value"] * scale, s.get("prev"))
         f.link(nid, "revenue", s["value"] * scale)
     return True
 
 
-def _general(cur, prev, streams, labels):
+def _general(cur, prev, streams, opex_items=None, cogs_items=None):
     f = _Flow()
     R = cur["revenue"]
     if R is None or R <= 0:
@@ -145,23 +213,28 @@ def _general(cur, prev, streams, labels):
         f.link(opex_src, "opex", base)
         f.link("loss", "opex", -OI)
     col += 1
-    # členenie prevádzkových nákladov
-    comps = [("rnd", "Výskum a vývoj")]
-    comps.append(("sga", "Predaj a administratíva") if cur["sga"] else
-                 ("ga", "Správna réžia"))
-    used = 0
+    # členenie prevádzkových nákladov: presné položky z výkazu firmy, inak štandardné
     comp_nodes = []
-    for key, label in comps:
-        v = cur[key]
-        if v and v > 0:
-            comp_nodes.append((key, label, v))
-            used += v
-    if opex > 0 and comp_nodes:
-        rest = opex - used
-        if rest > OTHER_MIN_SHARE * opex:
-            comp_nodes.append(("opex_other", "Ostatné prevádzkové náklady", rest))
-        elif rest < -0.02 * opex:
-            comp_nodes = []  # nedáva zmysel
+    rep_items = _valid_items(opex_items, opex) if opex > 0 else None
+    if rep_items:
+        comp_nodes = [(f"opex_{i}", it["label"], it["value"], it["prev"])
+                      for i, it in enumerate(rep_items)]
+    else:
+        comps = [("rnd", "Výskum a vývoj")]
+        comps.append(("sga", "Predaj a administratíva") if cur["sga"] else
+                     ("ga", "Správna réžia"))
+        used = 0
+        for key, label in comps:
+            v = cur[key]
+            if v and v > 0:
+                comp_nodes.append((key, label, v, prev.get(key)))
+                used += v
+        if opex > 0 and comp_nodes:
+            rest = opex - used
+            if rest > OTHER_MIN_SHARE * opex:
+                comp_nodes.append(("opex_other", "Ostatné prevádzkové náklady", rest, None))
+            elif rest < -0.02 * opex:
+                comp_nodes = []  # nedáva zmysel
     # čo sa deje s prevádzkovým ziskom
     tax = TAX if TAX is not None else 0.0
     ni_flow = max(NI, 0) if NI is not None else None
@@ -193,10 +266,17 @@ def _general(cur, prev, streams, labels):
             f.link("other_inc", "ni", other_income - (tax - t1))
         # prepočítať: ak oi->ni vyšlo záporné, link sa neprida (v <= 0)
     # členenie prevádzkových nákladov
-    for key, label, v in comp_nodes:
-        f.node(key, label, col, "cost", v, prev.get(key) if key in prev else None,
-               sub=f"{v / R * 100:.0f} % tržieb")
+    for i, (key, label, v, pv) in enumerate(comp_nodes):
+        f.node(key, label, col, "cost", v, pv, sub=f"{v / R * 100:.0f} % tržieb", ord=3 + i)
         f.link("opex", key, v)
+    # členenie nákladov na tržby (ak ho firma uvádza vo výkaze)
+    if "cogs" in f._ids:
+        ci = _valid_items(cogs_items, COGS)
+        for i, it in enumerate(ci or []):
+            nid = f"cogs_{i}"
+            f.node(nid, it["label"], col, "cost", it["value"], it["prev"],
+                   sub=f"{it['value'] / R * 100:.0f} % tržieb", ord=20 + i)
+            f.link("cogs", nid, it["value"])
     return f
 
 
@@ -272,7 +352,7 @@ def _tiles(cur, prev):
     return tiles[:3]
 
 
-def build_flow(built, end, btype, streams=None):
+def build_flow(built, end, btype, streams=None, opex_items=None, cogs_items=None):
     """Údaje pre Sankey diagram za obdobie končiace `end`. streams = zoznam
     {'label','value','prev'} s členením tržieb (voliteľné)."""
     data = built["data"]
@@ -291,7 +371,7 @@ def build_flow(built, end, btype, streams=None):
     else:
         if cur.get("revenue") is None:
             return None
-        f = _general(cur, prev, streams, None)
+        f = _general(cur, prev, streams, opex_items, cogs_items)
     if f is None or len(f.nodes) < 3 or not f.links:
         return None
     # medziročná zmena pre uzly bez uloženej predchádzajúcej hodnoty

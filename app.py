@@ -159,6 +159,30 @@ def _flow_streams(comp, built, end, btype, mode):
         return None
 
 
+def _flow_costs(comp, built, end, btype, mode):
+    """Presné položky prevádzkových nákladov a nákladov na tržby z výkazu firmy."""
+    if btype == "bank":
+        return None, None
+    data = built["data"]
+    try:
+        opex, cogs = flow.cost_targets(data, end)
+        if mode == "annual":
+            return (filings.cost_components(comp, end, 12, opex) if opex else None,
+                    filings.cost_components(comp, end, 12, cogs) if cogs else None)
+        qends = [e for e in built["ends"] if e <= end][-4:]
+        fy_o = nine_o = fy_c = nine_c = None
+        if len(qends) == 4 and 250 <= (qends[-1] - qends[0]).days <= 290:
+            t = [flow.cost_targets(data, e) for e in qends]
+            if all(x[0] is not None for x in t):
+                fy_o, nine_o = sum(x[0] for x in t), sum(x[0] for x in t[:3])
+            if all(x[1] for x in t):
+                fy_c, nine_c = sum(x[1] for x in t), sum(x[1] for x in t[:3])
+        return (filings.cost_components(comp, end, 3, opex, fy_o, nine_o) if opex else None,
+                filings.cost_components(comp, end, 3, cogs, fy_c, nine_c) if cogs else None)
+    except Exception:  # noqa: BLE001 - doplnok, nie nutnosť
+        return None, None
+
+
 def _flow_options(built, mode):
     out = []
     for e in reversed(built["display"]):
@@ -216,7 +240,8 @@ def build_context(ticker, section):
         flow_end = next((e for e in built["display"] if e.isoformat() == chosen),
                         built["display"][-1])
         streams = _flow_streams(comp, built, flow_end, btype, p["mode"])
-        fl = flow.build_flow(built, flow_end, btype, streams)
+        opex_items, cogs_items = _flow_costs(comp, built, flow_end, btype, p["mode"])
+        fl = flow.build_flow(built, flow_end, btype, streams, opex_items, cogs_items)
         if fl:
             fl["has_streams"] = any(n["id"].startswith("stream") or n["id"] == "int_income"
                                     for n in fl["nodes"])
