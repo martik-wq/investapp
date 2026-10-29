@@ -15,6 +15,10 @@ try {
     robocopy $src $PSScriptRoot /E /XD venv cache .git __pycache__ data /XF config.txt spustit.bat spustit.command .gitignore /NFL /NDL /NJH /NJS /NP | Out-Null
     Remove-Item $tmp -Recurse -Force
     Remove-Item $zip -Force
+    try {
+        $sha = (Invoke-RestMethod "https://api.github.com/repos/$repo/commits/$branch" -TimeoutSec 15).sha
+        [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'version.txt'), $sha)
+    } catch { }
     Write-Host 'Aplikacia je aktualna.'
 } catch {
     Write-Host 'Aktualizacia sa nepodarila, pokracujem so sucasnou verziou.'

@@ -8,7 +8,7 @@ import os
 import re
 from datetime import date
 
-from flask import (Flask, Response, abort, flash, redirect, render_template, request,
+from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
                    url_for)
 
 import edgar
@@ -19,6 +19,7 @@ import perf
 import portfolio
 import prices
 import trends
+import updater
 import statements
 from taxonomy import BUSINESS_TYPES
 
@@ -667,5 +668,23 @@ def export(ticker):
         "Content-Disposition": f"attachment; filename={comp['ticker']}_{ctx['mode']}.csv"})
 
 
+@app.route("/update/check")
+def update_check():
+    return jsonify(updater.check())
+
+
+@app.route("/update/apply", methods=["POST"])
+def update_apply():
+    res = updater.apply()
+    return jsonify(res), (200 if res["ok"] else 502)
+
+
+@app.route("/update/ping")
+def update_ping():
+    return jsonify({"ok": True, "version": updater.current_version()})
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # use_reloader: po aktualizácii (zmene .py súborov) sa server sám znova spustí, okno nemusíš zatvárať
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=True)

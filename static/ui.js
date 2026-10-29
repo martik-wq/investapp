@@ -50,3 +50,55 @@
   document.addEventListener('focusout', hide);
   window.addEventListener('scroll', hide, true);
 })();
+
+/* Aktualizácia aplikácie z GitHubu bez vypínania: tlačidlo v bočnom paneli */
+(function () {
+  var btn = document.getElementById('updBtn'), msg = document.getElementById('updMsg');
+  if (!btn) return;
+  var state = 'idle';
+  function setMsg(t) { msg.textContent = t || ''; }
+  function mark(available) {
+    state = available ? 'available' : 'idle';
+    btn.textContent = available ? '⬆ Aktualizovať na novú verziu' : '⟳ Skontrolovať aktualizáciu';
+    btn.className = available ? 'upd-new' : 'ghost';
+  }
+  function check(silent) {
+    if (!silent) { btn.disabled = true; setMsg('Kontrolujem…'); }
+    return fetch('/update/check').then(function (r) { return r.json(); }).then(function (d) {
+      btn.disabled = false;
+      if (!d.ok) { if (!silent) setMsg('Nepodarilo sa overiť verziu (internet?).'); return; }
+      mark(d.available);
+      setMsg(d.available ? 'Je dostupná nová verzia.' : (silent ? '' : 'Máš najnovšiu verziu ✓'));
+      try { sessionStorage.setItem('investapp_upd_check', String(Date.now())); } catch (e) {}
+    }).catch(function () { btn.disabled = false; if (!silent) setMsg('Nepodarilo sa overiť verziu.'); });
+  }
+  function overlay(text) {
+    var o = document.getElementById('updOverlay');
+    if (!o) { o = document.createElement('div'); o.id = 'updOverlay'; document.body.appendChild(o); }
+    o.textContent = text; o.style.display = 'flex';
+  }
+  function waitForServer(tries) {
+    fetch('/update/ping', {cache: 'no-store'}).then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function () { location.reload(); })
+      .catch(function () {
+        if (tries <= 0) { overlay('Aplikácia sa nespustila späť. Zatvor okno s aplikáciou a spusti ju znova cez spustit.bat.'); return; }
+        setTimeout(function () { waitForServer(tries - 1); }, 1000);
+      });
+  }
+  function apply() {
+    overlay('Sťahujem a inštalujem novú verziu… (stránka sa po chvíli sama obnoví)');
+    fetch('/update/apply', {method: 'POST'}).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { document.getElementById('updOverlay').style.display = 'none'; setMsg(d.error || 'Aktualizácia sa nepodarila.'); return; }
+      overlay('Hotovo. Spúšťam aplikáciu s novou verziou…');
+      setTimeout(function () { waitForServer(40); }, d.changed && d.changed.length ? 2500 : 300);
+    }).catch(function () {
+      /* server sa mohol reštartovať počas odpovede */
+      setTimeout(function () { waitForServer(40); }, 2000);
+    });
+  }
+  btn.addEventListener('click', function () { if (state === 'available') apply(); else check(false); });
+  try {
+    var last = Number(sessionStorage.getItem('investapp_upd_check') || 0);
+    if (Date.now() - last > 30 * 60 * 1000) check(true);
+  } catch (e) { check(true); }
+})();

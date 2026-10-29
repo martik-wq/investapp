@@ -542,6 +542,37 @@ check("riziko: vlastný výber indexu (Nasdaq Composite) a vysvetlivky pri ukazo
       ("Nasdaq Composite" in _hp and 'data-tip="' in _hp and "Beta" in _hp), "")
 _pc.post("/portfolio/clear")
 
+# --- aktualizácia z GitHubu (zip v pamäti, dočasný priečinok)
+import io as _io  # noqa: E402
+import updater as _up  # noqa: E402
+import zipfile as _zf  # noqa: E402
+_bio = _io.BytesIO()
+with _zf.ZipFile(_bio, "w") as _z:
+    _z.writestr("investapp-main/app.py", "print('nova verzia')\n")
+    _z.writestr("investapp-main/templates/x.html", "NOVE")
+    _z.writestr("investapp-main/config.txt", "PREPISANE")
+    _z.writestr("investapp-main/spustit.bat", "PREPISANE")
+    _z.writestr("investapp-main/data/portfolio.json", "PREPISANE")
+    _z.writestr("investapp-main/cache/a.json", "PREPISANE")
+_dst = tempfile.mkdtemp()
+os.makedirs(os.path.join(_dst, "data")); os.makedirs(os.path.join(_dst, "templates"))
+for _n, _c in (("config.txt", "moje"), ("spustit.bat", "stary"), ("data/portfolio.json", "moje portfolio"), ("app.py", "stara")):
+    with open(os.path.join(_dst, _n), "w") as _f:
+        _f.write(_c)
+_ch = _up.install_zip(_bio.getvalue(), _dst)
+_rd = lambda n: open(os.path.join(_dst, n)).read()  # noqa: E731
+check("aktualizácia: nové súbory sa prepíšu", _rd("app.py").startswith("print") and _rd("templates/x.html") == "NOVE"
+      and sorted(_ch) == ["app.py", "templates/x.html"], _ch)
+check("aktualizácia: config.txt, spustit.bat, data a cache sa nikdy neprepíšu",
+      _rd("config.txt") == "moje" and _rd("spustit.bat") == "stary" and _rd("data/portfolio.json") == "moje portfolio"
+      and not os.path.exists(os.path.join(_dst, "cache")))
+_orig = _up.latest_version
+_up.latest_version = lambda: "abc123"
+_cc = _appmod.app.test_client().get("/update/check").get_json()
+_up.latest_version = _orig
+check("aktualizácia: kontrola verzie vráti, či je dostupná nová", _cc["latest"] == "abc123" and _cc["ok"] and _cc["available"] in (True, False))
+check("aktualizácia: tlačidlo v bočnom paneli", 'id="updBtn"' in _appmod.app.test_client().get("/").get_data(as_text=True))
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]
