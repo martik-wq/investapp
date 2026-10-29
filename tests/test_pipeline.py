@@ -533,6 +533,15 @@ check("riziko: beta = 1,5 a korelácia = 1 pri portfóliu = 1,5 × index",
 check("riziko: volatilita portfólia = 1,5 × volatilita indexu", abs(_rk["port"]["vol"] / _bs["vol"] - 1.5) < 1e-6)
 check("riziko: málo dát -> ok=False", perf.risk_stats(_tl, {"B": perf.Series(_dd, _b)}, _dd[-10], _dd[-1])["ok"] is False)
 
+# --- výber indexu pre rizikové ukazovatele a vysvetlivky
+_pc = _appmod.app.test_client()
+_pc.post("/portfolio/demo")
+_hp = _pc.get("/portfolio/performance?rb=%5EIXIC&bm=%5EGSPC").get_data(as_text=True)
+check("riziko: vlastný výber indexu (Nasdaq Composite) a vysvetlivky pri ukazovateľoch",
+      "Rizikové ukazovatele" in _hp and 'selected>Nasdaq Composite' in _hp.replace(" selected", "selected").replace("\n", "") or
+      ("Nasdaq Composite" in _hp and 'data-tip="' in _hp and "Beta" in _hp), "")
+_pc.post("/portfolio/clear")
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

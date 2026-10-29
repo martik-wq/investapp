@@ -262,3 +262,8 @@ tr.hdr td{color:var(--acc2);font-weight:700}
 @media(prefers-reduced-motion:reduce){.content>*{animation:none}*{transition:none!important}}
 body.loading::after{background:rgba(255,250,245,.88);color:var(--acc2)}
 .sk-lbl{stroke:#fff}
+
+/* vysvetlivky ⓘ */
+.info{cursor:help;color:#b08a68;margin-left:6px;font-size:13px;transition:color .15s var(--ease);outline:0}
+.info:hover,.info:focus{color:var(--acc)}
+.tipx{position:fixed;display:none;z-index:200;max-width:300px;padding:9px 12px;border-radius:10px;background:#2b2118;color:#fff6ee;font-size:12.5px;line-height:1.45;font-weight:400;box-shadow:0 10px 28px rgba(40,25,10,.28);pointer-events:none;text-align:left;white-space:normal}

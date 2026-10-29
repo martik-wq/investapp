@@ -453,6 +453,9 @@ def portfolio_performance():
         sel.append(custom)
     if not sel and "bm" not in request.args:
         sel = list(DEFAULT_BENCH)
+    rb = request.args.get("rb", "").strip()
+    rb = rb if rb and (rb in BENCH_LABEL or rb == custom) else ""
+    fetch_list = list(sel) + ([rb] if rb and rb not in sel else [])
     trades = [t for t in txns if t["kind"] in ("buy", "sell", "spinoff", "dividend")]
     first = min(t["time"][:10] for t in trades)
     start = date.fromisoformat(first) - timedelta(days=10)
@@ -464,7 +467,7 @@ def portfolio_performance():
             isins.setdefault(t["isin"], (t["ticker"], t["price_ccy"] or t["ccy"]))
     sym_of = {i: symbol_fn(i, tk) for i, (tk, _c) in isins.items()}
     jobs = {("p", i): sym for i, sym in sym_of.items() if sym}
-    for b in sel:
+    for b in fetch_list:
         jobs[("b", b)] = b
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = dict(zip(jobs, ex.map(lambda sym: hist_fn(sym, start), jobs.values())))
@@ -478,7 +481,7 @@ def portfolio_performance():
     need |= {(t["ccy"], base) for t in trades if t.get("ccy")}
     need |= {(t["price_ccy"], base) for t in trades if t.get("price_ccy")}
     bser, bccy = {}, {}
-    for b in sel:
+    for b in fetch_list:
         h = results.get(("b", b))
         s, c = perf.to_series(h, "adj") if h else (None, None)
         if s:
@@ -518,7 +521,8 @@ def portfolio_performance():
     r_end = min(today, tl.last) if tl.last else today
     r_start = {"all": (tl.first or r_end) - timedelta(days=1), "12m": r_end - timedelta(days=365),
                "ytd": date(r_end.year - 1, 12, 31)}[rw]
-    risk = perf.risk_stats(tl, benches, r_start, r_end, rf_pct / 100.0) if benches and tl.first else None
+    rb_set = {rb: benches[rb]} if rb in benches else {b: benches[b] for b in sel if b in benches}
+    risk = perf.risk_stats(tl, rb_set, r_start, r_end, rf_pct / 100.0) if rb_set and tl.first else None
     chart_days = [d["d"] for d in res["days"] if d["idx"] is not None and (d["d"].weekday() < 5 or d is res["days"][-1])]
     row_by = {d["d"]: d for d in res["days"]}
     payload = {
@@ -536,7 +540,7 @@ def portfolio_performance():
         warns.append(f"Obdobie „{r['label']}“ som skryl: výnos vyšiel mimo reálneho rozsahu "
                      f"({'neznámy' if r['twr'] is None else signed_pct(r['twr'])}). Býva to neúplná "
                      "história alebo chyba v cenách. Po doplnení starších exportov sa zobrazí.")
-    missing_bm = [b for b in sel if b not in benches]
+    missing_bm = [b for b in fetch_list if b not in benches]
     if missing_bm:
         warns.append("Nepodarilo sa načítať históriu indexu: " + ", ".join(missing_bm) + ".")
     if any("staršia história" in w for w in data["warnings"]):
@@ -548,7 +552,7 @@ def portfolio_performance():
         benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
         bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),
         data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches],
-        risk=risk, rw=rw, rf_pct=rf_pct)
+        risk=risk, rw=rw, rf_pct=rf_pct, rb=rb)
 
 
 @app.route("/portfolio/import", methods=["POST"])

@@ -46,7 +46,7 @@
         <thead><tr><th></th>{% for e in ends %}<th>{{ e.strftime('%d.%m.%Y') }}</th>{% endfor %}</tr></thead>
         <tbody>
         {% for r in g.rows %}
-          <tr><td>{{ r.label }}{% if r.note %}<span class="info" title="{{ r.note }}">ⓘ</span>{% endif %}</td>
+          <tr><td>{{ r.label }}{% if r.note %}<span class="info" tabindex="0" data-tip="{{ r.note }}">ⓘ</span>{% endif %}</td>
             {% for e in ends %}{% set v = r.vals[e] %}
               <td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|fmt(r.fmt) }}</td>
             {% endfor %}</tr>

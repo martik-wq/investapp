@@ -112,6 +112,11 @@
         <option value="12m" {{ 'selected' if rw == '12m' }}>Posledných 12 mesiacov</option>
         <option value="ytd" {{ 'selected' if rw == 'ytd' }}>Od začiatku roka</option>
       </select></label>
+      <label>Porovnať s indexom<select name="rb" onchange="this.form.submit()">
+        <option value="" {{ 'selected' if not rb }}>Podľa grafu (všetky zaškrtnuté)</option>
+        {% for bid, blabel, bnote in benchmarks %}<option value="{{ bid }}" {{ 'selected' if rb == bid }}>{{ blabel }}</option>{% endfor %}
+        {% if custom %}<option value="{{ custom }}" {{ 'selected' if rb == custom }}>{{ custom }} (vlastný)</option>{% endif %}
+      </select></label>
       <label>Bezriziková sadzba (% ročne)<input name="rf" value="{{ rf_pct|string|replace('.', ',') }}" style="width:90px"></label>
       <button class="ghost">Prepočítať</button>
     </form>
@@ -125,7 +130,7 @@
     <thead><tr><th>Ukazovateľ</th><th>Moje portfólio</th>{% for b, st in bl %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}</tr></thead>
     <tbody>
     {% macro row(label, key, kind, tip) %}
-      <tr><td style="text-align:left;white-space:normal">{{ label }}{% if tip %}<span class="info" title="{{ tip }}">ⓘ</span>{% endif %}</td>
+      <tr><td style="text-align:left;white-space:normal">{{ label }}{% if tip %}<span class="info" tabindex="0" data-tip="{{ tip }}">ⓘ</span>{% endif %}</td>
         {% for st in [P] + bl|map(attribute=1)|list %}{% set v = st.get(key) %}
         <td class="{{ 'neg' if kind in ('pct','spct') and v is not none and v < 0 }}">{% if v is none %}–{% elif kind == 'pct' %}{{ v|pct }}{% elif kind == 'spct' %}{{ v|spct }}{% else %}{{ ('%.2f'|format(v))|replace('.', ',') }}{% endif %}</td>
         {% endfor %}</tr>
@@ -146,7 +151,7 @@
     <thead><tr><th>Ukazovateľ</th>{% for b, st in bl %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}</tr></thead>
     <tbody>
     {% macro vrow(label, key, kind, tip) %}
-      <tr><td style="text-align:left;white-space:normal">{{ label }}<span class="info" title="{{ tip }}">ⓘ</span></td>
+      <tr><td style="text-align:left;white-space:normal">{{ label }}<span class="info" tabindex="0" data-tip="{{ tip }}">ⓘ</span></td>
         {% for b, st in bl %}{% set v = st.get(key) %}
         <td class="{{ 'neg' if kind == 'spct' and v is not none and v < 0 }}">{% if v is none %}–{% elif kind == 'spct' %}{{ v|spct }}{% elif kind == 'pct' %}{{ v|pct }}{% else %}{{ ('%.2f'|format(v))|replace('.', ',') }}{% endif %}</td>
         {% endfor %}</tr>
