@@ -138,13 +138,17 @@ body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prv
 .modeSw a.on{background:var(--acc);color:#fff;font-weight:600}
 
 /* ---- porovnanie dvoch období v grafoch ---- */
-.cmp{background:#fff8e6;border:1px solid #f3dca0;border-radius:10px;padding:8px 10px;margin:4px 0 8px;font-size:12.5px;color:#4a3b00}
-.cmp .cmph{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px;color:#1c2430}
-.cmp .cmpr{display:flex;flex-wrap:wrap;gap:0;align-items:baseline;margin-top:3px}
-.cmp .cmpr .key{align-self:center;margin-right:7px}
-.cmp .cmpn{color:#52514e;margin-right:2px}
-.cmp strong.up{color:var(--pos)}.cmp strong.down{color:var(--neg)}.cmp strong.muted{color:var(--mute)}
-.cmp .cmpc{color:#6b5400}
-.cmpx{background:#fff;color:#8a5a00;border:1px solid #e0c370;border-radius:999px;padding:1px 9px;font-size:11.5px;cursor:pointer}
-.ttable td.pk,.ttable th.pk{background:#fff1c9}
-.cmp .cmpr strong{margin:0 4px 0 0}
+.cmp{background:#f5f7fa;border-radius:8px;padding:6px 10px;margin:2px 0 6px;font-size:12px;color:#3b4656;font-variant-numeric:tabular-nums}
+.cmp .cmph{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:2px}
+.cmp .cmpt{color:#52607a;font-weight:600;letter-spacing:.01em}
+.cmp .cmpr{display:grid;grid-template-columns:12px minmax(110px,auto) 1fr auto auto;gap:0 8px;align-items:baseline;padding:2px 0;border-top:1px solid #e8ecf2}
+.cmp .cmpr:first-of-type{border-top:0}
+.cmp .cmpr .key{align-self:center;width:10px}
+.cmp .cmpn{color:#52514e}
+.cmp .cmpv{color:#6b7585}
+.cmp strong{font-weight:600}
+.cmp strong.up{color:var(--pos)}.cmp strong.down{color:var(--neg)}.cmp strong.muted{color:var(--mute);font-weight:400}
+.cmp .cmpc{color:#6b7585;min-width:92px;text-align:right}
+.cmpx{background:none;border:0;color:#7d8aa3;font-size:11.5px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
+.cmpx:hover{color:#3b4656}
+.ttable td.pk,.ttable th.pk{background:#eef2f9}

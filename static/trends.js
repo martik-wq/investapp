@@ -156,32 +156,33 @@
     box.style.display = 'block';
     var all = (this.sel || []);
     if (pick.b == null) {
-      box.appendChild(h('span', null, 'Vybrané obdobie: ' + d.labels[pick.a] +
-        '. Klikni v grafe na druhé obdobie a zobrazí sa rast medzi nimi.'));
-      var x0 = h('button', 'cmpx', 'Zrušiť výber'); x0.type = 'button'; x0.onclick = clearPick;
+      box.appendChild(h('span', 'cmpt', 'Od: ' + d.labels[pick.a] +
+        ' · klikni na druhé obdobie a uvidíš rast medzi nimi'));
+      var x0 = h('button', 'cmpx', 'zrušiť'); x0.type = 'button'; x0.onclick = clearPick;
       box.appendChild(x0);
       return;
     }
     var i0 = Math.min(pick.a, pick.b), i1 = Math.max(pick.a, pick.b), steps = i1 - i0;
     var years = d.lag === 1 ? steps : steps / 4;
     var head = h('div', 'cmph');
-    head.appendChild(h('strong', null, 'Porovnanie ' + d.labels[i0] + ' → ' + d.labels[i1] +
+    head.appendChild(h('span', 'cmpt', d.labels[i0] + ' → ' + d.labels[i1] +
       ' (' + (d.lag === 1 ? steps + (steps === 1 ? ' rok' : steps < 5 ? ' roky' : ' rokov')
         : steps + (steps === 1 ? ' kvartál' : steps < 5 ? ' kvartály' : ' kvartálov')) + ')'));
-    var x = h('button', 'cmpx', 'Zrušiť výber'); x.type = 'button'; x.onclick = clearPick;
+    var x = h('button', 'cmpx', 'zrušiť výber'); x.type = 'button'; x.onclick = clearPick;
     head.appendChild(x);
     box.appendChild(head);
     all.forEach(function (sr) {
       var a = sr.values[i0], b = sr.values[i1];
       var row = h('div', 'cmpr');
       var key = h('span', 'key'); key.style.background = self.color(sr.id); row.appendChild(key);
-      row.appendChild(h('span', 'cmpn', sr.label + ': '));
-      row.appendChild(h('span', null, fmt(a, sr.group) + ' → ' + fmt(b, sr.group) + '  '));
+      row.appendChild(h('span', 'cmpn', sr.label));
+      row.appendChild(h('span', 'cmpv', fmt(a, sr.group) + ' → ' + fmt(b, sr.group)));
       var res;
       if (a == null || b == null) res = h('strong', null, 'chýbajú údaje');
       else if (sr.group === 'pct') {
         var pp = (b - a) * 100;
-        res = h('strong', pp >= 0 ? 'up' : 'down', (pp >= 0 ? '+' : '−') + Math.abs(pp).toFixed(1).replace('.', ',') + ' p. b.');
+        res = Math.abs(pp) < 0.05 ? h('strong', 'muted', '0,0 p. b.') :
+          h('strong', pp >= 0 ? 'up' : 'down', (pp >= 0 ? '+' : '−') + Math.abs(pp).toFixed(1).replace('.', ',') + ' p. b.');
       } else if (a > 0) {
         var g = b / a - 1;
         res = h('strong', g >= 0 ? 'up' : 'down', pctTxt(g));
@@ -191,7 +192,7 @@
       row.appendChild(res);
       if (a != null && b != null && a > 0 && b > 0 && sr.group !== 'pct' && years >= 1) {
         var cg = Math.pow(b / a, 1 / years) - 1;
-        row.appendChild(h('span', 'cmpc', '  · priemerne ' + pctTxt(cg) + ' ročne'));
+        row.appendChild(h('span', 'cmpc', pctTxt(cg) + ' ročne'));
       }
       box.appendChild(row);
     });
@@ -232,9 +233,9 @@
     [pick.a, pick.b].forEach(function (pi, k) {
       if (pi == null || pi >= n) return;
       svg.appendChild(s('rect', {x: L + band * pi, y: T, width: band, height: H - T - B,
-        fill: 'rgba(245,166,35,.18)', stroke: 'rgba(245,166,35,.7)', 'stroke-width': 1}));
+        fill: 'rgba(79,110,160,.09)'}));
       var tag = s('text', {x: L + band * (pi + 0.5), y: T + 10, 'text-anchor': 'middle', class: 'ax',
-        'font-weight': 700, fill: '#8a5a00'});
+        'font-weight': 600, fill: '#6b7a99', 'font-size': 9.5});
       tag.textContent = (pick.a != null && pick.b != null) ? (pi === Math.min(pick.a, pick.b) ? 'Od' : 'Do') : 'Od';
       svg.appendChild(tag);
     });
