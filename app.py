@@ -4,20 +4,26 @@ Spustenie:  python app.py   a potom otvor http://127.0.0.1:5000
 """
 import csv
 import io
+import os
+import re
 from datetime import date
 
-from flask import Flask, Response, abort, redirect, render_template, request, url_for
+from flask import (Flask, Response, abort, flash, redirect, render_template, request,
+                   url_for)
 
 import edgar
 import filings
 import flow
 import metrics
+import portfolio
 import prices
 import trends
 import statements
 from taxonomy import BUSINESS_TYPES
 
 app = Flask(__name__)
+app.secret_key = os.urandom(16).hex()      # len na hlásenia po importe
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
 
 # ----------------------------------------------------------------- formátovanie
@@ -37,6 +43,10 @@ def fmt_value(v, fmt, scale_note=None):
         return f"{v:.0f} dní"
     if fmt == "eps":
         return f"{v:,.2f}"
+    if fmt == "amt":
+        return f"{v:,.2f}"
+    if fmt == "sh":
+        return f"{v:,.6f}".rstrip("0").rstrip(".")
     if fmt == "big":
         a = abs(v)
         if a >= 1e9:
@@ -252,6 +262,119 @@ def build_context(ticker, section):
                        "quarterly": url_for("section_view", ticker=match[0], section="charts",
                                             **dict(base, mode="quarterly"))})
     return ctx
+
+
+# ------------------------------------------------------------------ portfólio
+DEMO_SYMBOLS = {"DEMOCO", "DEMOBANK"}
+DEMO_FX = {("USD", "EUR"): 0.92, ("EUR", "USD"): 1 / 0.92}
+US_SYMBOL = re.compile(r"^[A-Z]{1,5}(-[AB])?$")
+
+
+def _pf_symbol_fn(store):
+    def fn(isin, ticker):
+        if isin in store["symbols"]:
+            return store["symbols"][isin]
+        if ticker in DEMO_SYMBOLS:
+            return ticker
+        sym = prices.search_symbol(isin) if isin else None
+        return sym or ticker or None
+    return fn
+
+
+def _pf_quote(sym):
+    if sym in DEMO_SYMBOLS:
+        return dict(DEMO_QUOTE)
+    return prices.get_price(sym)
+
+
+def _pf_fx(frm, to):
+    if (frm, to) in DEMO_FX and frm == "USD":   # ukážkové portfólio funguje aj bez internetu
+        return DEMO_FX[(frm, to)]
+    q = prices.get_price(f"{frm}{to}=X")
+    if q:
+        return q["price"]
+    inv = prices.get_price(f"{to}{frm}=X")
+    return 1 / inv["price"] if inv and inv["price"] else None
+
+
+def _read_upload(f):
+    raw = f.read()
+    for enc in ("utf-8-sig", "utf-8", "cp1250", "latin-1"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+@app.route("/portfolio")
+def portfolio_view():
+    store = portfolio.load_store()
+    txns = list(store["txns"].values())
+    ctx = {"page": "portfolio", "ticker": None, "section": None, "files": store["files"]}
+    if not txns:
+        return render_template("portfolio.html", has_data=False, **ctx)
+    acct = store["acct_ccy"] or "EUR"
+    data = portfolio.build_positions(txns)
+    valued = portfolio.value_positions(data["open"], acct, _pf_symbol_fn(store), _pf_quote, _pf_fx)
+    summary = portfolio.summarize(data, valued)
+    priced = sorted([p for p in valued if p.get("value") is not None], key=lambda p: -p["value"])
+    alloc = [{"label": p["ticker"] or p["isin"], "name": p["name"], "pct": p["weight"],
+              "value": p["value"]} for p in priced[:12]]
+    if len(priced) > 12:
+        rest = priced[12:]
+        alloc.append({"label": "Ostatné", "name": f"{len(rest)} ďalších", "value":
+                      sum(p["value"] for p in rest), "pct": sum(p["weight"] for p in rest)})
+    recent = sorted(txns, key=lambda t: t["time"], reverse=True)[:400]
+    return render_template(
+        "portfolio.html", has_data=True, acct=acct, data=data, positions=valued, summary=summary,
+        alloc=alloc, txns=recent, n_txn=len(txns), us_symbol=US_SYMBOL,
+        closed=sorted(data["closed"], key=lambda p: p["last"], reverse=True), **ctx)
+
+
+@app.route("/portfolio/import", methods=["POST"])
+def portfolio_import():
+    files = [(f.filename or "súbor", _read_upload(f)) for f in request.files.getlist("files")
+             if f and f.filename]
+    if not files:
+        flash("Nevybral si žiadny súbor.", "warn")
+        return redirect(url_for("portfolio_view"))
+    res = portfolio.import_files(files)
+    if res["added"]:
+        flash(f"Načítaných {res['added']} nových transakcií"
+              + (f", {res['duplicates']} už bolo nahratých." if res["duplicates"] else "."), "ok")
+    elif res["duplicates"]:
+        flash("Všetky transakcie z týchto súborov už v portfóliu sú.", "ok")
+    for w in res["warnings"]:
+        flash(w, "warn")
+    return redirect(url_for("portfolio_view"))
+
+
+@app.route("/portfolio/demo", methods=["POST"])
+def portfolio_demo():
+    p = os.path.join(edgar.DEMO_DIR, "portfolio_demo.csv")
+    with open(p, encoding="utf-8") as f:
+        res = portfolio.import_files([("ukážkové portfólio.csv", f.read())])
+    flash("Načítané ukážkové (fiktívne) portfólio. Zmažeš ho tlačidlom nižšie.", "ok")
+    for w in res["warnings"]:
+        flash(w, "warn")
+    return redirect(url_for("portfolio_view"))
+
+
+@app.route("/portfolio/clear", methods=["POST"])
+def portfolio_clear():
+    portfolio.clear_store()
+    flash("Portfólio je zmazané.", "ok")
+    return redirect(url_for("portfolio_view"))
+
+
+@app.route("/portfolio/symbol", methods=["POST"])
+def portfolio_symbol():
+    isin = request.form.get("isin", "").strip()
+    if isin:
+        portfolio.set_symbol(isin, request.form.get("symbol", ""))
+        flash("Symbol uložený.", "ok")
+    return redirect(url_for("portfolio_view"))
 
 
 @app.route("/")

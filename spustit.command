@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 TMPD=$(mktemp -d)
 if curl -fsSL -m 30 "https://github.com/martik-wq/investapp/archive/refs/heads/main.zip" -o "$TMPD/u.zip" 2>/dev/null && unzip -q "$TMPD/u.zip" -d "$TMPD" 2>/dev/null; then
   SRC=$(find "$TMPD" -mindepth 1 -maxdepth 1 -type d | head -1)
-  rsync -a --exclude venv --exclude cache --exclude .git --exclude __pycache__ --exclude config.txt --exclude spustit.bat --exclude spustit.command "$SRC"/ ./ && echo "Aplikácia je aktuálna."
+  rsync -a --exclude venv --exclude cache --exclude data --exclude .git --exclude __pycache__ --exclude config.txt --exclude spustit.bat --exclude spustit.command "$SRC"/ ./ && echo "Aplikácia je aktuálna."
 else
   echo "Aktualizácia sa nepodarila, pokračujem so súčasnou verziou."
 fi

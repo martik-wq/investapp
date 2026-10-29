@@ -1,0 +1,11 @@
+Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Currency (Price / share),Exchange rate,Result (EUR),Total (EUR),Withholding tax,Currency (Withholding tax),Charge amount (EUR),Notes,ID
+Deposit,2024-01-10 09:00:00,,,,,,,,,5000.00,,,,,D1
+Market buy,2024-01-15 15:31:02,US0000000001,DEMOCO,"Demo Software Inc.",10.0000000000,40.00,USD,1.10,,363.64,,,,,B1
+Market buy,2024-02-01 16:02:11,US0000000002,DEMOBANK,"Demo Bank Corp.",20.0000000000,30.00,USD,1.09,,550.46,,,,,B2
+Market buy,2024-06-03 14:45:09,US0000000001,DEMOCO,"Demo Software Inc.",5.0000000000,45.00,USD,1.08,,208.33,,,,,B3
+Currency conversion,2024-06-03 14:45:09,,,,,,,,,-208.33,,,,,C1
+Dividend (Ordinary),2024-09-01 10:00:00,US0000000001,DEMOCO,"Demo Software Inc.",15.0000000000,0.25,USD,Not available,,3.40,0.56,USD,,,DV1
+Interest on cash,2024-12-31 00:00:00,,,,,,,,,1.23,,,,,I1
+Limit sell,2025-03-10 15:30:00,US0000000001,DEMOCO,"Demo Software Inc.",6.0000000000,52.00,USD,1.05,,297.14,,,,,S1
+Withdrawal,2025-05-01 12:00:00,,,,,,,,,-200.00,,,,,W1
+Dividend (Ordinary),2025-09-01 10:00:00,US0000000002,DEMOBANK,"Demo Bank Corp.",20.0000000000,0.30,USD,Not available,,5.10,0.90,USD,,,DV2

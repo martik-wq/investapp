@@ -69,3 +69,10 @@ V záložke Grafy je diagram toku od tržieb cez náklady až po čistý zisk (`
 Základ tvoria štandardizované výkazy, členenie tržieb (podľa produktov/služieb) sa hľadá v podaniach SEC:
 vo výkaze alebo v poznámkach „(Details)“, vždy len ak súčet položiek sedí s celkovými tržbami.
 Q4 sa dopočíta ako rok − 9M. Banky majú vlastné rozloženie (úroky, rezervy, neúrokové náklady).
+
+## Portfólio (Trading 212)
+
+V bočnom paneli je záložka Portfólio. Nahraj CSV z Trading 212 (História → export, Objednávky + Dividendy + Transakcie,
+najviac 12 mesiacov na súbor, viac súborov naraz). Aplikácia spočíta pozície (priemerná nákupná cena ako v T212),
+realizovaný a nerealizovaný zisk, dividendy a aktuálnu hodnotu (ceny z Yahoo Finance podľa ISIN). Údaje sú v priečinku `data/`
+(nenahrávajú sa na GitHub a aktualizácia ich neprepisuje).

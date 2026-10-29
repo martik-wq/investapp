@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Portfólio{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>💼 Portfólio</h1>
+  <div class="sub">{% if has_data %}Import z Trading 212 · mena účtu {{ acct }} · {{ n_txn }} transakcií · údaje sú uložené len na tvojom počítači{% else %}Nahraj export z Trading 212 a uvidíš pozície, zisky, dividendy a aktuálnu hodnotu.{% endif %}</div>
+</div>
+{% for cat, msg in get_flashed_messages(with_categories=true) %}
+  <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
+{% endfor %}
+
+{% macro importbox(title) %}
+<div class="card">
+  <h2>{{ title }}</h2>
+  <ol class="stepsol">
+    <li>V Trading 212 otvor <strong>História</strong> a klikni na ikonu exportu (stiahnutie).</li>
+    <li>Označ všetky typy údajov (<strong>Objednávky, Dividendy, Transakcie</strong>), vyber obdobie, ktoré začína pred tvojím prvým vkladom, a klikni <strong>Export CSV</strong>.</li>
+    <li>Trading 212 dovoľuje najviac 12 mesiacov na jeden súbor. Pri dlhšej histórii stiahni viac súborov a nahraj ich naraz, duplicity sa zahodia.</li>
+  </ol>
+  <form action="{{ url_for('portfolio_import') }}" method="post" enctype="multipart/form-data" class="drop">
+    <input type="file" name="files" accept=".csv,text/csv" multiple required>
+    <button>Nahrať a spočítať</button>
+  </form>
+  {% if not has_data %}
+  <form action="{{ url_for('portfolio_demo') }}" method="post" style="margin-top:10px">
+    <button class="ghost" type="submit">Vyskúšať s ukážkovým (fiktívnym) portfóliom</button>
+  </form>
+  {% endif %}
+  <p class="note">Súbory sa nikam neodosielajú, spracujú sa na tvojom počítači (priečinok data). Aplikácia prijíma len export z jedného účtu s jednou menou naraz.</p>
+</div>
+{% endmacro %}
+
+{% if not has_data %}
+  {{ importbox('Nahraj export z Trading 212') }}
+{% else %}
+
+<div class="card">
+  <div class="pfkpis">
+    <div class="pfk"><div class="l">Trhová hodnota pozícií</div><div class="v">{{ summary.value|fmt('amt') }} {{ acct }}</div>
+      <div class="s note">{{ positions|length }} otvorených pozícií</div></div>
+    <div class="pfk"><div class="l">Vložené do pozícií (nákupná cena)</div><div class="v">{{ summary.cost|fmt('amt') }} {{ acct }}</div></div>
+    <div class="pfk"><div class="l">Nerealizovaný zisk / strata</div>
+      <div class="v {{ 'up' if summary.unrealized >= 0 else 'down' }}">{{ ('+' if summary.unrealized >= 0 else '') ~ (summary.unrealized|fmt('amt')) }} {{ acct }}</div>
+      {% if summary.unrealized_pct is not none %}<div class="s {{ 'up' if summary.unrealized >= 0 else 'down' }}">{{ ('+' if summary.unrealized_pct >= 0 else '') ~ (summary.unrealized_pct*100)|round(1) }} %</div>{% endif %}</div>
+    <div class="pfk"><div class="l">Realizovaný zisk (predaje)</div>
+      <div class="v {{ 'up' if summary.realized >= 0 else 'down' }}">{{ ('+' if summary.realized >= 0 else '') ~ (summary.realized|fmt('amt')) }} {{ acct }}</div></div>
+    <div class="pfk"><div class="l">Dividendy (po zrážkovej dani)</div><div class="v">{{ summary.dividends|fmt('amt') }} {{ acct }}</div></div>
+    <div class="pfk"><div class="l">Úroky z hotovosti</div><div class="v">{{ summary.interest|fmt('amt') }} {{ acct }}</div></div>
+    <div class="pfk"><div class="l">Celkový výsledok</div>
+      <div class="v {{ 'up' if summary.total_return >= 0 else 'down' }}">{{ ('+' if summary.total_return >= 0 else '') ~ (summary.total_return|fmt('amt')) }} {{ acct }}</div>
+      <div class="s note">nerealizovaný + realizovaný + dividendy + úroky</div></div>
+    <div class="pfk"><div class="l">Vklady − výbery</div><div class="v">{{ (summary.deposits - summary.withdrawals)|fmt('amt') }} {{ acct }}</div>
+      <div class="s note">vklady {{ summary.deposits|fmt('amt') }}, výbery {{ summary.withdrawals|fmt('amt') }}</div></div>
+  </div>
+  {% if summary.unpriced %}
+  <div class="warn" style="margin-top:12px">U niektorých pozícií sa nepodarilo načítať aktuálnu cenu z Yahoo Finance, preto nie sú v trhovej hodnote a nerealizovanom zisku. Zadaj správny symbol z Yahoo (napr. <code>VUSA.L</code>, <code>SAP.DE</code>) alebo to skús neskôr:
+    {% for p in summary.unpriced %}
+      <form class="symfix" action="{{ url_for('portfolio_symbol') }}" method="post">
+        <strong>{{ p.ticker or p.isin }}</strong> <span class="note">{{ p.name }} ({{ p.isin }}), skúšaný symbol: {{ p.symbol or '–' }}</span>
+        <input type="hidden" name="isin" value="{{ p.isin }}"><input name="symbol" placeholder="symbol z Yahoo"><button>Uložiť</button>
+      </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% for w in data.warnings %}<div class="warn" style="margin-top:8px">{{ w }}</div>{% endfor %}
+</div>
+
+{% if alloc %}
+<div class="card">
+  <h2>Rozloženie portfólia</h2>
+  <div class="alloc">
+    {% for a in alloc %}
+      <div class="arow"><span class="nm" title="{{ a.name }}"><strong>{{ a.label }}</strong></span>
+        <span class="bar"><i style="width: {{ (a.pct*100)|round(1) }}%"></i></span>
+        <span class="vv">{{ (a.pct*100)|round(1) }} % · {{ a.value|fmt('amt') }}</span></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Otvorené pozície</h2>
+  <div class="tablewrap"><table class="pf sortable" id="postable">
+    <thead><tr>
+      <th>Ticker</th><th>Názov</th><th>Ks</th><th>Priem. nákupná cena ({{ acct }})</th><th>Aktuálna cena ({{ acct }})</th>
+      <th>Hodnota ({{ acct }})</th><th>Zisk / strata ({{ acct }})</th><th>Zisk / strata %</th><th>Podiel</th><th>Dividendy ({{ acct }})</th>
+    </tr></thead>
+    <tbody>
+    {% for p in positions %}
+      <tr>
+        <td data-v="{{ p.ticker }}">{% if p.symbol and us_symbol.match(p.symbol) %}<a href="{{ url_for('section_view', ticker=p.symbol, section='overview') }}"><strong>{{ p.ticker }}</strong></a>{% else %}<strong>{{ p.ticker or p.isin }}</strong>{% endif %}</td>
+        <td data-v="{{ p.name }}" style="text-align:left;white-space:normal">{{ p.name }}</td>
+        <td data-v="{{ p.shares }}">{{ p.shares|fmt('sh') }}</td>
+        <td data-v="{{ p.avg_cost }}">{{ p.avg_cost|fmt('amt') }}</td>
+        <td data-v="{{ p.price_acct or 0 }}">{{ p.price_acct|fmt('amt') if p.price_acct is not none else '–' }}</td>
+        <td data-v="{{ p.value or 0 }}">{{ p.value|fmt('amt') if p.value is not none else '–' }}</td>
+        <td data-v="{{ p.unrealized or 0 }}" class="{{ 'neg' if p.unrealized is not none and p.unrealized < 0 }}">{{ p.unrealized|fmt('amt') if p.unrealized is not none else '–' }}</td>
+        <td data-v="{{ p.unrealized_pct or 0 }}" class="{{ 'neg' if p.unrealized_pct is not none and p.unrealized_pct < 0 }}">{{ p.unrealized_pct|fmt('pct') if p.unrealized_pct is not none else '–' }}</td>
+        <td data-v="{{ p.weight or 0 }}">{{ p.weight|fmt('pct') if p.weight is not none else '–' }}</td>
+        <td data-v="{{ p.dividends }}">{{ p.dividends|fmt('amt') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="note">Priemerná nákupná cena = súčet nákupov (vrátane poplatkov, v mene účtu) ÷ počet kusov, rovnako ako to robí Trading 212. Aktuálna cena je z Yahoo Finance a prepočítaná aktuálnym kurzom. Kliknutím na hlavičku stĺpca tabuľku zoradíš, kliknutím na ticker otvoríš analýzu firmy (len akcie z USA).</p>
+</div>
+
+{% if data.dividends_by_year %}
+<div class="card">
+  <h2>Dividendy podľa rokov</h2>
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Rok</th><th>Dividendy ({{ acct }})</th></tr></thead><tbody>
+    {% for y, v in data.dividends_by_year.items() %}<tr><td>{{ y }}</td><td style="text-align:left">{{ v|fmt('amt') }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% endif %}
+
+{% if closed %}
+<details class="card"><summary>Uzavreté pozície ({{ closed|length }})</summary>
+  <div class="tablewrap" style="margin-top:10px"><table class="pf">
+    <thead><tr><th>Ticker</th><th>Názov</th><th>Posledný predaj</th><th>Nákupy ({{ acct }})</th><th>Predaje ({{ acct }})</th><th>Realizovaný zisk ({{ acct }})</th><th>Dividendy ({{ acct }})</th></tr></thead>
+    <tbody>{% for p in closed %}<tr><td><strong>{{ p.ticker or p.isin }}</strong></td><td style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.last }}</td>
+      <td>{{ p.bought|fmt('amt') }}</td><td>{{ p.sold|fmt('amt') }}</td><td class="{{ 'neg' if p.realized < 0 }}">{{ p.realized|fmt('amt') }}</td><td>{{ p.dividends|fmt('amt') }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</details>
+{% endif %}
+
+<details class="card"><summary>Transakcie ({{ n_txn }}{% if n_txn > txns|length %}, zobrazených posledných {{ txns|length }}{% endif %})</summary>
+  <div class="controls" style="margin:10px 0"><label>Hľadať (ticker, názov, druh)<input id="txfilter" placeholder="napr. AAPL alebo dividend"></label></div>
+  <div class="tablewrap"><table class="pf" id="txtable">
+    <thead><tr><th>Dátum</th><th>Druh</th><th>Ticker</th><th>Ks</th><th>Cena</th><th>Spolu ({{ acct }})</th></tr></thead>
+    <tbody>{% for t in txns %}<tr><td>{{ t.time[:16] }}</td><td style="text-align:left">{{ t.action }}</td><td>{{ t.ticker }}</td>
+      <td>{{ t.shares|fmt('sh') if t.shares is not none else '' }}</td><td>{{ (t.price|fmt('amt') ~ ' ' ~ t.price_ccy) if t.price is not none else '' }}</td>
+      <td>{{ t.total|fmt('amt') if t.total is not none else '' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</details>
+
+{{ importbox('Pridať ďalšie súbory z Trading 212') }}
+
+<div class="card">
+  <h2>Nahrané súbory</h2>
+  <ul>{% for f in files %}<li>{{ f.name }} · {{ f.rows }} riadkov, {{ f.new }} nových · {{ f.at }}</li>{% endfor %}</ul>
+  <form action="{{ url_for('portfolio_clear') }}" method="post" onsubmit="return confirm('Naozaj zmazať všetky nahraté údaje o portfóliu z tohto počítača?')">
+    <button class="danger" type="submit">Zmazať portfólio</button>
+  </form>
+</div>
+{% endif %}
+
+<script>
+(function(){
+  var t = document.getElementById('postable');
+  if (t) {
+    var heads = t.querySelectorAll('thead th');
+    heads.forEach(function(th, ci){
+      th.addEventListener('click', function(){
+        var asc = !th.classList.contains('asc');
+        heads.forEach(function(h){ h.classList.remove('asc','desc'); });
+        th.classList.add(asc ? 'asc' : 'desc');
+        var rows = Array.prototype.slice.call(t.tBodies[0].rows);
+        rows.sort(function(a, b){
+          var x = a.cells[ci].dataset.v, y = b.cells[ci].dataset.v, nx = parseFloat(x), ny = parseFloat(y);
+          var r = (!isNaN(nx) && !isNaN(ny)) ? nx - ny : String(x).localeCompare(String(y));
+          return asc ? r : -r;
+        });
+        rows.forEach(function(r){ t.tBodies[0].appendChild(r); });
+      });
+    });
+  }
+  var f = document.getElementById('txfilter'), tx = document.getElementById('txtable');
+  if (f && tx) f.addEventListener('input', function(){
+    var q = f.value.toLowerCase();
+    Array.prototype.forEach.call(tx.tBodies[0].rows, function(r){ r.style.display = r.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none'; });
+  });
+})();
+</script>
+{% endblock %}

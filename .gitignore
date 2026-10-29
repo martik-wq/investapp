@@ -3,3 +3,4 @@ cache/
 config.txt
 __pycache__/
 *.zip
+data/

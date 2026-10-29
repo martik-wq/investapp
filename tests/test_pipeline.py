@@ -303,6 +303,75 @@ check("flow: nesprávny súčet položiek sa ignoruje (štandardné členenie)",
 check("sk(): preklady", flow.sk("Research and development") == "Výskum a vývoj" and flow.sk("Marketing and sales") ==
       "Predaj a marketing" and flow.sk("Something unusual") == "Something unusual")
 
+# ------------------------------------------------------------ portfólio (Trading 212)
+import portfolio  # noqa: E402
+import tempfile  # noqa: E402
+
+pf_dir = tempfile.mkdtemp()
+portfolio.DATA_DIR = pf_dir
+portfolio.STORE = os.path.join(pf_dir, "portfolio.json")      # testy sa nedotknú tvojich údajov
+demo_csv = open(os.path.join(ROOT, "demo_data", "portfolio_demo.csv"), encoding="utf-8").read()
+pr = portfolio.parse_csv(demo_csv)
+check("T212: mena účtu z hlavičky Total (EUR)", pr["acct_ccy"] == "EUR")
+check("T212: 9 použiteľných transakcií, konverzia meny sa ticho preskočí", len(pr["txns"]) == 9
+      and not pr["warnings"], pr["warnings"])
+unk = portfolio.parse_csv(demo_csv + "Neznama akcia,2024-03-01 10:00:00,,,,,,,,,1.00,,,,,Z9\n")
+check("T212: neznáma akcia sa preskočí s upozornením", len(unk["txns"]) == 9 and any("Neznama akcia" in w for w in unk["warnings"]))
+pd_ = portfolio.build_positions(pr["txns"])
+dco = next(p for p in pd_["open"] if p["ticker"] == "DEMOCO")
+cost1, cost2 = round(10 * 40 / 1.10, 2), round(5 * 45 / 1.08, 2)
+check("portfólio: počet kusov po nákupoch a predaji", abs(dco["shares"] - 9) < 1e-9)
+avg = (cost1 + cost2) / 15
+check("portfólio: priemerná nákupná cena", abs(dco["avg_cost"] - avg) < 1e-6, dco["avg_cost"])
+sold = round(6 * 52 / 1.05, 2)
+check("portfólio: realizovaný zisk = výnos − priemerná cena × predané kusy",
+      abs(dco["realized"] - (sold - avg * 6)) < 1e-6, dco["realized"])
+check("portfólio: zostávajúca nákupná hodnota", abs(dco["cost"] - avg * 9) < 1e-6)
+check("portfólio: dividendy podľa rokov a spolu", pd_["dividends_by_year"] == {"2024": 3.4, "2025": 5.1}
+      and abs(pd_["totals"]["dividends"] - 8.5) < 1e-9)
+check("portfólio: vklady, výbery, úroky", pd_["totals"]["deposits"] == 5000 and pd_["totals"]["withdrawals"] == 200
+      and abs(pd_["totals"]["interest"] - 1.23) < 1e-9)
+
+# ocenenie s vymyslenými cenami (GBp = pence) a kurzami
+quotes = {"DEMOCO": {"price": 50.0, "currency": "USD"}, "DEMOBANK": {"price": 3000.0, "currency": "GBp"}}
+vals = portfolio.value_positions(pd_["open"], "EUR", lambda i, t: t, lambda s: quotes.get(s),
+                                 lambda a, b: {"USD": 0.9, "GBP": 1.2}.get(a))
+by = {p["ticker"]: p for p in vals}
+check("ocenenie: USD → EUR", abs(by["DEMOCO"]["value"] - 9 * 50 * 0.9) < 1e-9)
+check("ocenenie: pence sa prepočítajú na libry", abs(by["DEMOBANK"]["value"] - 20 * 30.0 * 1.2) < 1e-9, by["DEMOBANK"]["value"])
+sm = portfolio.summarize(pd_, vals)
+check("súhrn: trhová hodnota a nerealizovaný zisk", abs(sm["value"] - (405 + 720)) < 1e-9 and
+      abs(sm["unrealized"] - (sm["value"] - sm["cost"])) < 1e-9)
+no_price = portfolio.value_positions(portfolio.build_positions(pr["txns"])["open"], "EUR", lambda i, t: t,
+                                     lambda s: None, lambda a, b: 1.0)
+check("ocenenie: bez ceny sa pozícia zobrazí, ale nie je v hodnote",
+      portfolio.summarize(pd_, no_price)["value"] == 0 and len(portfolio.summarize(pd_, no_price)["unpriced"]) == 2)
+
+# iné tvary exportu: nová hlavička Total + Currency (Total), starší formát dátumu, bodkočiarka
+alt = ("Action;Time;ISIN;Ticker;Name;No. of shares;Price / share;Currency (Price / share);Exchange rate;"
+       "Result;Currency (Result);Total;Currency (Total);ID\n"
+       "Market buy;25/09/2020 13:34;US88579Y1010;MMM;3M;1,5;159.52;USD;1.16329;;GBP;\"1,234.50\";GBP;X1\n"
+       "Market sell;26/09/2020 10:00;US88579Y1010;MMM;3M;0,5;170.00;USD;1.16329;;GBP;80.00;GBP;X2\n")
+pa = portfolio.parse_csv(alt)
+check("T212 (iný formát): mena z Currency (Total), dátum d/m/Y, desatinná čiarka",
+      pa["acct_ccy"] == "GBP" and pa["txns"][0]["time"].startswith("2020-09-25") and pa["txns"][0]["shares"] == 1.5
+      and pa["txns"][0]["total"] == 1234.5)
+over = portfolio.build_positions(portfolio.parse_csv(alt.replace("0,5;170.00", "5;170.00"))["txns"])
+check("predaj viac kusov, než evidujem -> upozornenie", over["warnings"] and not over["open"])
+try:
+    portfolio.parse_csv("a,b,c\n1,2,3\n")
+    bad = False
+except portfolio.PortfolioError as e:
+    bad = "Trading 212" in str(e)
+check("cudzí CSV súbor -> zrozumiteľná chyba", bad)
+res1 = portfolio.import_files([("a.csv", demo_csv)])
+res2 = portfolio.import_files([("b.csv", demo_csv)])
+check("import: opakovaný súbor nepridá duplicity", res1["added"] == 9 and res2["added"] == 0 and res2["duplicates"] == 9)
+res3 = portfolio.import_files([("c.csv", demo_csv.replace("Total (EUR)", "Total (GBP)"))])
+check("import: iná mena účtu sa odmietne", res3["added"] == 0 and any("mena účtu" in w for w in res3["warnings"]))
+portfolio.clear_store()
+check("import: zmazanie údajov", portfolio.load_store()["txns"] == {})
+
 # ------------------------------------------------------- rozhranie (Flask klient)
 import app as appmod  # noqa: E402
 
@@ -339,6 +408,23 @@ check("grafy: viditeľný prepínač Ročne/Kvartálne pri diagrame", 'class="mo
       and 'name="mode"' in chh)
 check("grafy: návod na porovnanie dvoch období", "Klikni v grafe na dve obdobia" in chh and "trends.js" in chh)
 check("grafy: kvartálny Sankey (Q4)", 'id="flow-data"' in chq and "Licencie" in chq)
+import io as _io  # noqa: E402
+r = cl.get("/portfolio")
+check("portfólio: prázdna stránka s návodom", r.status_code == 200 and b"Export CSV" in r.data)
+r = cl.post("/portfolio/demo", follow_redirects=True)
+ph = r.get_data(as_text=True)
+check("portfólio: ukážkové portfólio sa zobrazí", r.status_code == 200 and "Otvorené pozície" in ph and "DEMOCO" in ph
+      and "1,334.00" in ph, r.status_code)
+r = cl.post("/portfolio/import", data={"files": (_io.BytesIO(demo_csv.encode()), "export.csv")},
+            content_type="multipart/form-data", follow_redirects=True)
+check("portfólio: nahratie súboru, duplicity sa zahodia", r.status_code == 200 and "už bolo nahratých" in r.get_data(as_text=True)
+      or "už v portfóliu sú" in r.get_data(as_text=True))
+r = cl.post("/portfolio/import", data={"files": (_io.BytesIO(b"x,y\n1,2\n"), "zly.csv")},
+            content_type="multipart/form-data", follow_redirects=True)
+check("portfólio: zlý súbor -> chybové hlásenie", "Trading 212" in r.get_data(as_text=True))
+r = cl.post("/portfolio/clear", follow_redirects=True)
+check("portfólio: zmazanie cez stránku", "Nahraj export" in r.get_data(as_text=True))
+check("bočný panel: odkaz na Portfólio", "Portfólio" in cl.get("/").get_data(as_text=True))
 check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)

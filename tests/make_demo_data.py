@@ -285,7 +285,9 @@ def build_demobank():
 def main():
     import shutil
     import make_demo_filings
+    import make_demo_portfolio
     os.makedirs(OUT, exist_ok=True)
+    make_demo_portfolio.main(OUT)
     froot = os.path.join(OUT, "filings", "DEMOCO")
     shutil.rmtree(froot, ignore_errors=True)
     recent = make_demo_filings.generate(froot)

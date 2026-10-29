@@ -14,6 +14,7 @@
     <input name="q" placeholder="Ticker alebo názov" required>
     <button aria-label="Hľadať">🔍</button>
   </form>
+  <a class="gnav {{ 'on' if page == 'portfolio' }}" href="{{ url_for('portfolio_view') }}"><span class="ic">💼</span>Portfólio</a>
   {% if ticker %}
   <div class="coBox">
     <div class="coTick">{{ ticker }}</div>

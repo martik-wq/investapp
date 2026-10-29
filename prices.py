@@ -5,6 +5,7 @@ Vtedy aplikácia nespadne, len údaje chýbajú a cenu si zadáš ručne.
 """
 import json
 import os
+import re
 import time
 
 import requests
@@ -21,7 +22,11 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 
 
 def _sym(ticker):
-    return ticker.upper().replace(".", "-")
+    """Yahoo symbol. Triedy akcií (BRK.B) majú pomlčku, burzové prípony (VUSA.L) bodku."""
+    t = ticker.upper().strip()
+    if re.fullmatch(r"[A-Z0-9]+\.[AB]", t):
+        return t.replace(".", "-")
+    return t
 
 
 def _cached(name, ttl):
@@ -128,3 +133,29 @@ def get_profile(ticker):
     }
     _store(f"profile_{sym}.json", out)
     return out
+
+
+SEARCH_URL = ("https://query1.finance.yahoo.com/v1/finance/search?q={q}&quotesCount=8"
+              "&newsCount=0&listsCount=0")
+
+
+def search_symbol(query):
+    """Yahoo symbol podľa ISIN (alebo názvu). None, ak sa nenájde."""
+    key = re.sub(r"[^A-Za-z0-9]", "_", query)
+    hit = _cached(f"search_{key}.json", 7 * 24 * 3600)
+    if hit is not None:
+        return hit.get("symbol")
+    try:
+        r = requests.get(SEARCH_URL.format(q=requests.utils.quote(query)), headers=HEADERS,
+                         timeout=10)
+        r.raise_for_status()
+        quotes = r.json().get("quotes") or []
+    except (requests.RequestException, ValueError, AttributeError):
+        return None
+    sym = None
+    for q in quotes:
+        if q.get("quoteType") in ("EQUITY", "ETF", "MUTUALFUND") and q.get("symbol"):
+            sym = q["symbol"]
+            break
+    _store(f"search_{key}.json", {"symbol": sym})
+    return sym

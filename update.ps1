@@ -12,7 +12,7 @@ try {
     Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/$branch.zip" -OutFile $zip -UseBasicParsing -TimeoutSec 30
     Expand-Archive $zip $tmp -Force
     $src = (Get-ChildItem $tmp -Directory | Select-Object -First 1).FullName
-    robocopy $src $PSScriptRoot /E /XD venv cache .git __pycache__ /XF config.txt spustit.bat spustit.command .gitignore /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $src $PSScriptRoot /E /XD venv cache .git __pycache__ data /XF config.txt spustit.bat spustit.command .gitignore /NFL /NDL /NJH /NJS /NP | Out-Null
     Remove-Item $tmp -Recurse -Force
     Remove-Item $zip -Force
     Write-Host 'Aplikacia je aktualna.'
