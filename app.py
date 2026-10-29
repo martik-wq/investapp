@@ -6,7 +6,7 @@ import csv
 import io
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
                    url_for)
@@ -433,6 +433,77 @@ def _parse_dates(s, default):
         return default
 
 
+def _whatif_build(data, isins, sym_of, results, rates, base, benches, sel, rb, wi_rows, wi_hist,
+                  r_start, r_end, rf):
+    """Simulácia „čo keby“: aktuálne pozície v dnešných váhach + pridané tituly (podiel z celku)."""
+    out = {"ok": False, "notes": [], "rows": wi_rows}
+    bid = rb if rb in benches else next((b for b in sel if b in benches), None)
+    if bid is None:
+        bid = next(iter(benches), None)
+    if bid is None:
+        out["error"] = "Chýba história indexu na porovnanie."
+        return out
+    if not wi_rows:
+        out["error"] = "Zadaj aspoň jeden titul (Yahoo symbol) a jeho váhu v %."
+        return out
+    if sum(w for _s, w in wi_rows) > 100:
+        out["error"] = "Súčet váh pridaných titulov presahuje 100 %."
+        return out
+    missing = [s_ for s_, _w in wi_rows if s_ not in wi_hist]
+    if missing:
+        out["error"] = "Nenašiel som históriu cien pre: " + ", ".join(missing) + " (skontroluj Yahoo symbol)."
+        return out
+
+    def in_base(series, ccy):
+        days = [date.fromordinal(o) for o in series.o]
+        vals = []
+        for d, v in zip(days, series.v):
+            r = rates.rate(ccy, base, d)
+            vals.append(v * r if r is not None else None)
+        return perf.Series(days, vals)
+
+    held, wt, skipped = {}, {}, []
+    for p in data["open"]:
+        h = results.get(("p", p["isin"]))
+        s_, c_ = perf.to_series(h, "adj") if h else (None, None)
+        if not s_:
+            skipped.append(p["ticker"] or p["isin"])
+            continue
+        ser = in_base(s_, c_ or p["ccy"])
+        px = ser.at(r_end)
+        if px is None or p["shares"] <= 0:
+            skipped.append(p["ticker"] or p["isin"])
+            continue
+        held[p["isin"]] = ser
+        wt[p["isin"]] = p["shares"] * px
+    if not held:
+        out["error"] = "Nemám ceny aktuálnych pozícií na porovnanie."
+        return out
+    adds = {s_: in_base(*wi_hist[s_]) for s_, _w in wi_rows}
+    bench = benches[bid]
+    firsts = [max(x.first for x in list(held.values()) + list(adds.values()) + [bench])]
+    start = max(r_start, firsts[0])
+    days = [date.fromordinal(o) for o in bench.o if start < date.fromordinal(o) <= r_end]
+    days = [d for d in days if all(x.at(d) for x in list(held.values()) + list(adds.values()))]
+    if len(days) < perf.MIN_OBS + 1:
+        out["error"] = (f"Spoločná história je príliš krátka ({max(0, len(days) - 1)} dní, treba aspoň "
+                        f"{perf.MIN_OBS}). Vyber dlhšie obdobie alebo titul s dlhšou históriou.")
+        return out
+
+    def rets(ser):
+        return [ser.at(days[i]) / ser.at(days[i - 1]) - 1.0 for i in range(1, len(days))]
+
+    res = perf.whatif({k: rets(v) for k, v in held.items()}, wt, {k: rets(v) for k, v in adds.items()},
+                      {s_: w / 100.0 for s_, w in wi_rows}, rets(bench), rf)
+    res.update(ok=True, notes=out["notes"], rows=wi_rows, bench=bid, start=days[0], end=days[-1],
+               weights={k: wt[k] / sum(wt.values()) for k in wt}, skipped=skipped)
+    if skipped:
+        res["notes"].append("Bez cien (vynechané zo simulácie): " + ", ".join(skipped) + ".")
+    if days[0] > r_start + timedelta(days=10):
+        res["notes"].append(f"Spoločná história začína až {days[0].strftime('%d.%m.%Y')} (kratšie obdobie ako vybrané).")
+    return res
+
+
 @app.route("/portfolio/performance")
 def portfolio_performance():
     from concurrent.futures import ThreadPoolExecutor
@@ -470,6 +541,17 @@ def portfolio_performance():
     jobs = {("p", i): sym for i, sym in sym_of.items() if sym}
     for b in fetch_list:
         jobs[("b", b)] = b
+    wi_rows = []
+    for sym_in, w_in in zip(request.args.getlist("wi_s"), request.args.getlist("wi_w")):
+        sym_in = sym_in.strip().upper()
+        try:
+            wv = float((w_in or "0").replace(",", "."))
+        except ValueError:
+            wv = 0.0
+        if sym_in and 0 < wv <= 100 and len(wi_rows) < 5 and sym_in not in [x[0] for x in wi_rows]:
+            wi_rows.append((sym_in, wv))
+    for sym_in, _w in wi_rows:
+        jobs[("w", sym_in)] = sym_in
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = dict(zip(jobs, ex.map(lambda sym: hist_fn(sym, start), jobs.values())))
     price_hist = {}
@@ -488,6 +570,13 @@ def portfolio_performance():
         if s:
             bser[b], bccy[b] = s, c
             need.add((c, base))
+    wi_hist = {}
+    for sym_in, _w in wi_rows:
+        h = results.get(("w", sym_in))
+        s_, c_ = perf.to_series(h, "adj") if h else (None, None)
+        if s_:
+            wi_hist[sym_in] = (s_, c_ or base)
+            need.add((c_ or base, base))
     need = {p for p in need if p[0] and p[0] != base}
     with ThreadPoolExecutor(max_workers=6) as ex:
         fxres = dict(zip(need, ex.map(lambda p: hist_fn(f"{p[0]}{p[1]}=X", start), need)))
@@ -524,6 +613,10 @@ def portfolio_performance():
                "ytd": date(r_end.year - 1, 12, 31)}[rw]
     rb_set = {rb: benches[rb]} if rb in benches else {b: benches[b] for b in sel if b in benches}
     risk = perf.risk_stats(tl, rb_set, r_start, r_end, rf_pct / 100.0) if rb_set and tl.first else None
+    whatif_res = None
+    if wi_rows or "wi_s" in request.args:
+        whatif_res = _whatif_build(data, isins, sym_of, results, rates, base, benches, sel, rb, wi_rows,
+                                   wi_hist, r_start, r_end, rf_pct / 100.0)
     chart_days = [d["d"] for d in res["days"] if d["idx"] is not None and (d["d"].weekday() < 5 or d is res["days"][-1])]
     row_by = {d["d"]: d for d in res["days"]}
     payload = {
@@ -553,7 +646,7 @@ def portfolio_performance():
         benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
         bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),
         data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches],
-        risk=risk, rw=rw, rf_pct=rf_pct, rb=rb)
+        risk=risk, rw=rw, rf_pct=rf_pct, rb=rb, whatif=whatif_res, wi_rows=wi_rows)
 
 
 @app.route("/portfolio/import", methods=["POST"])

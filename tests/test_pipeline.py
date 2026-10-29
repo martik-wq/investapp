@@ -573,6 +573,22 @@ _up.latest_version = _orig
 check("aktualizácia: kontrola verzie vráti, či je dostupná nová", _cc["latest"] == "abc123" and _cc["ok"] and _cc["available"] in (True, False))
 check("aktualizácia: tlačidlo v bočnom paneli", 'id="updBtn"' in _appmod.app.test_client().get("/").get_data(as_text=True))
 
+# --- „čo keby“: pridanie titulu s beta 0 a nulovou volatilitou zníži beta o jeho váhu
+_rb = [_g.gauss(0.0004, 0.01) for _ in range(120)]
+_hd = {"A": [1.2 * r for r in _rb]}
+_wi = perf.whatif(_hd, {"A": 1.0}, {"C": [0.0] * 120}, {"C": 0.25}, _rb, 0.0)
+check("čo keby: 25 % hotovosti zníži betu zo 1,2 na 0,9 a volatilitu o štvrtinu",
+      abs(_wi["before"]["beta"] - 1.2) < 1e-9 and abs(_wi["after"]["beta"] - 0.9) < 1e-9
+      and abs(_wi["after"]["vol"] / _wi["before"]["vol"] - 0.75) < 1e-9, (_wi["before"]["beta"], _wi["after"]["beta"]))
+_pc2 = _appmod.app.test_client()
+_pc2.post("/portfolio/demo")
+_h2 = _pc2.get("/portfolio/performance?wi_s=NEEXISTUJE999&wi_w=10").get_data(as_text=True)
+check("čo keby: výpočet s pridaným titulom (ukážkové dáta) vráti tabuľku pred/po",
+      "Čo keby" in _h2 and "Terajšie portfólio" in _h2 and "Po úprave" in _h2)
+_h3 = _pc2.get("/portfolio/performance?wi_s=A&wi_w=70&wi_s=B&wi_w=50").get_data(as_text=True)
+check("čo keby: súčet váh nad 100 % -> chybová hláška", "presahuje 100" in _h3)
+_pc2.post("/portfolio/clear")
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

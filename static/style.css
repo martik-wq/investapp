@@ -275,3 +275,7 @@ body.loading::after{background:rgba(255,250,245,.88);color:var(--acc2)}
 button.upd-new{background:linear-gradient(180deg,#1b8a4a,#16743e);border-color:#16743e;color:#fff}
 #updOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;background:rgba(255,250,245,.92);color:var(--acc2);font-size:18px;font-weight:600;z-index:300}
 .recentBox{margin-top:auto}
+
+/* čo keby */
+.wirows{display:flex;flex-direction:column;gap:8px;max-width:520px}
+.wirow{display:grid;grid-template-columns:1fr 110px;gap:8px}

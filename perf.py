@@ -449,3 +449,41 @@ def risk_stats(tl, benches, start, end, rf=0.0):
                   "up": upc, "down": dnc})
         out["bench"][b] = s
     return out
+
+
+# ------------------------------------------------------------------ „čo keby“: úprava portfólia
+def series_metrics(r, rb, rf=0.0):
+    """Ukazovatele z radu denných výnosov r a výnosov indexu rb (rovnaká dĺžka)."""
+    n = len(r)
+    mp, mb = _mean(r), _mean(rb)
+    sp, sb = _std(r), _std(rb)
+    cov = sum((a - mp) * (b - mb) for a, b in zip(r, rb)) / (n - 1) if n > 1 else 0.0
+    beta = cov / (sb * sb) if sb > 1e-12 else None
+    corr = cov / (sp * sb) if sp > 1e-12 and sb > 1e-12 else None
+    vol = sp * math.sqrt(TRADING_DAYS)
+    ex = (mp - rf / TRADING_DAYS) * TRADING_DAYS
+    lv, level = 1.0, [1.0]
+    for a in r:
+        lv *= 1.0 + a
+        level.append(lv)
+    act = [a - b for a, b in zip(r, rb)]
+    return {"beta": beta, "corr": corr, "vol": vol, "sharpe": ex / vol if vol > 1e-12 else None,
+            "mdd": _max_drawdown(level), "pos": sum(1 for a in r if a > 0) / n if n else None,
+            "te": _std(act) * math.sqrt(TRADING_DAYS), "total": lv - 1.0,
+            "alpha": ((mp - rf / TRADING_DAYS) - beta * (mb - rf / TRADING_DAYS)) * TRADING_DAYS
+            if beta is not None else None}
+
+
+def whatif(held, weights, adds, add_w, bench_r, rf=0.0):
+    """held = {kľúč: [denné výnosy]}, weights = {kľúč: váha}, adds/add_w rovnako pre pridané tituly
+    (váha = podiel z celého portfólia). Zvyšok sa pomerne zmenší. Denné prevažovanie na pevné váhy."""
+    n = len(bench_r)
+    tot = sum(weights.values())
+    cur = [sum(weights[k] / tot * held[k][i] for k in held) for i in range(n)]
+    share = sum(add_w.values())
+    new = [(1.0 - share) * cur[i] + sum(add_w[k] * adds[k][i] for k in adds) for i in range(n)]
+    out = {"n": n, "before": series_metrics(cur, bench_r, rf), "after": series_metrics(new, bench_r, rf),
+           "share": share, "assets": {}}
+    for k in adds:
+        out["assets"][k] = series_metrics(adds[k], bench_r, rf)
+    return out

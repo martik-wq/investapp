@@ -107,6 +107,7 @@
       {% for b in selected %}<input type="hidden" name="bm" value="{{ b }}">{% endfor %}
       {% if not selected %}<input type="hidden" name="bm" value="">{% endif %}
       {% if custom %}<input type="hidden" name="custom" value="{{ custom }}">{% endif %}
+      {% for s_, w_ in wi_rows %}<input type="hidden" name="wi_s" value="{{ s_ }}"><input type="hidden" name="wi_w" value="{{ w_ }}">{% endfor %}
       <label>Obdobie<select name="rw" onchange="this.form.submit()">
         <option value="all" {{ 'selected' if rw == 'all' }}>Od začiatku</option>
         <option value="12m" {{ 'selected' if rw == '12m' }}>Posledných 12 mesiacov</option>
@@ -170,6 +171,84 @@
   {% endif %}
 </div>
 {% endif %}
+
+<div class="card" id="whatif">
+  <div class="flowhead"><h2>Čo keby: úprava portfólia</h2></div>
+  <p class="note">Zadaj Yahoo symbol a podiel z celého portfólia v %. Zvyšok tvorí tvoje terajšie portfólio v dnešných váhach (zmenšené pomerne).
+    Výsledok porovnáva rizikové ukazovatele pred a po úprave za obdobie a voči indexu zvolenému v karte vyššie.</p>
+  <form method="get" action="#whatif">
+    <input type="hidden" name="base" value="{{ base }}">
+    {% for b in selected %}<input type="hidden" name="bm" value="{{ b }}">{% endfor %}
+    {% if not selected %}<input type="hidden" name="bm" value="">{% endif %}
+    {% if custom %}<input type="hidden" name="custom" value="{{ custom }}">{% endif %}
+    <input type="hidden" name="rw" value="{{ rw }}"><input type="hidden" name="rb" value="{{ rb }}"><input type="hidden" name="rf" value="{{ rf_pct|string|replace('.', ',') }}">
+    <datalist id="wi-suggest">
+      <option value="CSSPX.MI">iShares Core S&amp;P 500 (SXR8)</option><option value="VUAA.L">Vanguard S&amp;P 500 Acc (USD)</option>
+      <option value="VWCE.DE">Vanguard FTSE All-World</option><option value="XEON.DE">Xtrackers EUR Overnight (peňažný trh)</option>
+      <option value="IB01.L">iShares USD Treasury 0-1y</option><option value="PEP">PepsiCo</option><option value="MCD">McDonald's</option>
+      <option value="NEE">NextEra Energy</option><option value="JPM">JPMorgan</option><option value="AAPL">Apple</option>
+    </datalist>
+    <div class="wirows">
+    {% set rows_ = wi_rows if wi_rows else [('', '')] %}
+    {% for s_, w_ in rows_ %}<div class="wirow"><input name="wi_s" list="wi-suggest" placeholder="Yahoo symbol, napr. CSSPX.MI" value="{{ s_ }}" autocomplete="off"><input name="wi_w" placeholder="váha %" value="{{ ('%g'|format(w_))|replace('.', ',') if w_ != '' else '' }}" inputmode="decimal"></div>{% endfor %}
+    <div class="wirow" id="wi-extra"><input name="wi_s" list="wi-suggest" placeholder="ďalší symbol (voliteľné)" autocomplete="off"><input name="wi_w" placeholder="váha %" inputmode="decimal"></div>
+    </div>
+    <div class="controls" style="margin-top:10px"><button>Spočítať</button>
+      <button type="button" class="ghost" id="wi-preset">Príklad: 40 % S&amp;P 500 ETF + 10 % peňažný trh</button></div>
+  </form>
+  {% if whatif %}
+    {% if not whatif.ok %}<div class="warn" style="margin-top:12px">{{ whatif.error }}</div>
+    {% else %}
+    {% set B = whatif.before %}{% set A = whatif.after %}
+    <p class="note" style="margin-top:12px">{{ whatif.start.strftime('%d.%m.%Y') }} – {{ whatif.end.strftime('%d.%m.%Y') }} · {{ whatif.n }} denných výnosov · voči {{ bench_label.get(whatif.bench, whatif.bench) }} · pridané {{ ('%g'|format(whatif.share * 100))|replace('.', ',') }} % z portfólia.</p>
+    <div class="tablewrap"><table class="pf">
+      <thead><tr><th>Ukazovateľ</th><th>Terajšie portfólio</th><th>Po úprave</th><th>Zmena</th></tr></thead>
+      <tbody>
+      {% macro wrow(label, key, kind, better) %}
+        {% set a = B.get(key) %}{% set b = A.get(key) %}
+        {% set d = (b - a) if a is not none and b is not none else none %}
+        {% set good = (d is not none and ((better == 'up' and d > 0) or (better == 'down' and d < 0))) %}
+        {% set bad = (d is not none and ((better == 'up' and d < 0) or (better == 'down' and d > 0))) %}
+        <tr><td style="text-align:left">{{ label }}</td>
+          <td>{% if a is none %}–{% elif kind == 'pct' %}{{ a|pct }}{% else %}{{ ('%.2f'|format(a))|replace('.', ',') }}{% endif %}</td>
+          <td><strong>{% if b is none %}–{% elif kind == 'pct' %}{{ b|pct }}{% else %}{{ ('%.2f'|format(b))|replace('.', ',') }}{% endif %}</strong></td>
+          <td class="{{ 'up' if good }}{{ 'down' if bad }}">{% if d is none %}–{% elif kind == 'pct' %}{{ d|spp }}{% else %}{{ ('%+.2f'|format(d))|replace('.', ',')|replace('-', '−') }}{% endif %}</td></tr>
+      {% endmacro %}
+      {{ wrow('Beta', 'beta', 'num', '') }}
+      {{ wrow('Sharpe pomer', 'sharpe', 'num', 'up') }}
+      {{ wrow('Podiel ziskových dní', 'pos', 'pct', 'up') }}
+      {{ wrow('Volatilita (ročná)', 'vol', 'pct', 'down') }}
+      {{ wrow('Maximálny pokles', 'mdd', 'pct', 'up') }}
+      {{ wrow('Tracking error', 'te', 'pct', 'down') }}
+      {{ wrow('Korelácia s indexom', 'corr', 'num', '') }}
+      {{ wrow('Výnos za obdobie', 'total', 'pct', 'up') }}
+      </tbody>
+    </table></div>
+    <h3>Pridané tituly samostatne</h3>
+    <div class="tablewrap"><table class="pf">
+      <thead><tr><th>Symbol</th><th>Váha</th><th>Beta</th><th>Korelácia</th><th>Volatilita</th><th>Výnos za obdobie</th></tr></thead>
+      <tbody>{% for s_, w_ in whatif.rows %}{% set m = whatif.assets[s_] %}
+        <tr><td style="text-align:left"><strong>{{ s_ }}</strong></td><td>{{ ('%g'|format(w_))|replace('.', ',') }} %</td>
+          <td>{{ ('%.2f'|format(m.beta))|replace('.', ',') if m.beta is not none else '–' }}</td>
+          <td>{{ ('%.2f'|format(m.corr))|replace('.', ',') if m.corr is not none else '–' }}</td>
+          <td>{{ m.vol|pct }}</td><td class="{{ 'neg' if m.total < 0 }}">{{ m.total|spct }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% for n in whatif.notes %}<p class="note">{{ n }}</p>{% endfor %}
+    <p class="note">Je to spätný pohľad na zvolené obdobie s denným prevažovaním na pevné váhy (ceny vrátane dividend, bez poplatkov a daní), nie predpoveď ani investičná rada. Výsledok závisí od obdobia a platí len pre tituly s dostatočnou históriou.</p>
+    {% endif %}
+  {% endif %}
+</div>
+<script>
+(function () {
+  var b = document.getElementById('wi-preset'); if (!b) return;
+  b.addEventListener('click', function () {
+    var f = b.closest('form'), s = f.querySelectorAll('input[name=wi_s]'), w = f.querySelectorAll('input[name=wi_w]');
+    s[0].value = 'CSSPX.MI'; w[0].value = '40';
+    s[s.length - 1].value = 'XEON.DE'; w[w.length - 1].value = '10';
+    f.submit();
+  });
+})();
+</script>
 
 <script type="application/json" id="perf-data">{{ payload|tojson }}</script>
 <script src="{{ url_for('static', filename='perf.js') }}"></script>
