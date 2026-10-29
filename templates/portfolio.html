@@ -3,7 +3,7 @@
 {% block content %}
 <div class="pagehead">
   <h1>💼 Portfólio</h1>
-  <div class="sub">{% if has_data %}Import z Trading 212 · mena účtu {{ acct }} · {{ n_txn }} transakcií · údaje sú uložené len na tvojom počítači{% else %}Nahraj export z Trading 212 a uvidíš pozície, zisky, dividendy a aktuálnu hodnotu.{% endif %}</div>
+  <div class="sub">{% if has_data %}Import z Trading 212 · {{ n_txn }} transakcií · {{ data.first }} – {{ data.last }} · údaje sú uložené len na tvojom počítači{% else %}Nahraj export z Trading 212 a uvidíš pozície, zisky, dividendy a aktuálnu hodnotu.{% endif %}</div>
 </div>
 {% for cat, msg in get_flashed_messages(with_categories=true) %}
   <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
@@ -26,7 +26,7 @@
     <button class="ghost" type="submit">Vyskúšať s ukážkovým (fiktívnym) portfóliom</button>
   </form>
   {% endif %}
-  <p class="note">Súbory sa nikam neodosielajú, spracujú sa na tvojom počítači (priečinok data). Aplikácia prijíma len export z jedného účtu s jednou menou naraz.</p>
+  <p class="note">Súbory sa nikam neodosielajú, spracujú sa na tvojom počítači (priečinok data). Nahrávaj export jedného účtu (viac peňaženiek a mien je v poriadku).</p>
 </div>
 {% endmacro %}
 
@@ -35,22 +35,27 @@
 {% else %}
 
 <div class="card">
+  <form method="get" class="controls" style="margin-bottom:10px">
+    <label>Súhrn v mene
+      <select name="base" onchange="this.form.submit()">{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if c == base }}>{{ c }}</option>{% endfor %}</select></label>
+    <span class="note" style="max-width:640px">Pozície sú v mene, v ktorej ich Trading 212 zúčtoval (USD, EUR…). Súhrn sa prepočítava aktuálnym kurzom, preto je približný (skutočný zisk v {{ base }} závisí aj od kurzu v čase nákupu).</span>
+  </form>
   <div class="pfkpis">
-    <div class="pfk"><div class="l">Trhová hodnota pozícií</div><div class="v">{{ summary.value|fmt('amt') }} {{ acct }}</div>
+    <div class="pfk"><div class="l">Trhová hodnota pozícií</div><div class="v">{{ summary.value|fmt('amt') }} {{ base }}</div>
       <div class="s note">{{ positions|length }} otvorených pozícií</div></div>
-    <div class="pfk"><div class="l">Vložené do pozícií (nákupná cena)</div><div class="v">{{ summary.cost|fmt('amt') }} {{ acct }}</div></div>
+    <div class="pfk"><div class="l">Vložené do pozícií (nákupná cena)</div><div class="v">{{ summary.cost|fmt('amt') }} {{ base }}</div></div>
     <div class="pfk"><div class="l">Nerealizovaný zisk / strata</div>
-      <div class="v {{ 'up' if summary.unrealized >= 0 else 'down' }}">{{ ('+' if summary.unrealized >= 0 else '') ~ (summary.unrealized|fmt('amt')) }} {{ acct }}</div>
+      <div class="v {{ 'up' if summary.unrealized >= 0 else 'down' }}">{{ ('+' if summary.unrealized >= 0 else '') ~ (summary.unrealized|fmt('amt')) }} {{ base }}</div>
       {% if summary.unrealized_pct is not none %}<div class="s {{ 'up' if summary.unrealized >= 0 else 'down' }}">{{ ('+' if summary.unrealized_pct >= 0 else '') ~ (summary.unrealized_pct*100)|round(1) }} %</div>{% endif %}</div>
     <div class="pfk"><div class="l">Realizovaný zisk (predaje)</div>
-      <div class="v {{ 'up' if summary.realized >= 0 else 'down' }}">{{ ('+' if summary.realized >= 0 else '') ~ (summary.realized|fmt('amt')) }} {{ acct }}</div></div>
-    <div class="pfk"><div class="l">Dividendy (po zrážkovej dani)</div><div class="v">{{ summary.dividends|fmt('amt') }} {{ acct }}</div></div>
-    <div class="pfk"><div class="l">Úroky z hotovosti</div><div class="v">{{ summary.interest|fmt('amt') }} {{ acct }}</div></div>
+      <div class="v {{ 'up' if summary.realized >= 0 else 'down' }}">{{ ('+' if summary.realized >= 0 else '') ~ (summary.realized|fmt('amt')) }} {{ base }}</div></div>
+    <div class="pfk"><div class="l">Dividendy (po zrážkovej dani)</div><div class="v">{{ summary.dividends|fmt('amt') }} {{ base }}</div></div>
+    <div class="pfk"><div class="l">Úroky z hotovosti</div><div class="v">{{ summary.interest|fmt('amt') }} {{ base }}</div></div>
     <div class="pfk"><div class="l">Celkový výsledok</div>
-      <div class="v {{ 'up' if summary.total_return >= 0 else 'down' }}">{{ ('+' if summary.total_return >= 0 else '') ~ (summary.total_return|fmt('amt')) }} {{ acct }}</div>
+      <div class="v {{ 'up' if summary.total_return >= 0 else 'down' }}">{{ ('+' if summary.total_return >= 0 else '') ~ (summary.total_return|fmt('amt')) }} {{ base }}</div>
       <div class="s note">nerealizovaný + realizovaný + dividendy + úroky</div></div>
-    <div class="pfk"><div class="l">Vklady − výbery</div><div class="v">{{ (summary.deposits - summary.withdrawals)|fmt('amt') }} {{ acct }}</div>
-      <div class="s note">vklady {{ summary.deposits|fmt('amt') }}, výbery {{ summary.withdrawals|fmt('amt') }}</div></div>
+    <div class="pfk"><div class="l">Čisté vklady (banka)</div><div class="v">{{ (summary.deposits - summary.withdrawals)|fmt('amt') }} {{ base }}</div>
+      <div class="s note">z banky {{ summary.deposits|fmt('amt') }}, do banky/na kartu {{ summary.withdrawals|fmt('amt') }}</div></div>
   </div>
   {% if summary.unpriced %}
   <div class="warn" style="margin-top:12px">U niektorých pozícií sa nepodarilo načítať aktuálnu cenu z Yahoo Finance, preto nie sú v trhovej hodnote a nerealizovanom zisku. Zadaj správny symbol z Yahoo (napr. <code>VUSA.L</code>, <code>SAP.DE</code>) alebo to skús neskôr:
@@ -63,6 +68,7 @@
   </div>
   {% endif %}
   {% for w in data.warnings %}<div class="warn" style="margin-top:8px">{{ w }}</div>{% endfor %}
+  {% if summary.fx_missing %}<div class="warn" style="margin-top:8px">Nepodarilo sa načítať kurz: {{ summary.fx_missing|join(', ') }}. Tieto sumy nie sú v súhrne.</div>{% endif %}
 </div>
 
 {% if alloc %}
@@ -82,34 +88,36 @@
   <h2>Otvorené pozície</h2>
   <div class="tablewrap"><table class="pf sortable" id="postable">
     <thead><tr>
-      <th>Ticker</th><th>Názov</th><th>Ks</th><th>Priem. nákupná cena ({{ acct }})</th><th>Aktuálna cena ({{ acct }})</th>
-      <th>Hodnota ({{ acct }})</th><th>Zisk / strata ({{ acct }})</th><th>Zisk / strata %</th><th>Podiel</th><th>Dividendy ({{ acct }})</th>
+      <th>Ticker</th><th>Názov</th><th>Ks</th><th>Mena</th><th>Priem. nákupná cena</th><th>Aktuálna cena</th>
+      <th>Hodnota</th><th>Zisk / strata</th><th>Zisk / strata %</th><th>Hodnota ({{ base }})</th><th>Podiel</th><th>Dividendy ({{ base }})</th>
     </tr></thead>
     <tbody>
     {% for p in positions %}
       <tr>
         <td data-v="{{ p.ticker }}">{% if p.symbol and us_symbol.match(p.symbol) %}<a href="{{ url_for('section_view', ticker=p.symbol, section='overview') }}"><strong>{{ p.ticker }}</strong></a>{% else %}<strong>{{ p.ticker or p.isin }}</strong>{% endif %}</td>
-        <td data-v="{{ p.name }}" style="text-align:left;white-space:normal">{{ p.name }}</td>
+        <td data-v="{{ p.name }}" style="text-align:left;white-space:normal">{{ p.name }}{% if p.spinoff %} <span class="note">(spin-off)</span>{% endif %}</td>
         <td data-v="{{ p.shares }}">{{ p.shares|fmt('sh') }}</td>
+        <td data-v="{{ p.ccy }}">{{ p.ccy }}</td>
         <td data-v="{{ p.avg_cost }}">{{ p.avg_cost|fmt('amt') }}</td>
-        <td data-v="{{ p.price_acct or 0 }}">{{ p.price_acct|fmt('amt') if p.price_acct is not none else '–' }}</td>
+        <td data-v="{{ p.price_pc or 0 }}">{{ p.price_pc|fmt('amt') if p.price_pc is not none else '–' }}</td>
         <td data-v="{{ p.value or 0 }}">{{ p.value|fmt('amt') if p.value is not none else '–' }}</td>
         <td data-v="{{ p.unrealized or 0 }}" class="{{ 'neg' if p.unrealized is not none and p.unrealized < 0 }}">{{ p.unrealized|fmt('amt') if p.unrealized is not none else '–' }}</td>
         <td data-v="{{ p.unrealized_pct or 0 }}" class="{{ 'neg' if p.unrealized_pct is not none and p.unrealized_pct < 0 }}">{{ p.unrealized_pct|fmt('pct') if p.unrealized_pct is not none else '–' }}</td>
+        <td data-v="{{ p.value_b or 0 }}">{{ p.value_b|fmt('amt') if p.value_b is not none else '–' }}</td>
         <td data-v="{{ p.weight or 0 }}">{{ p.weight|fmt('pct') if p.weight is not none else '–' }}</td>
-        <td data-v="{{ p.dividends }}">{{ p.dividends|fmt('amt') }}</td>
+        <td data-v="{{ p.div_b or 0 }}">{{ p.div_b|fmt('amt') }}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
-  <p class="note">Priemerná nákupná cena = súčet nákupov (vrátane poplatkov, v mene účtu) ÷ počet kusov, rovnako ako to robí Trading 212. Aktuálna cena je z Yahoo Finance a prepočítaná aktuálnym kurzom. Kliknutím na hlavičku stĺpca tabuľku zoradíš, kliknutím na ticker otvoríš analýzu firmy (len akcie z USA).</p>
+  <p class="note">Priemerná nákupná cena = súčet nákupov ÷ počet kusov, v mene pozície. Aktuálna cena je z Yahoo Finance a prepočítaná na menu pozície aktuálnym kurzom. Kliknutím na hlavičku stĺpca tabuľku zoradíš, kliknutím na ticker otvoríš analýzu firmy (len akcie z USA).</p>
 </div>
 
-{% if data.dividends_by_year %}
+{% if summary.div_year %}
 <div class="card">
   <h2>Dividendy podľa rokov</h2>
-  <div class="tablewrap"><table class="plain"><thead><tr><th>Rok</th><th>Dividendy ({{ acct }})</th></tr></thead><tbody>
-    {% for y, v in data.dividends_by_year.items() %}<tr><td>{{ y }}</td><td style="text-align:left">{{ v|fmt('amt') }}</td></tr>{% endfor %}
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Rok</th><th>Dividendy ({{ base }})</th></tr></thead><tbody>
+    {% for y, v in summary.div_year.items() %}<tr><td>{{ y }}</td><td style="text-align:left">{{ v|fmt('amt') }}</td></tr>{% endfor %}
   </tbody></table></div>
 </div>
 {% endif %}
@@ -117,20 +125,21 @@
 {% if closed %}
 <details class="card"><summary>Uzavreté pozície ({{ closed|length }})</summary>
   <div class="tablewrap" style="margin-top:10px"><table class="pf">
-    <thead><tr><th>Ticker</th><th>Názov</th><th>Posledný predaj</th><th>Nákupy ({{ acct }})</th><th>Predaje ({{ acct }})</th><th>Realizovaný zisk ({{ acct }})</th><th>Dividendy ({{ acct }})</th></tr></thead>
-    <tbody>{% for p in closed %}<tr><td><strong>{{ p.ticker or p.isin }}</strong></td><td style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.last }}</td>
-      <td>{{ p.bought|fmt('amt') }}</td><td>{{ p.sold|fmt('amt') }}</td><td class="{{ 'neg' if p.realized < 0 }}">{{ p.realized|fmt('amt') }}</td><td>{{ p.dividends|fmt('amt') }}</td></tr>{% endfor %}</tbody>
+    <thead><tr><th>Ticker</th><th>Názov</th><th>Mena</th><th>Posledný predaj</th><th>Nákupy</th><th>Predaje</th><th>Realizovaný zisk ({{ base }})</th></tr></thead>
+    <tbody>{% for p in closed %}<tr><td><strong>{{ p.ticker or p.isin }}</strong></td><td style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.ccy }}</td><td>{{ p.last }}</td>
+      <td>{{ p.bought|fmt('amt') if p.bought else '–' }}</td><td>{{ p.sold|fmt('amt') if p.sold else '–' }}</td><td class="{{ 'neg' if p.realized_b < 0 }}">{{ p.realized_b|fmt('amt') }}</td></tr>{% endfor %}</tbody>
   </table></div>
+  <p class="note">Zisk z predaja beriem z exportu Trading 212 (stĺpec Result), ak v ňom je. Ak pozícia vznikla pred začiatkom exportu, nákupy v tabuľke chýbajú.</p>
 </details>
 {% endif %}
 
 <details class="card"><summary>Transakcie ({{ n_txn }}{% if n_txn > txns|length %}, zobrazených posledných {{ txns|length }}{% endif %})</summary>
   <div class="controls" style="margin:10px 0"><label>Hľadať (ticker, názov, druh)<input id="txfilter" placeholder="napr. AAPL alebo dividend"></label></div>
   <div class="tablewrap"><table class="pf" id="txtable">
-    <thead><tr><th>Dátum</th><th>Druh</th><th>Ticker</th><th>Ks</th><th>Cena</th><th>Spolu ({{ acct }})</th></tr></thead>
+    <thead><tr><th>Dátum</th><th>Druh</th><th>Ticker</th><th>Ks</th><th>Cena</th><th>Spolu</th></tr></thead>
     <tbody>{% for t in txns %}<tr><td>{{ t.time[:16] }}</td><td style="text-align:left">{{ t.action }}</td><td>{{ t.ticker }}</td>
       <td>{{ t.shares|fmt('sh') if t.shares is not none else '' }}</td><td>{{ (t.price|fmt('amt') ~ ' ' ~ t.price_ccy) if t.price is not none else '' }}</td>
-      <td>{{ t.total|fmt('amt') if t.total is not none else '' }}</td></tr>{% endfor %}</tbody>
+      <td>{{ (t.total|fmt('amt') ~ ' ' ~ t.ccy) if t.total is not none else '' }}</td></tr>{% endfor %}</tbody>
   </table></div>
 </details>
 

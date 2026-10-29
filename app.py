@@ -265,8 +265,16 @@ def build_context(ticker, section):
 
 
 # ------------------------------------------------------------------ portfólio
-DEMO_SYMBOLS = {"DEMOCO", "DEMOBANK"}
-DEMO_FX = {("USD", "EUR"): 0.92, ("EUR", "USD"): 1 / 0.92}
+DEMO_QUOTES = {   # ukážkové portfólio funguje aj bez internetu
+    "DEMOCO": {"price": 50.0, "currency": "USD", "change_pct": 0.012},
+    "DEMOBANK": {"price": 50.0, "currency": "USD", "change_pct": -0.004},
+    "DEMOEU": {"price": 110.0, "currency": "EUR", "change_pct": 0.003},
+    "DEMOUK": {"price": 2300.0, "currency": "GBp", "change_pct": 0.006},   # pence
+    "DEMOSPIN": {"price": 20.0, "currency": "EUR", "change_pct": 0.0},
+}
+DEMO_SYMBOLS = set(DEMO_QUOTES)
+DEMO_FX = {("USD", "EUR"): 0.92, ("EUR", "USD"): 1 / 0.92, ("GBP", "EUR"): 1.15,
+           ("EUR", "GBP"): 1 / 1.15, ("GBP", "USD"): 1.25, ("USD", "GBP"): 0.8}
 US_SYMBOL = re.compile(r"^[A-Z]{1,5}(-[AB])?$")
 
 
@@ -282,19 +290,21 @@ def _pf_symbol_fn(store):
 
 
 def _pf_quote(sym):
-    if sym in DEMO_SYMBOLS:
-        return dict(DEMO_QUOTE)
+    if sym in DEMO_QUOTES:
+        return dict(DEMO_QUOTES[sym])
     return prices.get_price(sym)
 
 
-def _pf_fx(frm, to):
-    if (frm, to) in DEMO_FX and frm == "USD":   # ukážkové portfólio funguje aj bez internetu
-        return DEMO_FX[(frm, to)]
-    q = prices.get_price(f"{frm}{to}=X")
-    if q:
-        return q["price"]
-    inv = prices.get_price(f"{to}{frm}=X")
-    return 1 / inv["price"] if inv and inv["price"] else None
+def _pf_fx_factory(demo):
+    def fx(frm, to):
+        if demo:
+            return DEMO_FX.get((frm, to))
+        q = prices.get_price(f"{frm}{to}=X")
+        if q:
+            return q["price"]
+        inv = prices.get_price(f"{to}{frm}=X")
+        return 1 / inv["price"] if inv and inv["price"] else None
+    return fx
 
 
 def _read_upload(f):
@@ -314,22 +324,30 @@ def portfolio_view():
     ctx = {"page": "portfolio", "ticker": None, "section": None, "files": store["files"]}
     if not txns:
         return render_template("portfolio.html", has_data=False, **ctx)
-    acct = store["acct_ccy"] or "EUR"
     data = portfolio.build_positions(txns)
-    valued = portfolio.value_positions(data["open"], acct, _pf_symbol_fn(store), _pf_quote, _pf_fx)
-    summary = portfolio.summarize(data, valued)
-    priced = sorted([p for p in valued if p.get("value") is not None], key=lambda p: -p["value"])
+    currencies = sorted(set(data["currencies"]) | {"EUR", "USD"})
+    base = request.args.get("base", "").upper()
+    base = base if base in currencies else (store.get("base") if store.get("base") in currencies
+                                            else portfolio.default_base(txns))
+    demo = any(t.get("ticker") in DEMO_SYMBOLS for t in txns)
+    conv = portfolio.Converter(_pf_fx_factory(demo))
+    valued = portfolio.value_positions(data["open"], base, _pf_symbol_fn(store), _pf_quote, conv)
+    summary = portfolio.summarize(data, valued, base, conv)
+    priced = sorted([p for p in valued if p.get("value_b") is not None],
+                    key=lambda p: -p["value_b"])
     alloc = [{"label": p["ticker"] or p["isin"], "name": p["name"], "pct": p["weight"],
-              "value": p["value"]} for p in priced[:12]]
+              "value": p["value_b"]} for p in priced[:12]]
     if len(priced) > 12:
         rest = priced[12:]
-        alloc.append({"label": "Ostatné", "name": f"{len(rest)} ďalších", "value":
-                      sum(p["value"] for p in rest), "pct": sum(p["weight"] for p in rest)})
+        alloc.append({"label": "Ostatné", "name": f"{len(rest)} ďalších",
+                      "value": sum(p["value_b"] for p in rest),
+                      "pct": sum(p["weight"] for p in rest)})
     recent = sorted(txns, key=lambda t: t["time"], reverse=True)[:400]
+    closed = sorted(data["closed"], key=lambda p: p["last"], reverse=True)
     return render_template(
-        "portfolio.html", has_data=True, acct=acct, data=data, positions=valued, summary=summary,
-        alloc=alloc, txns=recent, n_txn=len(txns), us_symbol=US_SYMBOL,
-        closed=sorted(data["closed"], key=lambda p: p["last"], reverse=True), **ctx)
+        "portfolio.html", has_data=True, base=base, currencies=currencies, data=data,
+        positions=valued, summary=summary, alloc=alloc, txns=recent, n_txn=len(txns),
+        us_symbol=US_SYMBOL, closed=closed, **ctx)
 
 
 @app.route("/portfolio/import", methods=["POST"])
