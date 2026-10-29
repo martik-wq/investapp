@@ -353,6 +353,7 @@ def portfolio_view():
                                             else portfolio.default_base(txns))
     demo = any(t.get("ticker") in DEMO_SYMBOLS for t in txns)
     conv = portfolio.Converter(_pf_fx_factory(demo))
+    ctx["demo"] = demo
     valued = portfolio.value_positions(data["open"], base, _pf_symbol_fn(store), _pf_quote, conv)
     summary = portfolio.summarize(data, valued, base, conv)
     priced = sorted([p for p in valued if p.get("value_b") is not None],
@@ -517,7 +518,7 @@ def portfolio_performance():
         warns.append("Výnosy portfólia sú orientačné, kým nenahráš aj staršie exporty od prvého "
                      "vkladu (pozície kúpené pred začiatkom exportu nie sú vo výpočte).")
     return render_template(
-        "performance.html", page="portfolio", ticker=None, section=None, base=base,
+        "performance.html", page="portfolio", ticker=None, section=None, base=base, demo=demo,
         currencies=currencies, rows=rows, ytd=ytd, allr=allr, twelve=twelve, payload=payload,
         benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
         bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),

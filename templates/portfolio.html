@@ -6,6 +6,7 @@
   <div class="sub">{% if has_data %}Import z Trading 212 · {{ n_txn }} transakcií · {{ data.first }} – {{ data.last }} · údaje sú uložené len na tvojom počítači{% else %}Nahraj export z Trading 212 a uvidíš pozície, zisky, dividendy a aktuálnu hodnotu.{% endif %}</div>
 </div>
 {% if has_data %}{% with tab = 'overview' %}{% include "_pftabs.html" %}{% endwith %}{% endif %}
+{% if demo %}<div class="warn"><strong>Ukážkové portfólio:</strong> ceny akcií, kurzy aj indexy sú tu vymyslené, preto nezodpovedajú skutočnému trhu (napr. S&amp;P 500 sa nebude zhodovať s Googlom). Po nahraní vlastného exportu sa použijú reálne údaje z Yahoo Finance.</div>{% endif %}
 {% for cat, msg in get_flashed_messages(with_categories=true) %}
   <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
 {% endfor %}

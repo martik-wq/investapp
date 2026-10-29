@@ -539,6 +539,7 @@ check("výkonnosť: stránka s tabuľkou, grafom a indexmi (ukážkové dáta)",
       and 'id="perf-data"' in hp and "S&amp;P 500" in hp and "YTD" in hp, rp.status_code)
 rp2 = cl.get("/portfolio/performance?bm=^NDX&bm=URTH&custom=^GDAXI&base=USD")
 hp2 = rp2.get_data(as_text=True)
+check("výkonnosť: ukážkové dáta sú označené ako vymyslené", "Ukážkové portfólio:" in hp and "vymyslené" in hp)
 check("výkonnosť: vlastný výber indexov a meny", rp2.status_code == 200 and "Nasdaq-100" in hp2 and "MSCI World" in hp2
       and "DAX" in hp2 and "výnosy v mene USD" in hp2)
 check("výkonnosť: záložky Prehľad a Výkonnosť", "Výkonnosť a porovnanie s indexmi" in cl.get("/portfolio").get_data(as_text=True))
