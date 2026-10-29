@@ -494,7 +494,11 @@ def portfolio_performance():
             vals.append(v * r if r is not None else None)
         benches[b] = perf.Series(days, vals)
     windows = perf.standard_windows(tl, today)
-    rows = perf.period_rows(tl, windows, benches)
+    all_rows = perf.period_rows(tl, windows, benches)
+    hidden_keys = set(store.get("hidden_periods", []))
+    bad_rows = [r for r in all_rows if r["bad"]]
+    hidden_rows = [r for r in all_rows if r["key"] in hidden_keys and not r["bad"]]
+    rows = [r for r in all_rows if not r["bad"] and r["key"] not in hidden_keys]
     ytd = next((r for r in rows if r["key"] == f"y{today.year}" or r["label"].startswith("YTD")), None)
     allr = next((r for r in rows if r["key"] == "all"), None)
     twelve = next((r for r in rows if r["key"] == "12m"), None)
@@ -511,6 +515,10 @@ def portfolio_performance():
         "currency": base,
     }
     warns = list(res["warnings"]) + [w for w in data["warnings"] if "staršia história" in w]
+    for r in bad_rows:
+        warns.append(f"Obdobie „{r['label']}“ som skryl: výnos vyšiel mimo reálneho rozsahu "
+                     f"({'neznámy' if r['twr'] is None else signed_pct(r['twr'])}). Býva to neúplná "
+                     "história alebo chyba v cenách. Po doplnení starších exportov sa zobrazí.")
     missing_bm = [b for b in sel if b not in benches]
     if missing_bm:
         warns.append("Nepodarilo sa načítať históriu indexu: " + ", ".join(missing_bm) + ".")
@@ -519,7 +527,7 @@ def portfolio_performance():
                      "vkladu (pozície kúpené pred začiatkom exportu nie sú vo výpočte).")
     return render_template(
         "performance.html", page="portfolio", ticker=None, section=None, base=base, demo=demo,
-        currencies=currencies, rows=rows, ytd=ytd, allr=allr, twelve=twelve, payload=payload,
+        currencies=currencies, rows=rows, hidden_rows=hidden_rows, ytd=ytd, allr=allr, twelve=twelve, payload=payload,
         benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
         bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),
         data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches])
@@ -552,6 +560,14 @@ def portfolio_demo():
     for w in res["warnings"]:
         flash(w, "warn")
     return redirect(url_for("portfolio_view"))
+
+
+@app.route("/portfolio/performance/hide", methods=["POST"])
+def portfolio_hide_period():
+    key = request.form.get("key", "")
+    if re.fullmatch(r"y\d{4}|12m|all", key):
+        portfolio.set_hidden(key, request.form.get("action") != "show")
+    return redirect(request.referrer or url_for("portfolio_performance"))
 
 
 @app.route("/portfolio/clear", methods=["POST"])

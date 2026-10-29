@@ -474,6 +474,18 @@ check("výnos: predaj bez evidovaných nákupov nevyrobí zisk", abs(r4["days"][
 r5 = perf.compute(tx1[:1], "EUR", {"X1": (None, "EUR")}, perf.Rates({}), d0 + timedelta(2))
 check("bez histórie cien: náhradná cena z obchodu + upozornenie", abs(r5["days"][-1]["v"] - 1000) < 1e-9
       and any("Bez histórie cien" in w for w in r5["warnings"]))
+# veľký nákup po malom základe a mierny pokles ceny nesmie dať záporný výnos (chyba −224 %)
+ps = perf.Series([d0, d0 + timedelta(1), d0 + timedelta(2)], [100, 100, 98])
+tx6 = [ptx("buy", d0, "S1", 0.5, 100, 50), ptx("buy", d0 + timedelta(2), "S1", 50, 100, 5000)]
+r6 = perf.compute(tx6, "EUR", {"S1": (ps, "EUR")}, perf.Rates({}), d0 + timedelta(2))
+check("výnos: veľký nákup po malom základe nedá záporný index", all(d["idx"] > 0 for d in r6["days"] if d["idx"] is not None)
+      and abs(r6["days"][-1]["idx"] - 98.0) < 1e-6, [d["idx"] for d in r6["days"]])
+tx7 = [ptx("buy", d0, "S1", 10, 100, 1000), ptx("sell", d0 + timedelta(1), "S1", 10, 100, 1000)]
+r7 = perf.compute(tx7, "EUR", {"S1": (perf.Series([d0, d0 + timedelta(1)], [100, 100]), "EUR")}, perf.Rates({}), d0 + timedelta(2))
+check("výnos: úplný predaj nedá záporný ani nulový index", all(d["idx"] is None or d["idx"] > 0 for d in r7["days"]))
+check("obdobia mimo reálneho rozsahu sa označia ako chybné", perf.period_rows(
+    perf.Timeline([{"d": d0, "v": 1.0, "flow": 0, "div": 0, "idx": 100.0}, {"d": d0 + timedelta(1), "v": 1.0, "flow": 0, "div": 0, "idx": -124.0}]),
+    [("all", "x", d0 - timedelta(1), d0 + timedelta(1), True)], {})[0]["bad"])
 bs = perf.Series([d0, d0 + timedelta(5)], [100, 120])
 check("index: výnos za obdobie", abs(perf.benchmark_return(bs, d0, d0 + timedelta(5)) - 0.2) < 1e-9)
 
@@ -539,6 +551,11 @@ check("výkonnosť: stránka s tabuľkou, grafom a indexmi (ukážkové dáta)",
       and 'id="perf-data"' in hp and "S&amp;P 500" in hp and "YTD" in hp, rp.status_code)
 rp2 = cl.get("/portfolio/performance?bm=^NDX&bm=URTH&custom=^GDAXI&base=USD")
 hp2 = rp2.get_data(as_text=True)
+rh = cl.post("/portfolio/performance/hide", data={"key": "all"})
+check("výkonnosť: riadok sa dá skryť a znova zobraziť", portfolio.load_store()["hidden_periods"] == ["all"]
+      and "Skryté obdobia" in cl.get("/portfolio/performance").get_data(as_text=True))
+cl.post("/portfolio/performance/hide", data={"key": "all", "action": "show"})
+check("výkonnosť: skrytý riadok sa vráti", portfolio.load_store()["hidden_periods"] == [])
 check("výkonnosť: ukážkové dáta sú označené ako vymyslené", "Ukážkové portfólio:" in hp and "vymyslené" in hp)
 check("výkonnosť: vlastný výber indexov a meny", rp2.status_code == 200 and "Nasdaq-100" in hp2 and "MSCI World" in hp2
       and "DAX" in hp2 and "výnosy v mene USD" in hp2)

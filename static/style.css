@@ -187,3 +187,4 @@ label.bm input{width:auto;padding:0}
 .periodsw button.on{background:var(--acc);color:#fff}
 #perf-chart svg{display:block;width:100%;height:auto}
 #perf-legend .chip{cursor:pointer}
+.linkbtn{background:none;border:0;color:#7d8aa3;text-decoration:underline;font-size:12px;padding:0;cursor:pointer}.linkbtn:hover{color:#1c2430}

@@ -108,11 +108,12 @@ def compute(txns, base, price_hist, rates, end):
     shares = defaultdict(float)
     ticker = {}
     days, prev_v, idx = [], 0.0, None
+    jumps = []
     fb_price = {}                                   # posledná cena z obchodu (náhradná)
     day = first_day
     no_hist = set()
     while day <= end:
-        flow = div = 0.0
+        buys = sells = div = 0.0
         for t in ev.get(day, ()):
             k = t["kind"]
             ticker[t["isin"]] = t.get("ticker") or t["isin"]
@@ -124,12 +125,12 @@ def compute(txns, base, price_hist, rates, end):
                     fb_price[t["isin"]] = (t["price"], t.get("price_ccy") or ccy)
                 if k == "buy":
                     shares[t["isin"]] += sh
-                    flow += amt * r if r is not None else 0.0
+                    buys += amt * r if r is not None else 0.0
                 elif k == "sell":
                     tracked = min(sh, shares[t["isin"]])      # staršia história chýba -> len evidovaná časť
                     shares[t["isin"]] -= tracked
                     frac = tracked / sh if sh else 0.0
-                    flow -= amt * frac * r if r is not None else 0.0
+                    sells += amt * frac * r if r is not None else 0.0
                 else:
                     shares[t["isin"]] += sh
             elif k == "dividend":
@@ -152,14 +153,25 @@ def compute(txns, base, price_hist, rates, end):
             if r is None:
                 continue
             v += sh * px * r
+        flow = buys - sells
         if idx is None:
             if v > MIN_VALUE:
                 idx = 100.0
-        elif prev_v > MIN_VALUE:
-            idx *= 1.0 + (v + div - flow) / prev_v - 1.0
+        elif prev_v + buys > MIN_VALUE:
+            # nákupy sa berú ako kapitál od začiatku dňa, predaje sa započítajú do konca dňa:
+            # výnos nikdy nemôže byť menší ako −100 % (čitateľ ani menovateľ nie sú záporné)
+            f = (v + div + sells) / (prev_v + buys)
+            if f > 1.6 or f < 0.4:
+                jumps.append((day, f - 1.0))
+            idx *= f
         days.append({"d": day, "v": v, "flow": flow, "div": div, "idx": idx})
         prev_v = v
         day += timedelta(days=1)
+    if jumps:
+        ex = ", ".join(f"{d.strftime('%d.%m.%Y')} ({r * 100:+.0f} %)" for d, r in jumps[:3])
+        warnings.append(f"Podozrivý denný pohyb portfólia ({len(jumps)}×, napr. {ex}). Býva to chyba "
+                        "v cenách (zlý symbol, akciový split) alebo neúplná história, výnosy v tom "
+                        "období môžu byť nepresné.")
     if no_hist:
         warnings.append("Bez histórie cien z Yahoo: " + ", ".join(sorted(no_hist)) +
                         ". Hodnota týchto pozícií je odhadnutá z poslednej ceny z obchodu, výnos "
@@ -277,7 +289,8 @@ def period_rows(tl, windows, benches):
         # indexy merať od rovnakého dňa ako portfólio
         b_start = w["start"] if scratch else start
         row = {"key": key, "label": label, "start": w["start"], "end": w["end"], "pnl": w["pnl"],
-               "twr": w["twr"], "dividends": w["dividends"], "bench": {}}
+               "twr": w["twr"], "dividends": w["dividends"], "bench": {},
+               "bad": w["twr"] is None or w["twr"] <= -1.0 or w["twr"] > 50}
         for bid, s in benches.items():
             row["bench"][bid] = benchmark_return(s, b_start, w["end"])
         rows.append(row)

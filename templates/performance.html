@@ -77,6 +77,7 @@
       <th>Obdobie</th><th>Zisk / strata ({{ base }})</th><th>Výnos portfólia</th>
       {% for b in sel_ok %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}
       {% if sel_ok %}<th>Rozdiel voči {{ bench_label.get(sel_ok[0], sel_ok[0]) }}</th>{% endif %}
+      <th></th>
     </tr></thead>
     <tbody>
     {% for r in rows %}
@@ -87,11 +88,14 @@
         {% for b in sel_ok %}{% set v = r.bench.get(b) %}<td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|spct }}</td>{% endfor %}
         {% if sel_ok %}{% set d = (r.twr - r.bench.get(sel_ok[0])) if r.twr is not none and r.bench.get(sel_ok[0]) is not none else none %}
         <td class="{{ 'neg' if d is not none and d < 0 }}">{{ d|spp }}</td>{% endif %}
+        <td><form action="{{ url_for('portfolio_hide_period') }}" method="post"><input type="hidden" name="key" value="{{ r.key }}"><button class="linkbtn" title="Skryť tento riadok z tabuľky">skryť</button></form></td>
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
-  <p class="note"><strong>Ako sa to počíta:</strong> výnos je časovo vážený (TWR): nákupy, predaje a vklady výnos neskresľujú, počítajú sa len zmeny cien, kurzov a dividendy. Zisk / strata je v {{ base }}: zmena hodnoty pozícií − čisté nákupy + dividendy. Hotovosť na účte sa nepočíta. Obdobie, ktoré začína až po tvojom prvom nákupe, je označené „od …“.</p>
+  {% if hidden_rows %}<p class="note">Skryté obdobia:
+    {% for r in hidden_rows %}<form action="{{ url_for('portfolio_hide_period') }}" method="post" style="display:inline"><input type="hidden" name="key" value="{{ r.key }}"><input type="hidden" name="action" value="show"><button class="linkbtn">{{ r.label }} (zobraziť)</button></form> {% endfor %}</p>{% endif %}
+  <p class="note"><strong>Ako sa to počíta:</strong> výnos je časovo vážený (TWR): nákupy, predaje a vklady výnos neskresľujú, počítajú sa len zmeny cien, kurzov a dividendy (nákupy sa berú ako kapitál od začiatku dňa, preto výnos nemôže klesnúť pod −100 %). Zisk / strata je v {{ base }}: zmena hodnoty pozícií − čisté nákupy + dividendy. Hotovosť na účte sa nepočíta. Obdobie, ktoré začína až po tvojom prvom nákupe, je označené „od …“.</p>
 </div>
 
 <script type="application/json" id="perf-data">{{ payload|tojson }}</script>

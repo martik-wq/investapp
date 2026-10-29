@@ -193,7 +193,7 @@ def parse_csv(text):
 
 # --------------------------------------------------------------------- úložisko
 def _empty():
-    return {"txns": {}, "acct_ccy": None, "symbols": {}, "files": []}
+    return {"txns": {}, "acct_ccy": None, "symbols": {}, "files": [], "hidden_periods": []}
 
 
 def load_store():
@@ -247,6 +247,16 @@ def import_files(files):
 def clear_store():
     if os.path.exists(STORE):
         os.remove(STORE)
+
+
+def set_hidden(key, hide=True):
+    """Skryje (alebo znova zobrazí) riadok v tabuľke výnosov, napr. 'y2024'."""
+    store = load_store()
+    hid = [k for k in store.get("hidden_periods", []) if k != key]
+    if hide:
+        hid.append(key)
+    store["hidden_periods"] = hid
+    save_store(store)
 
 
 def set_symbol(isin, symbol):
