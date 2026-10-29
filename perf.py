@@ -358,3 +358,94 @@ def period_rows(tl, windows, benches):
             row["bench"][bid] = benchmark_return(s, b_start, w["end"])
         rows.append(row)
     return rows
+
+
+# ------------------------------------------------------------------ rizikové ukazovatele
+import math
+
+MIN_OBS = 30
+TRADING_DAYS = 252
+
+
+def _mean(a):
+    return sum(a) / len(a) if a else 0.0
+
+
+def _std(a):
+    if len(a) < 2:
+        return 0.0
+    m = _mean(a)
+    return math.sqrt(sum((x - m) ** 2 for x in a) / (len(a) - 1))
+
+
+def _max_drawdown(levels):
+    peak, mdd = None, 0.0
+    for v in levels:
+        if peak is None or v > peak:
+            peak = v
+        if peak:
+            mdd = min(mdd, v / peak - 1.0)
+    return mdd
+
+
+def _single(levels, rets, years, rf):
+    """Ukazovatele jednej rady (úroveň = index alebo cena v základnej mene)."""
+    vol = _std(rets) * math.sqrt(TRADING_DAYS)
+    total = levels[-1] / levels[0] - 1.0 if levels and levels[0] else None
+    cagr = (1.0 + total) ** (1.0 / years) - 1.0 if total is not None and years >= 1.0 and total > -1.0 else None
+    ex = (_mean(rets) - rf / TRADING_DAYS) * TRADING_DAYS            # ročný nadvýnos (aritmeticky, z denných)
+    neg = [min(0.0, r - rf / TRADING_DAYS) for r in rets]
+    dd = math.sqrt(sum(x * x for x in neg) / len(neg)) * math.sqrt(TRADING_DAYS) if rets else 0.0
+    return {"total": total, "cagr": cagr, "vol": vol,
+            "sharpe": ex / vol if vol > 1e-12 else None,
+            "sortino": ex / dd if dd > 1e-12 else None,
+            "mdd": _max_drawdown(levels), "best": max(rets), "worst": min(rets),
+            "pos": sum(1 for r in rets if r > 0) / len(rets)}
+
+
+def risk_stats(tl, benches, start, end, rf=0.0):
+    """Beta, alfa, volatilita, Sharpe, max. pokles… za obdobie (start, end].
+    Denné výnosy sa merajú v dňoch, keď obchoduje prvý index (spoločné dni so všetkými).
+    rf = ročná bezriziková sadzba (0.03 = 3 %). Vráti None, ak je málo dát."""
+    first = tl.first
+    if first is None or not benches:
+        return None
+    start = max(start, first)
+    ids = list(benches)
+    days = [date.fromordinal(o) for o in benches[ids[0]].o if start <= date.fromordinal(o) <= end]
+    rows = []
+    for d in days:
+        r = tl.row(d)
+        vals = [benches[b].at(d) for b in ids]
+        if r and r["idx"] and all(v for v in vals):
+            rows.append((d, r["idx"], vals))
+    if len(rows) < MIN_OBS + 1:
+        return {"n": max(0, len(rows) - 1), "ok": False, "min": MIN_OBS}
+    port_lv = [x[1] for x in rows]
+    port_r = [port_lv[i] / port_lv[i - 1] - 1.0 for i in range(1, len(rows))]
+    years = (rows[-1][0] - rows[0][0]).days / 365.25
+    rfd = rf / TRADING_DAYS
+    out = {"ok": True, "n": len(port_r), "start": rows[0][0], "end": rows[-1][0], "years": years,
+           "rf": rf, "port": _single(port_lv, port_r, years, rf), "bench": {}}
+    for k, b in enumerate(ids):
+        lv = [x[2][k] for x in rows]
+        br = [lv[i] / lv[i - 1] - 1.0 for i in range(1, len(rows))]
+        s = _single(lv, br, years, rf)
+        var_b = _std(br) ** 2
+        mp, mb = _mean(port_r), _mean(br)
+        cov = sum((p - mp) * (q - mb) for p, q in zip(port_r, br)) / (len(br) - 1)
+        beta = cov / var_b if var_b > 1e-14 else None
+        sp, sb = _std(port_r), _std(br)
+        corr = cov / (sp * sb) if sp > 1e-12 and sb > 1e-12 else None
+        act = [p - q for p, q in zip(port_r, br)]
+        te = _std(act) * math.sqrt(TRADING_DAYS)
+        alpha = ((mp - rfd) - beta * (mb - rfd)) * TRADING_DAYS if beta is not None else None
+        up = [(p, q) for p, q in zip(port_r, br) if q > 0]
+        dn = [(p, q) for p, q in zip(port_r, br) if q < 0]
+        upc = _mean([p for p, _ in up]) / _mean([q for _, q in up]) if up and _mean([q for _, q in up]) else None
+        dnc = _mean([p for p, _ in dn]) / _mean([q for _, q in dn]) if dn and _mean([q for _, q in dn]) else None
+        s.update({"beta": beta, "alpha": alpha, "corr": corr, "r2": corr * corr if corr is not None else None,
+                  "te": te, "ir": _mean(act) * TRADING_DAYS / te if te > 1e-12 else None,
+                  "up": upc, "down": dnc})
+        out["bench"][b] = s
+    return out

@@ -82,6 +82,11 @@ def signed_pp(v):
     return f"{'+' if v >= 0 else '−'}{abs(v) * 100:.1f}".replace(".", ",") + " p. b."
 
 
+def plain_pct(v):
+    return "–" if v is None else f"{v * 100:.1f} %".replace(".", ",")
+
+
+app.jinja_env.filters["pct"] = plain_pct
 app.jinja_env.filters["samt"] = signed_amt
 app.jinja_env.filters["spp"] = signed_pp
 app.jinja_env.globals["unit_to_fmt"] = unit_to_fmt
@@ -503,6 +508,17 @@ def portfolio_performance():
     ytd = next((r for r in rows if r["key"] == f"y{today.year}" or r["label"].startswith("YTD")), None)
     allr = next((r for r in rows if r["key"] == "all"), None)
     twelve = next((r for r in rows if r["key"] == "12m"), None)
+    rw = request.args.get("rw", "all")
+    rw = rw if rw in ("all", "12m", "ytd") else "all"
+    try:
+        rf_pct = float((request.args.get("rf", "0") or "0").replace(",", "."))
+    except ValueError:
+        rf_pct = 0.0
+    rf_pct = min(max(rf_pct, 0.0), 25.0)
+    r_end = min(today, tl.last) if tl.last else today
+    r_start = {"all": (tl.first or r_end) - timedelta(days=1), "12m": r_end - timedelta(days=365),
+               "ytd": date(r_end.year - 1, 12, 31)}[rw]
+    risk = perf.risk_stats(tl, benches, r_start, r_end, rf_pct / 100.0) if benches and tl.first else None
     chart_days = [d["d"] for d in res["days"] if d["idx"] is not None and (d["d"].weekday() < 5 or d is res["days"][-1])]
     row_by = {d["d"]: d for d in res["days"]}
     payload = {
@@ -531,7 +547,8 @@ def portfolio_performance():
         currencies=currencies, rows=rows, hidden_rows=hidden_rows, ytd=ytd, allr=allr, twelve=twelve, payload=payload,
         benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
         bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),
-        data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches])
+        data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches],
+        risk=risk, rw=rw, rf_pct=rf_pct)
 
 
 @app.route("/portfolio/import", methods=["POST"])

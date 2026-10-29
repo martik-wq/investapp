@@ -514,6 +514,25 @@ check("split: hodnota pozície po splite = 10 kusov × upravená cena", abs(_r2[
 check("split: načítanie zoznamu splitov z histórie Yahoo",
       perf.split_list({"splits": [["2024-06-10", 10.0], ["2020-01-01", 0.5]]}) == [(date(2020, 1, 1), 0.5), (date(2024, 6, 10), 10.0)])
 
+# --- rizikové ukazovatele: beta, korelácia, volatilita na známom vzťahu (portfólio = 1,5 × index)
+import random as _rr  # noqa: E402
+_g = _rr.Random(1)
+_dd = [d for d in (date(2024, 1, 1) + timedelta(days=i) for i in range(400)) if d.weekday() < 5]
+_b = [100.0]
+for _ in _dd[1:]:
+    _b.append(_b[-1] * (1 + _g.gauss(0.0004, 0.01)))
+_p = [100.0]
+for _i in range(1, len(_dd)):
+    _p.append(_p[-1] * (1 + 1.5 * (_b[_i] / _b[_i - 1] - 1)))
+_tl = perf.Timeline([{"d": d, "v": 100, "flow": 0, "div": 0, "idx": x} for d, x in zip(_dd, _p)])
+_rk = perf.risk_stats(_tl, {"B": perf.Series(_dd, _b)}, _dd[0] - timedelta(days=1), _dd[-1], 0.0)
+_bs = _rk["bench"]["B"]
+check("riziko: beta = 1,5 a korelácia = 1 pri portfóliu = 1,5 × index",
+      abs(_bs["beta"] - 1.5) < 1e-6 and abs(_bs["corr"] - 1.0) < 1e-6 and abs(_bs["alpha"]) < 1e-6,
+      (_bs["beta"], _bs["corr"], _bs["alpha"]))
+check("riziko: volatilita portfólia = 1,5 × volatilita indexu", abs(_rk["port"]["vol"] / _bs["vol"] - 1.5) < 1e-6)
+check("riziko: málo dát -> ok=False", perf.risk_stats(_tl, {"B": perf.Series(_dd, _b)}, _dd[-10], _dd[-1])["ok"] is False)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

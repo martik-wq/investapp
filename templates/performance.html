@@ -98,6 +98,74 @@
   <p class="note"><strong>Ako sa to počíta:</strong> výnos je časovo vážený (TWR): nákupy, predaje a vklady výnos neskresľujú, počítajú sa len zmeny cien, kurzov a dividendy (nákupy sa berú ako kapitál od začiatku dňa, preto výnos nemôže klesnúť pod −100 %). Zisk / strata je v {{ base }}: zmena hodnoty pozícií − čisté nákupy + dividendy. Hotovosť na účte sa nepočíta. Obdobie, ktoré začína až po tvojom prvom nákupe, je označené „od …“.</p>
 </div>
 
+
+{% if risk is not none %}
+<div class="card">
+  <div class="flowhead"><h2>Rizikové ukazovatele</h2>
+    <form method="get" class="controls">
+      <input type="hidden" name="base" value="{{ base }}">
+      {% for b in selected %}<input type="hidden" name="bm" value="{{ b }}">{% endfor %}
+      {% if not selected %}<input type="hidden" name="bm" value="">{% endif %}
+      {% if custom %}<input type="hidden" name="custom" value="{{ custom }}">{% endif %}
+      <label>Obdobie<select name="rw" onchange="this.form.submit()">
+        <option value="all" {{ 'selected' if rw == 'all' }}>Od začiatku</option>
+        <option value="12m" {{ 'selected' if rw == '12m' }}>Posledných 12 mesiacov</option>
+        <option value="ytd" {{ 'selected' if rw == 'ytd' }}>Od začiatku roka</option>
+      </select></label>
+      <label>Bezriziková sadzba (% ročne)<input name="rf" value="{{ rf_pct|string|replace('.', ',') }}" style="width:90px"></label>
+      <button class="ghost">Prepočítať</button>
+    </form>
+  </div>
+  {% if not risk.ok %}
+    <p class="note">Na výpočet je potrebných aspoň {{ risk.min }} obchodných dní s hodnotou portfólia a indexu, v zvolenom období ich je len {{ risk.n }}. Vyber dlhšie obdobie.</p>
+  {% else %}
+  {% set P = risk.port %}{% set bl = risk.bench.items()|list %}
+  <p class="note">{{ risk.start.strftime('%d.%m.%Y') }} – {{ risk.end.strftime('%d.%m.%Y') }} · {{ risk.n }} denných výnosov · výnosy v mene {{ base }}.</p>
+  <div class="tablewrap"><table class="pf">
+    <thead><tr><th>Ukazovateľ</th><th>Moje portfólio</th>{% for b, st in bl %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% macro row(label, key, kind, tip) %}
+      <tr><td style="text-align:left;white-space:normal">{{ label }}{% if tip %}<span class="info" title="{{ tip }}">ⓘ</span>{% endif %}</td>
+        {% for st in [P] + bl|map(attribute=1)|list %}{% set v = st.get(key) %}
+        <td class="{{ 'neg' if kind in ('pct','spct') and v is not none and v < 0 }}">{% if v is none %}–{% elif kind == 'pct' %}{{ v|pct }}{% elif kind == 'spct' %}{{ v|spct }}{% else %}{{ ('%.2f'|format(v))|replace('.', ',') }}{% endif %}</td>
+        {% endfor %}</tr>
+    {% endmacro %}
+    {{ row('Výnos za obdobie', 'total', 'spct', 'Celkový výnos portfólia (časovo vážený) a indexu v zvolenom období.') }}
+    {{ row('Ročný výnos (CAGR)', 'cagr', 'spct', 'Ročne zosúladený výnos. Pri období kratšom ako rok sa nepočíta.') }}
+    {{ row('Volatilita (ročná)', 'vol', 'pct', 'Smerodajná odchýlka denných výnosov × √252. Čím vyššia, tým viac kolíše.') }}
+    {{ row('Sharpe pomer', 'sharpe', 'num', 'Priemerný ročný nadvýnos nad bezrizikovou sadzbou lomený volatilitou. Vyšší je lepší.') }}
+    {{ row('Sortino pomer', 'sortino', 'num', 'Ako Sharpe, ale do rizika sa počítajú len stratové dni.') }}
+    {{ row('Maximálny pokles', 'mdd', 'spct', 'Najväčší pokles od vrcholu po dno v období.') }}
+    {{ row('Najlepší deň', 'best', 'spct', '') }}
+    {{ row('Najhorší deň', 'worst', 'spct', '') }}
+    {{ row('Podiel ziskových dní', 'pos', 'pct', '') }}
+    </tbody>
+  </table></div>
+  <h3>Portfólio voči indexu</h3>
+  <div class="tablewrap"><table class="pf">
+    <thead><tr><th>Ukazovateľ</th>{% for b, st in bl %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% macro vrow(label, key, kind, tip) %}
+      <tr><td style="text-align:left;white-space:normal">{{ label }}<span class="info" title="{{ tip }}">ⓘ</span></td>
+        {% for b, st in bl %}{% set v = st.get(key) %}
+        <td class="{{ 'neg' if kind == 'spct' and v is not none and v < 0 }}">{% if v is none %}–{% elif kind == 'spct' %}{{ v|spct }}{% elif kind == 'pct' %}{{ v|pct }}{% else %}{{ ('%.2f'|format(v))|replace('.', ',') }}{% endif %}</td>
+        {% endfor %}</tr>
+    {% endmacro %}
+    {{ vrow('Beta', 'beta', 'num', 'Citlivosť portfólia na index: 1,0 = hýbe sa rovnako, 1,5 = o polovicu viac, 0,5 = o polovicu menej.') }}
+    {{ vrow('Alfa (ročná)', 'alpha', 'spct', 'Jensenova alfa: výnos nad tým, čo by zodpovedalo betě voči indexu (nad bezrizikovou sadzbou).') }}
+    {{ vrow('Korelácia', 'corr', 'num', 'Ako úzko sa portfólio hýbe s indexom (−1 až 1).') }}
+    {{ vrow('R²', 'r2', 'num', 'Aká časť pohybov portfólia sa dá vysvetliť indexom (0 až 1).') }}
+    {{ vrow('Tracking error', 'te', 'pct', 'Ročná smerodajná odchýlka rozdielu výnosu portfólia a indexu.') }}
+    {{ vrow('Information ratio', 'ir', 'num', 'Priemerný ročný rozdiel výnosu voči indexu lomený tracking errorom.') }}
+    {{ vrow('Upside capture', 'up', 'num', 'Aký podiel rastu indexu v dňoch jeho rastu portfólio zachytilo (1,0 = 100 %).') }}
+    {{ vrow('Downside capture', 'down', 'num', 'Aký podiel poklesu indexu v dňoch jeho poklesu portfólio zachytilo (nižšie je lepšie).') }}
+    </tbody>
+  </table></div>
+  <p class="note">Denné výnosy sa merajú v dňoch, keď obchoduje index. Ukazovatele používajú rovnaký časovo vážený výnos portfólia ako graf (hotovosť sa nepočíta). Pri krátkej histórii alebo malom portfóliu sú odhady neistejšie. Nie je to investičná rada.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 <script type="application/json" id="perf-data">{{ payload|tojson }}</script>
 <script src="{{ url_for('static', filename='perf.js') }}"></script>
 {% endif %}
