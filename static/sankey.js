@@ -5,8 +5,8 @@
   if (!el || !box) return;
   var D = JSON.parse(el.textContent);
   var NS = 'http://www.w3.org/2000/svg';
-  var COL = {rev: '#4f8df5', profit: '#3db07f', cost: '#e8564f'};
-  var RIB = {rev: '#bcd0f2', profit: '#b3dcc8', cost: '#efc3c3'};
+  var COL = {rev: '#f2822b', profit: '#3db07f', cost: '#94a3b8'};
+  var RIB = {rev: '#fbd3b0', profit: '#b9e0cd', cost: '#dfe3ea'};
   var NODE_W = 12;
   var byId = {};
   D.nodes.forEach(function (n, i) { n.idx = i; byId[n.id] = n; });

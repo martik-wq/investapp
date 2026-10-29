@@ -385,7 +385,7 @@ BENCHMARKS = [
 ]
 BENCH_LABEL = {b[0]: b[1] for b in BENCHMARKS}
 DEFAULT_BENCH = ["^GSPC", "^NDX"]
-BENCH_COLORS = ["#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#6250d6", "#008300", "#e34948", "#2a78d6"]
+BENCH_COLORS = ["#334155", "#94a3b8", "#b45309", "#64748b", "#f5a524", "#7c2d12", "#475569", "#cbd5e1"]
 
 
 def _demo_history(symbol, start, end=None):

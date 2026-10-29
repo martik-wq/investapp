@@ -8,7 +8,7 @@
   var tip = document.getElementById('perf-tip');
   var N = D.dates.length;
   var days = D.dates.map(function (d) { return Date.parse(d + 'T00:00:00Z') / 864e5; });
-  var series = [{id: 'portfolio', label: 'Moje portfólio', color: '#2a78d6', width: 2.6, values: D.portfolio, on: true}]
+  var series = [{id: 'portfolio', label: 'Moje portfólio', color: '#f26a1b', width: 2.8, values: D.portfolio, on: true}]
     .concat(D.bench.map(function (b) { return {id: b.id, label: b.label, color: b.color, width: 1.8, values: b.values, on: true}; }));
   var period = 'ytd', s0 = 0, s1 = N - 1;
 
@@ -107,7 +107,7 @@
     var Y = function (v) { return T + (hi - v) / (hi - lo) * (H - T - B); };
     var svg = s('svg', {width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Výkonnosť portfólia a indexov'});
     ticks.forEach(function (t) {
-      s('line', {x1: L, x2: W - R, y1: Y(t), y2: Y(t), stroke: t === 0 ? '#9aa3b2' : '#e6e8ec', 'stroke-width': t === 0 ? 1.2 : 1}, svg);
+      s('line', {x1: L, x2: W - R, y1: Y(t), y2: Y(t), stroke: t === 0 ? '#9aa3b2' : '#f0e8df', 'stroke-width': t === 0 ? 1.2 : 1}, svg);
       var tx = s('text', {x: L - 8, y: Y(t) + 4, 'text-anchor': 'end', class: 'ax'}, svg);
       tx.textContent = (t * 100).toFixed(Math.abs(hi - lo) < 0.1 ? 1 : 0).replace('.', ',') + ' %';
     });
