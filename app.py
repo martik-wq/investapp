@@ -15,6 +15,7 @@ import edgar
 import filings
 import flow
 import metrics
+import perf
 import portfolio
 import prices
 import trends
@@ -61,7 +62,28 @@ def unit_to_fmt(unit):
     return {"cur": "money", "shares": "num", "eps": "eps"}.get(unit, "money")
 
 
+def signed_pct(v, digits=1):
+    if v is None:
+        return "–"
+    return f"{'+' if v >= 0 else '−'}{abs(v) * 100:.{digits}f} %".replace(".", ",")
+
+
+def signed_amt(v):
+    if v is None:
+        return "–"
+    return f"{'+' if v >= 0 else '−'}{abs(v):,.2f}"
+
+
 app.jinja_env.filters["fmt"] = fmt_value
+app.jinja_env.filters["spct"] = signed_pct
+def signed_pp(v):
+    if v is None:
+        return "–"
+    return f"{'+' if v >= 0 else '−'}{abs(v) * 100:.1f} p. b.".replace(".", ",")
+
+
+app.jinja_env.filters["samt"] = signed_amt
+app.jinja_env.filters["spp"] = signed_pp
 app.jinja_env.globals["unit_to_fmt"] = unit_to_fmt
 
 
@@ -348,6 +370,158 @@ def portfolio_view():
         "portfolio.html", has_data=True, base=base, currencies=currencies, data=data,
         positions=valued, summary=summary, alloc=alloc, txns=recent, n_txn=len(txns),
         us_symbol=US_SYMBOL, closed=closed, **ctx)
+
+
+# --------------------------------------------------- výkonnosť portfólia a indexy
+BENCHMARKS = [
+    ("^GSPC", "S&P 500", "cenový index"),
+    ("^SP500TR", "S&P 500 s dividendami", "celkový výnos"),
+    ("^NDX", "Nasdaq-100", "cenový index"),
+    ("^IXIC", "Nasdaq Composite", "cenový index"),
+    ("URTH", "MSCI World (ETF URTH)", "ETF vrátane dividend"),
+    ("^STOXX50E", "Euro Stoxx 50", "cenový index"),
+    ("^GDAXI", "DAX", "výkonnostný index"),
+]
+BENCH_LABEL = {b[0]: b[1] for b in BENCHMARKS}
+DEFAULT_BENCH = ["^GSPC", "^NDX"]
+BENCH_COLORS = ["#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#6250d6", "#008300", "#e34948", "#2a78d6"]
+
+
+def _demo_history(symbol, start, end=None):
+    """Vymyslené denné ceny pre ukážkové portfólio (deterministické, bez internetu)."""
+    import random
+    from datetime import timedelta
+    end = end or date.today()
+    if symbol.endswith("=X") and len(symbol) >= 8:      # kurz, napr. USDEUR=X
+        rate = DEMO_FX.get((symbol[:3], symbol[3:6]))
+        ccy = symbol[3:6]
+        if rate is None:
+            return None
+        base_p, mu, sig = rate, 0.0, 0.0
+    else:
+        rnd_seed = sum(ord(c) * (i + 1) for i, c in enumerate(symbol))
+        q = DEMO_QUOTES.get(symbol)
+        ccy = q["currency"] if q else ("EUR" if symbol in ("^STOXX50E", "^GDAXI") else "USD")
+        anchors = {"DEMOCO": 40.0, "DEMOBANK": 30.0, "DEMOEU": 100.0, "DEMOUK": 2000.0,
+                   "DEMOSPIN": 20.0, "DEMOOLD": 30.0}
+        base_p = anchors.get(symbol) or {"^GSPC": 5000.0, "^SP500TR": 9000.0, "^NDX": 17000.0,
+                                         "^IXIC": 16000.0, "URTH": 130.0}.get(symbol, 4000.0)
+        mu, sig = (0.0004, 0.012) if q else (0.0003, 0.008)
+    rnd = random.Random(rnd_seed if not symbol.endswith("=X") else 1)
+    dates, close, p = [], [], base_p
+    d = start
+    while d <= end:
+        if d.weekday() < 5:
+            p *= 1 + mu + sig * rnd.gauss(0, 1)
+            dates.append(d.isoformat())
+            close.append(round(p, 4))
+        d += timedelta(days=1)
+    return {"dates": dates, "close": close, "adj": close, "currency": ccy}
+
+
+def _parse_dates(s, default):
+    try:
+        return date.fromisoformat(s)
+    except (TypeError, ValueError):
+        return default
+
+
+@app.route("/portfolio/performance")
+def portfolio_performance():
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import timedelta
+    store = portfolio.load_store()
+    txns = list(store["txns"].values())
+    if not txns:
+        return redirect(url_for("portfolio_view"))
+    data = portfolio.build_positions(txns)
+    currencies = sorted(set(data["currencies"]) | {"EUR", "USD"})
+    base = request.args.get("base", "").upper()
+    base = base if base in currencies else (store.get("base") if store.get("base") in currencies
+                                            else portfolio.default_base(txns))
+    demo = any(t.get("ticker") in DEMO_SYMBOLS for t in txns)
+    hist_fn = _demo_history if demo else prices.get_history
+    sel = [b for b in request.args.getlist("bm") if b]
+    custom = request.args.get("custom", "").strip().upper()
+    if custom and custom not in sel:
+        sel.append(custom)
+    if not sel and "bm" not in request.args:
+        sel = list(DEFAULT_BENCH)
+    trades = [t for t in txns if t["kind"] in ("buy", "sell", "spinoff", "dividend")]
+    first = min(t["time"][:10] for t in trades)
+    start = date.fromisoformat(first) - timedelta(days=10)
+    today = date.today()
+    symbol_fn = _pf_symbol_fn(store)
+    isins = {}
+    for t in trades:
+        if t["kind"] != "dividend":
+            isins.setdefault(t["isin"], (t["ticker"], t["price_ccy"] or t["ccy"]))
+    sym_of = {i: symbol_fn(i, tk) for i, (tk, _c) in isins.items()}
+    jobs = {("p", i): sym for i, sym in sym_of.items() if sym}
+    for b in sel:
+        jobs[("b", b)] = b
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        results = dict(zip(jobs, ex.map(lambda sym: hist_fn(sym, start), jobs.values())))
+    price_hist = {}
+    for i, (tk, pccy) in isins.items():
+        h = results.get(("p", i))
+        s, c = perf.to_series(h, "close") if h else (None, None)
+        price_hist[i] = (s, c or pccy)
+    # kurzy: všetky meny cien, obchodov a indexov -> základná mena
+    need = {(c, base) for _s, c in price_hist.values() if c}
+    need |= {(t["ccy"], base) for t in trades if t.get("ccy")}
+    bser, bccy = {}, {}
+    for b in sel:
+        h = results.get(("b", b))
+        s, c = perf.to_series(h, "adj") if h else (None, None)
+        if s:
+            bser[b], bccy[b] = s, c
+            need.add((c, base))
+    need = {p for p in need if p[0] and p[0] != base}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        fxres = dict(zip(need, ex.map(lambda p: hist_fn(f"{p[0]}{p[1]}=X", start), need)))
+    fx = {p: perf.to_series(h, "close")[0] for p, h in fxres.items() if h}
+    rates = perf.Rates(fx)
+    res = perf.compute(txns, base, price_hist, rates, today)
+    tl = perf.Timeline(res["days"])
+    benches = {}
+    for b, s in bser.items():
+        days = [date.fromordinal(o) for o in s.o]
+        vals = []
+        for d, v in zip(days, s.v):
+            r = rates.rate(bccy[b], base, d)
+            vals.append(v * r if r is not None else None)
+        benches[b] = perf.Series(days, vals)
+    windows = perf.standard_windows(tl, today)
+    rows = perf.period_rows(tl, windows, benches)
+    ytd = next((r for r in rows if r["key"] == f"y{today.year}" or r["label"].startswith("YTD")), None)
+    allr = next((r for r in rows if r["key"] == "all"), None)
+    twelve = next((r for r in rows if r["key"] == "12m"), None)
+    chart_days = [d["d"] for d in res["days"] if d["idx"] is not None and (d["d"].weekday() < 5 or d is res["days"][-1])]
+    row_by = {d["d"]: d for d in res["days"]}
+    payload = {
+        "dates": [d.isoformat() for d in chart_days],
+        "portfolio": [round(row_by[d]["idx"], 4) for d in chart_days],
+        "value": [round(row_by[d]["v"], 2) for d in chart_days],
+        "bench": [{"id": b, "label": BENCH_LABEL.get(b, b), "color": BENCH_COLORS[k % len(BENCH_COLORS)],
+                   "values": [None if benches[b].at(d) is None else round(benches[b].at(d), 4)
+                              for d in chart_days]}
+                  for k, b in enumerate([x for x in sel if x in benches])],
+        "currency": base,
+    }
+    warns = list(res["warnings"]) + [w for w in data["warnings"] if "staršia história" in w]
+    missing_bm = [b for b in sel if b not in benches]
+    if missing_bm:
+        warns.append("Nepodarilo sa načítať históriu indexu: " + ", ".join(missing_bm) + ".")
+    if any("staršia história" in w for w in data["warnings"]):
+        warns.append("Výnosy portfólia sú orientačné, kým nenahráš aj staršie exporty od prvého "
+                     "vkladu (pozície kúpené pred začiatkom exportu nie sú vo výpočte).")
+    return render_template(
+        "performance.html", page="portfolio", ticker=None, section=None, base=base,
+        currencies=currencies, rows=rows, ytd=ytd, allr=allr, twelve=twelve, payload=payload,
+        benchmarks=BENCHMARKS, selected=sel, custom=custom, bench_colors=BENCH_COLORS,
+        bench_label=BENCH_LABEL, first=tl.first, last=tl.last, warns=warns, n_txn=len(txns),
+        data_first=data["first"], data_last=data["last"], sel_ok=[b for b in sel if b in benches])
 
 
 @app.route("/portfolio/import", methods=["POST"])

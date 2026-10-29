@@ -159,3 +159,50 @@ def search_symbol(query):
             break
     _store(f"search_{key}.json", {"symbol": sym})
     return sym
+
+
+HIST_URL = ("https://query1.finance.yahoo.com/v8/finance/chart/{sym}?period1={p1}&period2={p2}"
+            "&interval=1d&events=div%2Csplits")
+
+
+def get_history(symbol, start):
+    """Denné ceny od dátumu `start` (date): {'dates','close','adj','currency'} alebo None.
+    adj = cena upravená o dividendy (celkový výnos), ak ju Yahoo uvádza."""
+    from datetime import datetime, timedelta, timezone
+    sym = _sym(symbol)
+    p1 = int(datetime(start.year, start.month, start.day, tzinfo=timezone.utc).timestamp())
+    p2 = int((datetime.now(timezone.utc) + timedelta(days=2)).timestamp())
+    name = f"hist_{re.sub(r'[^A-Za-z0-9]', '_', sym)}_{start.isoformat()}.json"
+    hit = _cached(name, 6 * 3600)
+    if hit:
+        return hit
+    try:
+        url = HIST_URL.format(sym=requests.utils.quote(sym), p1=p1, p2=p2)
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        if r.status_code == 429:                      # Yahoo občas obmedzí počet požiadaviek
+            time.sleep(1.5)
+            r = requests.get(url, headers=HEADERS, timeout=20)
+        r.raise_for_status()
+        res = r.json()["chart"]["result"][0]
+        ts = res["timestamp"]
+        close = res["indicators"]["quote"][0]["close"]
+        adj = None
+        try:
+            adj = res["indicators"]["adjclose"][0]["adjclose"]
+        except (KeyError, IndexError, TypeError):
+            pass
+        ccy = res["meta"].get("currency")
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None
+    dates, c, a = [], [], []
+    for i, t in enumerate(ts):
+        if close[i] is None:
+            continue
+        dates.append(datetime.fromtimestamp(t, timezone.utc).date().isoformat())
+        c.append(close[i])
+        a.append(adj[i] if adj and adj[i] is not None else close[i])
+    if not dates:
+        return None
+    out = {"dates": dates, "close": c, "adj": a, "currency": ccy}
+    _store(name, out)
+    return out

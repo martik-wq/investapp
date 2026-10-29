@@ -76,3 +76,10 @@ V bočnom paneli je záložka Portfólio. Nahraj CSV z Trading 212 (História �
 najviac 12 mesiacov na súbor, viac súborov naraz). Aplikácia spočíta pozície (priemerná nákupná cena ako v T212),
 realizovaný a nerealizovaný zisk, dividendy a aktuálnu hodnotu (ceny z Yahoo Finance podľa ISIN). Údaje sú v priečinku `data/`
 (nenahrávajú sa na GitHub a aktualizácia ich neprepisuje).
+
+## Výkonnosť portfólia a porovnanie s indexmi
+
+V Portfóliu je záložka „Výkonnosť a porovnanie s indexmi“ (`perf.py`, `static/perf.js`). Počíta časovo vážený výnos (TWR)
+z denných hodnôt pozícií (historické ceny a kurzy z Yahoo Finance), zisk/stratu YTD, po kalendárnych rokoch a od začiatku,
+a porovnáva ho s indexmi (S&P 500, Nasdaq-100, MSCI World… alebo vlastný symbol) prepočítanými do tej istej meny.
+Presné výsledky vyžadujú kompletnú históriu od prvého nákupu; pri neúplnom exporte je výnos orientačný a aplikácia na to upozorní.

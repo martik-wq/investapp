@@ -175,3 +175,15 @@ table.sortable th.asc:after{content:"▲"}table.sortable th.desc:after{content:"
 details.card>summary{cursor:pointer;font-weight:700;font-size:16px}
 .danger{background:#fff;color:#c62828;border-color:#e3b3b0}
 .pf td[data-v][style*="text-align:left"]{min-width:170px}
+/* ---- výkonnosť portfólia ---- */
+.pftabs{display:flex;gap:6px;margin:0 0 12px;border-bottom:1px solid var(--line)}
+.pftabs a{padding:9px 14px;text-decoration:none;color:var(--mute);font-weight:600;font-size:14px;border-bottom:3px solid transparent;margin-bottom:-1px}
+.pftabs a.on{color:var(--acc);border-bottom-color:var(--acc)}
+.bmbox{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;max-width:760px}
+label.bm{flex-direction:row;align-items:center;gap:5px;font-size:13px;color:var(--ink)}
+label.bm input{width:auto;padding:0}
+.periodsw{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.periodsw button{background:#fff;color:var(--ink);border:0;border-radius:0;padding:6px 12px;font-size:13px}
+.periodsw button.on{background:var(--acc);color:#fff}
+#perf-chart svg{display:block;width:100%;height:auto}
+#perf-legend .chip{cursor:pointer}

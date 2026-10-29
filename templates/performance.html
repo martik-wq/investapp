@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Výkonnosť portfólia{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>💼 Portfólio</h1>
+  <div class="sub">{{ n_txn }} transakcií · údaje od {{ data_first }} do {{ data_last }} · výnosy v mene {{ base }}</div>
+</div>
+{% with tab = 'perf' %}{% include "_pftabs.html" %}{% endwith %}
+{% for w in warns %}<div class="warn">{{ w }}</div>{% endfor %}
+
+{% if not rows %}
+  <div class="warn">Zatiaľ sa nepodarilo vypočítať výkonnosť (chýbajú historické ceny alebo obchody).</div>
+{% else %}
+<div class="card">
+  <div class="pfkpis">
+    {% if ytd %}
+    <div class="pfk"><div class="l">Zisk / strata {{ ytd.label }}</div>
+      <div class="v {{ 'up' if ytd.pnl >= 0 else 'down' }}">{{ ytd.pnl|samt }} {{ base }}</div>
+      <div class="s {{ 'up' if ytd.twr >= 0 else 'down' }}">výnos {{ ytd.twr|spct }}</div></div>
+    {% endif %}
+    {% if twelve %}
+    <div class="pfk"><div class="l">Posledných 12 mesiacov</div>
+      <div class="v {{ 'up' if twelve.twr >= 0 else 'down' }}">{{ twelve.twr|spct }}</div>
+      <div class="s note">zisk / strata {{ twelve.pnl|samt }} {{ base }}</div></div>
+    {% endif %}
+    {% if allr %}
+    <div class="pfk"><div class="l">Od začiatku ({{ allr.start.strftime('%d.%m.%Y') }})</div>
+      <div class="v {{ 'up' if allr.twr >= 0 else 'down' }}">{{ allr.twr|spct }}</div>
+      <div class="s note">zisk / strata {{ allr.pnl|samt }} {{ base }}</div></div>
+    {% endif %}
+    {% if ytd %}
+    <div class="pfk"><div class="l">Dividendy {{ ytd.label }}</div><div class="v">{{ ytd.dividends|fmt('amt') }} {{ base }}</div>
+      <div class="s note">po zrážkovej dani</div></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" class="controls">
+    <label>Mena
+      <select name="base" onchange="this.form.submit()">{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if c == base }}>{{ c }}</option>{% endfor %}</select></label>
+    <div class="bmbox"><span class="note">Porovnať s indexmi:</span>
+      {% for sym, name, note in benchmarks %}
+        <label class="bm"><input type="checkbox" name="bm" value="{{ sym }}" {{ 'checked' if sym in selected }}> {{ name }}</label>
+      {% endfor %}
+    </div>
+    <label>Vlastný symbol z Yahoo
+      <input name="custom" value="{{ custom }}" size="10" placeholder="napr. ^DJI alebo VWCE.DE"></label>
+    <button>Použiť</button>
+  </form>
+  <p class="note" style="margin-bottom:0">Indexy sa prepočítavajú do meny {{ base }} dennými kurzami, takže porovnanie zahŕňa aj vplyv kurzu. Cenové indexy (S&amp;P 500, Nasdaq…) nezahŕňajú dividendy, preto sú voči portfóliu (ktoré dividendy zahŕňa) mierne znevýhodnené. Fér porovnanie je „S&amp;P 500 s dividendami“ alebo ETF.</p>
+</div>
+
+<div class="card">
+  <div class="flowhead">
+    <h2>Vývoj v čase</h2>
+    <div class="periodsw" id="perf-periods">
+      <button data-p="ytd" class="on">YTD</button><button data-p="1m">1 mes.</button><button data-p="3m">3 mes.</button>
+      <button data-p="6m">6 mes.</button><button data-p="1y">1 rok</button><button data-p="all">Od začiatku</button>
+    </div>
+  </div>
+  <div class="controls" style="margin:8px 0">
+    <label>Od<input type="date" id="perf-from"></label><label>Do<input type="date" id="perf-to"></label>
+    <button type="button" class="ghost" id="perf-apply">Vlastné obdobie</button>
+    <span class="note" id="perf-sum"></span>
+  </div>
+  <div class="chips" id="perf-legend"></div>
+  <div class="cwrap" id="perf-chart"><div class="tip" id="perf-tip" style="display:none"></div></div>
+  <p class="note">Čiary ukazujú zmenu v % od začiatku zvoleného obdobia (0 % = začiatok). Kurzorom nad grafom uvidíš hodnoty v jednotlivých dňoch.</p>
+</div>
+
+<div class="card">
+  <h2>Výnosy po obdobiach</h2>
+  <div class="tablewrap"><table class="pf">
+    <thead><tr>
+      <th>Obdobie</th><th>Zisk / strata ({{ base }})</th><th>Výnos portfólia</th>
+      {% for b in sel_ok %}<th>{{ bench_label.get(b, b) }}</th>{% endfor %}
+      {% if sel_ok %}<th>Rozdiel voči {{ bench_label.get(sel_ok[0], sel_ok[0]) }}</th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td style="text-align:left;white-space:normal">{{ r.label }}<div class="note">{{ r.start.strftime('%d.%m.%Y') }} – {{ r.end.strftime('%d.%m.%Y') }}</div></td>
+        <td class="{{ 'neg' if r.pnl < 0 }}">{{ r.pnl|samt }}</td>
+        <td class="{{ 'neg' if r.twr is not none and r.twr < 0 }}"><strong>{{ r.twr|spct }}</strong></td>
+        {% for b in sel_ok %}{% set v = r.bench.get(b) %}<td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|spct }}</td>{% endfor %}
+        {% if sel_ok %}{% set d = (r.twr - r.bench.get(sel_ok[0])) if r.twr is not none and r.bench.get(sel_ok[0]) is not none else none %}
+        <td class="{{ 'neg' if d is not none and d < 0 }}">{{ d|spp }}</td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="note"><strong>Ako sa to počíta:</strong> výnos je časovo vážený (TWR): nákupy, predaje a vklady výnos neskresľujú, počítajú sa len zmeny cien, kurzov a dividendy. Zisk / strata je v {{ base }}: zmena hodnoty pozícií − čisté nákupy + dividendy. Hotovosť na účte sa nepočíta. Obdobie, ktoré začína až po tvojom prvom nákupe, je označené „od …“.</p>
+</div>
+
+<script type="application/json" id="perf-data">{{ payload|tojson }}</script>
+<script src="{{ url_for('static', filename='perf.js') }}"></script>
+{% endif %}
+{% endblock %}

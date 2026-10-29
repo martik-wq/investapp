@@ -419,6 +419,64 @@ check("import: súbor v inej mene sa pridá k ostatným (každý riadok má svoj
 portfolio.clear_store()
 check("import: zmazanie údajov", portfolio.load_store()["txns"] == {})
 
+# ------------------------------------------------ výkonnosť portfólia a porovnanie s indexmi
+import perf  # noqa: E402
+from datetime import timedelta  # noqa: E402
+
+
+def ptx(kind, day, isin, sh, price, total, ccy="EUR", pccy="EUR", ticker="AAA"):
+    return {"kind": kind, "time": day.isoformat() + " 12:00:00", "isin": isin, "ticker": ticker,
+            "shares": sh, "price": price, "price_ccy": pccy, "total": total, "ccy": ccy}
+
+
+d0 = date(2025, 12, 29)
+px = perf.Series([d0, d0 + timedelta(1), d0 + timedelta(2), d0 + timedelta(4), d0 + timedelta(5)],
+                 [100, 110, 110, 110, 121])
+tx1 = [ptx("buy", d0, "X1", 10, 100, 1000), ptx("buy", d0 + timedelta(4), "X1", 10, 110, 1100)]
+r1 = perf.compute(tx1, "EUR", {"X1": (px, "EUR")}, perf.Rates({}), date(2026, 1, 3))
+tl1 = perf.Timeline(r1["days"])
+w1 = perf.window(tl1, date(2025, 12, 31), date(2026, 1, 3))
+check("výnos: TWR nezávisí od času vkladov (110 → 121 = +10 %)", abs(w1["twr"] - 0.10) < 1e-9, w1)
+check("zisk/strata: zmena hodnoty − nákupy (2420 − 1100 − 1100)", abs(w1["pnl"] - 220) < 1e-9, w1)
+w_all = perf.window(tl1, d0 - timedelta(1), date(2026, 1, 3), from_scratch=True)
+check("výnos od začiatku +21 % a zisk 320", abs(w_all["twr"] - 0.21) < 1e-9 and abs(w_all["pnl"] - 320) < 1e-9, w_all)
+wins = perf.standard_windows(tl1, date(2026, 1, 3))
+check("obdobia: YTD, rok začiatku s „od“, od začiatku", [w[0] for w in wins] == ["y2026", "y2025", "all"]
+      and "od 29. 12. 2025" in wins[1][1] and wins[0][1] == "YTD 2026", [w[1] for w in wins])
+rows = perf.period_rows(tl1, wins, {"IDX": perf.Series([d0, date(2025, 12, 31), date(2026, 1, 3)], [50, 55, 66])})
+ry = {r["key"]: r for r in rows}
+check("tabuľka: YTD portfólia aj indexu (55 → 66 = +20 %)", abs(ry["y2026"]["twr"] - 0.10) < 1e-9
+      and abs(ry["y2026"]["bench"]["IDX"] - 0.20) < 1e-9, ry["y2026"])
+check("tabuľka: rok začiatku sa meria od prvého dňa (index 50 → 55 = +10 %)", abs(ry["y2025"]["bench"]["IDX"] - 0.10) < 1e-9
+      and abs(ry["y2025"]["twr"] - 0.10) < 1e-9, ry["y2025"])
+
+# dividendy sa pripočítajú k výnosu
+tx2 = [ptx("buy", d0, "X1", 10, 100, 1000), {**ptx("dividend", d0 + timedelta(1), "X1", None, None, 55), "kind": "dividend"}]
+r2 = perf.compute(tx2, "EUR", {"X1": (perf.Series([d0, d0 + timedelta(1)], [100, 100]), "EUR")}, perf.Rates({}), d0 + timedelta(1))
+check("výnos: dividenda 55 z hodnoty 1000 = +5,5 %", abs(r2["days"][-1]["idx"] - 105.5) < 1e-9, r2["days"][-1])
+
+# kurz: cena v USD sa nemení, USD oslabí z 0,90 na 0,99 EUR -> +10 % v EUR; pence na libry
+fxs = {("USD", "EUR"): perf.Series([d0, d0 + timedelta(1)], [0.90, 0.99])}
+r3 = perf.compute([ptx("buy", d0, "U1", 10, 100, 900, ccy="EUR", pccy="USD")], "EUR",
+                  {"U1": (perf.Series([d0, d0 + timedelta(1)], [100, 100]), "USD")}, perf.Rates(fxs), d0 + timedelta(1))
+check("výnos: zmena kurzu sa prejaví v základnej mene (+10 %)", abs(r3["days"][-1]["idx"] - 110) < 1e-9, r3["days"][-1])
+hs, hc = perf.to_series({"dates": ["2026-01-02"], "close": [2500.0], "adj": [2500.0], "currency": "GBp"})
+check("ceny v penciach sa prepočítajú na libry", hc == "GBP" and abs(hs.at(date(2026, 1, 5)) - 25.0) < 1e-9)
+inv = perf.Rates({("EUR", "USD"): perf.Series([d0], [2.0])})
+check("kurz sa dá použiť aj opačne", abs(inv.rate("USD", "EUR", d0) - 0.5) < 1e-12)
+
+# predaj akcie z čias pred exportom nesmie vyrobiť falošný výnos
+tx4 = [ptx("buy", d0, "A1", 10, 100, 1000), ptx("sell", d0 + timedelta(1), "OLD", 50, 100, 5000, ticker="OLD")]
+r4 = perf.compute(tx4, "EUR", {"A1": (perf.Series([d0, d0 + timedelta(1)], [100, 100]), "EUR"),
+                               "OLD": (perf.Series([d0, d0 + timedelta(1)], [100, 100]), "EUR")}, perf.Rates({}), d0 + timedelta(1))
+check("výnos: predaj bez evidovaných nákupov nevyrobí zisk", abs(r4["days"][-1]["idx"] - 100) < 1e-9, r4["days"][-1])
+# bez histórie cien sa použije cena z obchodu a vypíše upozornenie
+r5 = perf.compute(tx1[:1], "EUR", {"X1": (None, "EUR")}, perf.Rates({}), d0 + timedelta(2))
+check("bez histórie cien: náhradná cena z obchodu + upozornenie", abs(r5["days"][-1]["v"] - 1000) < 1e-9
+      and any("Bez histórie cien" in w for w in r5["warnings"]))
+bs = perf.Series([d0, d0 + timedelta(5)], [100, 120])
+check("index: výnos za obdobie", abs(perf.benchmark_return(bs, d0, d0 + timedelta(5)) - 0.2) < 1e-9)
+
 # ------------------------------------------------------- rozhranie (Flask klient)
 import app as appmod  # noqa: E402
 
@@ -471,6 +529,19 @@ check("portfólio: nahratie súboru, duplicity sa zahodia", r.status_code == 200
 r = cl.post("/portfolio/import", data={"files": (_io.BytesIO(b"x,y\n1,2\n"), "zly.csv")},
             content_type="multipart/form-data", follow_redirects=True)
 check("portfólio: zlý súbor -> chybové hlásenie", "Trading 212" in r.get_data(as_text=True))
+r = cl.post("/portfolio/clear", follow_redirects=True)
+r = cl.get("/portfolio/performance")
+check("výkonnosť: bez portfólia presmeruje na prehľad", r.status_code == 302)
+cl.post("/portfolio/demo")
+rp = cl.get("/portfolio/performance")
+hp = rp.get_data(as_text=True)
+check("výkonnosť: stránka s tabuľkou, grafom a indexmi (ukážkové dáta)", rp.status_code == 200 and "Výnosy po obdobiach" in hp
+      and 'id="perf-data"' in hp and "S&amp;P 500" in hp and "YTD" in hp, rp.status_code)
+rp2 = cl.get("/portfolio/performance?bm=^NDX&bm=URTH&custom=^GDAXI&base=USD")
+hp2 = rp2.get_data(as_text=True)
+check("výkonnosť: vlastný výber indexov a meny", rp2.status_code == 200 and "Nasdaq-100" in hp2 and "MSCI World" in hp2
+      and "DAX" in hp2 and "výnosy v mene USD" in hp2)
+check("výkonnosť: záložky Prehľad a Výkonnosť", "Výkonnosť a porovnanie s indexmi" in cl.get("/portfolio").get_data(as_text=True))
 r = cl.post("/portfolio/clear", follow_redirects=True)
 check("portfólio: zmazanie cez stránku", "Nahraj export" in r.get_data(as_text=True))
 check("bočný panel: odkaz na Portfólio", "Portfólio" in cl.get("/").get_data(as_text=True))
