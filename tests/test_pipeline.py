@@ -490,6 +490,14 @@ bs = perf.Series([d0, d0 + timedelta(5)], [100, 120])
 check("index: výnos za obdobie", abs(perf.benchmark_return(bs, d0, d0 + timedelta(5)) - 0.2) < 1e-9)
 
 # ------------------------------------------------------- rozhranie (Flask klient)
+_mc = {"facts": {"dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": [
+    {"end": "2024-06-30", "filed": "2024-07-25", "val": 100},
+    {"end": "2024-09-30", "filed": "2024-10-25", "val": 5800},
+    {"end": "2024-09-30", "filed": "2024-10-25", "val": 800},
+    {"end": "2024-09-30", "filed": "2024-10-25", "val": 5800}]}}}}}
+check("akcie: viac tried sa sčíta (bez duplikátov)", edgar.latest_shares_outstanding(_mc) == 6600.0,
+      edgar.latest_shares_outstanding(_mc))
+
 # --- regresia: TWR musí presne sedieť s cenovým výnosom (obchody za cenu obchodu, náhodné toky + kurzy)
 import random as _rnd  # noqa: E402
 

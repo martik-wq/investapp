@@ -155,19 +155,20 @@ def detect_currency(facts):
 
 
 def latest_shares_outstanding(facts):
-    best = None
+    """Posledný počet akcií z titulnej strany výkazu. Firmy s viac triedami akcií (Alphabet,
+    Meta...) uvádzajú každú triedu zvlášť k rovnakému dňu, preto sa sčítajú rôzne hodnoty
+    z najnovšieho podania."""
     for tag in SHARES_OUT_TAGS + ["CommonStockSharesOutstanding"]:
         c = _concept(facts, tag)
         if not c:
             continue
         ents = c.get("units", {}).get("shares", [])
-        for e in ents:
-            key = (e.get("end", ""), e.get("filed", ""))
-            if best is None or key > best[0]:
-                best = (key, e["val"])
-        if best:
-            break
-    return best[1] if best else None
+        if not ents:
+            continue
+        key = max((e.get("end", ""), e.get("filed", "")) for e in ents)
+        vals = {e["val"] for e in ents if (e.get("end", ""), e.get("filed", "")) == key}
+        return float(sum(vals))
+    return None
 
 
 # ----------------------------------------------------------------- spracovanie faktov
