@@ -245,7 +245,12 @@ def build_context(ticker, section):
         if fl:
             fl["has_streams"] = any(n["id"].startswith("stream") or n["id"] == "int_income"
                                     for n in fl["nodes"])
-        ctx.update(flow=fl, flow_opts=opts, flow_end=flow_end.isoformat())
+        base = {k: v for k, v in ctx["qs"].items() if k != "mode"}
+        ctx.update(flow=fl, flow_opts=opts, flow_end=flow_end.isoformat(),
+                   mode_links={
+                       "annual": url_for("section_view", ticker=match[0], section="charts", **base),
+                       "quarterly": url_for("section_view", ticker=match[0], section="charts",
+                                            **dict(base, mode="quarterly"))})
     return ctx
 
 

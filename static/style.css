@@ -131,3 +131,8 @@ body.loading::after{content:"Načítavam údaje… (podrobné výkazy sa pri prv
 .sankey .tip{min-width:210px;max-width:340px}
 .sankey .tip .th2{margin-top:6px;font-weight:700;color:#3b4656}
 .sankey .tip .li{padding-left:8px;color:#1c2430}
+
+.flowctl{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.modeSw{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.modeSw a{padding:8px 16px;text-decoration:none;color:var(--ink);background:#fff;font-size:14px}
+.modeSw a.on{background:var(--acc);color:#fff;font-weight:600}

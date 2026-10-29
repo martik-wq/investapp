@@ -7,17 +7,23 @@
   <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong></div>
 </div>
 <div class="card">
-  {% with show = ['years','type'] %}{% include "_toolbar.html" %}{% endwith %}
+  {% with show = ['mode','years','type'] %}{% include "_toolbar.html" %}{% endwith %}
 </div>
 {{ warnings(built, n_req, mode, quote) }}
 {% if flow %}
 <div class="card" id="flowcard">
   <div class="flowhead">
     <h2>Od tržieb k zisku</h2>
-    <label>Obdobie
+    <div class="flowctl">
+    <div class="modeSw" role="group" aria-label="Ročne alebo kvartálne">
+      <a href="{{ mode_links.annual }}" class="{{ 'on' if mode == 'annual' }}" onclick="document.body.classList.add('loading')">Ročne</a>
+      <a href="{{ mode_links.quarterly }}" class="{{ 'on' if mode == 'quarterly' }}" onclick="document.body.classList.add('loading')">Kvartálne</a>
+    </div>
+    <label>{{ 'Rok' if mode == 'annual' else 'Kvartál' }}
       <select id="flow-period">
         {% for iso, lab in flow_opts %}<option value="{{ iso }}" {{ 'selected' if iso == flow_end }}>{{ lab }}</option>{% endfor %}
       </select></label>
+    </div>
   </div>
   <div class="sub">{{ comp.name }} · obdobie končiace {{ flow.end }} · medziročné zmeny sú voči rovnakému obdobiu vlani</div>
   <div class="legend"><span><i style="background:#4f8df5"></i>Tržby</span><span><i style="background:#3db07f"></i>Zisk</span><span><i style="background:#e8564f"></i>Náklady</span></div>
