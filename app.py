@@ -467,10 +467,11 @@ def portfolio_performance():
     for i, (tk, pccy) in isins.items():
         h = results.get(("p", i))
         s, c = perf.to_series(h, "close") if h else (None, None)
-        price_hist[i] = (s, c or pccy)
+        price_hist[i] = (s, c or pccy, perf.split_list(h))
     # kurzy: všetky meny cien, obchodov a indexov -> základná mena
-    need = {(c, base) for _s, c in price_hist.values() if c}
+    need = {(v[1], base) for v in price_hist.values() if v[1]}
     need |= {(t["ccy"], base) for t in trades if t.get("ccy")}
+    need |= {(t["price_ccy"], base) for t in trades if t.get("price_ccy")}
     bser, bccy = {}, {}
     for b in sel:
         h = results.get(("b", b))

@@ -172,7 +172,7 @@ def get_history(symbol, start):
     sym = _sym(symbol)
     p1 = int(datetime(start.year, start.month, start.day, tzinfo=timezone.utc).timestamp())
     p2 = int((datetime.now(timezone.utc) + timedelta(days=2)).timestamp())
-    name = f"hist_{re.sub(r'[^A-Za-z0-9]', '_', sym)}_{start.isoformat()}.json"
+    name = f"hist2_{re.sub(r'[^A-Za-z0-9]', '_', sym)}_{start.isoformat()}.json"
     hit = _cached(name, 6 * 3600)
     if hit:
         return hit
@@ -192,6 +192,14 @@ def get_history(symbol, start):
         except (KeyError, IndexError, TypeError):
             pass
         ccy = res["meta"].get("currency")
+        splits = []
+        for ev in ((res.get("events") or {}).get("splits") or {}).values():
+            try:
+                ratio = float(ev["numerator"]) / float(ev["denominator"])
+                splits.append([datetime.fromtimestamp(ev["date"], timezone.utc).date().isoformat(), ratio])
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                continue
+        splits.sort()
     except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
         return None
     dates, c, a = [], [], []
@@ -203,6 +211,6 @@ def get_history(symbol, start):
         a.append(adj[i] if adj and adj[i] is not None else close[i])
     if not dates:
         return None
-    out = {"dates": dates, "close": c, "adj": a, "currency": ccy}
+    out = {"dates": dates, "close": c, "adj": a, "currency": ccy, "splits": splits}
     _store(name, out)
     return out

@@ -51,6 +51,27 @@ def to_series(hist, field="close"):
     return Series(ds, [None if v is None else v * k for v in vals]), ccy
 
 
+def split_list(hist):
+    """[(dátum, pomer)] akciových splitov z histórie Yahoo (pomer 10 = 10 nových za 1 starú)."""
+    out = []
+    for d, r in (hist or {}).get("splits") or []:
+        try:
+            if r and r > 0:
+                out.append((date.fromisoformat(d), float(r)))
+        except (TypeError, ValueError):
+            continue
+    return sorted(out)
+
+
+def _split_factor(splits, day):
+    """Súčin pomerov splitov, ktoré nastali PO danom dni (kusy z toho dňa -> dnešné kusy)."""
+    f = 1.0
+    for sd, r in splits or ():
+        if sd > day:
+            f *= r
+    return f
+
+
 class Rates:
     """Kurzy mien v čase. fx[(a, b)] = Series kurzu a→b (voliteľné)."""
 
@@ -119,7 +140,7 @@ def compute(txns, base, price_hist, rates, end):
 
     def price_base(isin, day):
         """Cena akcie v základnej mene ku koncu dňa (alebo None)."""
-        s, pccy = price_hist.get(isin, (None, None))
+        s, pccy = price_hist.get(isin, (None, None))[:2]
         px = s.at(day) if s else None
         if px is None:                                  # bez histórie: posledná cena z obchodu
             fb = fb_price.get(isin)
@@ -165,14 +186,18 @@ def compute(txns, base, price_hist, rates, end):
             k, isin = t["kind"], t["isin"]
             ticker[isin] = t.get("ticker") or isin
             sh = t.get("shares") or 0.0
+            # Yahoo ceny sú upravené o splity (dnešné kusy), T212 kusy sú z dňa obchodu
+            ph = price_hist.get(isin) or ()
+            sf = _split_factor(ph[2] if len(ph) > 2 else None, day)
+            sh *= sf
             amt, ccy = _trade_amount(t)
             r = rates.rate(ccy, base, day)
             if t.get("price") is not None:
-                fb_price[isin] = (t["price"], t.get("price_ccy") or ccy)
-            tp = None                                   # cena obchodu v základnej mene
+                fb_price[isin] = (t["price"] / sf, t.get("price_ccy") or ccy)
+            tp = None                                   # cena obchodu v základnej mene (na dnešný kus)
             if t.get("price") is not None:
                 rp = rates.rate(t.get("price_ccy") or ccy, base, day)
-                tp = t["price"] * rp if rp is not None else None
+                tp = t["price"] / sf * rp if rp is not None else None
             if tp is None and sh and r is not None:
                 tp = amt * r / sh
             vb = value(day, at=True, traded=isin, tprice=tp, w=_session_fraction(t["time"]))
@@ -182,17 +207,17 @@ def compute(txns, base, price_hist, rates, end):
                 f_cash = amt * r if r is not None else 0.0
                 shares[isin] += sh
                 buys += f_cash
-                chk = vb + f_cash
             elif k == "sell":
                 tracked = min(sh, shares[isin])        # staršia história chýba -> len evidovaná časť
                 frac = tracked / sh if sh else 0.0
                 f_cash = amt * frac * r if r is not None else 0.0
                 shares[isin] -= tracked
                 sells += f_cash
-                chk = vb - f_cash
             else:                                       # spin-off: nová akcia bez peňažného toku
                 shares[isin] += sh
-                chk = vb
+            # hodnota po obchode = držané kusy v cene obchodu (nie vb ± hotovosť): bez zvyškov,
+            # keď sa predá všetko, a bez rozdielov kvôli poplatkom a kurzu
+            chk = value(day, at=True, traded=isin, tprice=tp, w=_session_fraction(t["time"]))
         v = value(day)
         if idx is None:
             if v > MIN_VALUE:

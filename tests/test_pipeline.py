@@ -498,6 +498,35 @@ _mc = {"facts": {"dei": {"EntityCommonStockSharesOutstanding": {"units": {"share
 check("akcie: viac tried sa sčíta (bez duplikátov)", edgar.latest_shares_outstanding(_mc) == 6600.0,
       edgar.latest_shares_outstanding(_mc))
 
+# --- akciový split: Yahoo ceny sú upravené o splity, Trading 212 kusy sú z doby obchodu
+_days_s = [date(2024, 6, 6) + timedelta(days=i) for i in range(6)]
+_adj = [12.0, 12.2, 12.1, 12.3, 12.5, 12.4]                      # ceny upravené (po splite 10:1)
+_sp = [(date(2024, 6, 10), 10.0)]
+_pa = perf.Series(_days_s, _adj)
+_buy = dict(kind="buy", time="2024-06-06 14:00:00", isin="S", ticker="S", shares=1, price=120.0,
+            price_ccy="USD", total=120.0, ccy="USD")
+_r2 = perf.compute([_buy], "USD", {"S": (_pa, "USD", _sp)}, perf.Rates({}), _days_s[-1])
+check("split: výnos cez split je len cenový pohyb (12,4 vs 12,0 = +3,3 %), nie −90 %",
+      abs(_r2["days"][-1]["idx"] / _r2["days"][0]["idx"] - 12.4 / 12.0) < 0.02 and not _r2["warnings"],
+      (_r2["days"][-1]["idx"], _r2["warnings"]))
+check("split: hodnota pozície po splite = 10 kusov × upravená cena", abs(_r2["days"][-1]["v"] - 10 * 12.4) < 1e-6,
+      _r2["days"][-1]["v"])
+check("split: načítanie zoznamu splitov z histórie Yahoo",
+      perf.split_list({"splits": [["2024-06-10", 10.0], ["2020-01-01", 0.5]]}) == [(date(2020, 1, 1), 0.5), (date(2024, 6, 10), 10.0)])
+
+# --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
+_d0 = date(2024, 3, 4)
+_days = [_d0 + timedelta(days=i) for i in range(8)]
+_ps = perf.Series(_days, [100.0, 101.0, 102.0, 101.0, 103.0, 104.0, 104.0, 104.0])
+_tx = [
+    dict(kind="buy", time="2024-03-04 10:00:00", isin="X", ticker="X", shares=2, price=100.0, price_ccy="EUR", total=200.0, ccy="EUR"),
+    dict(kind="sell", time="2024-03-07 10:00:00", isin="X", ticker="X", shares=2, price=102.0, price_ccy="EUR", total=203.5, ccy="EUR"),
+    dict(kind="buy", time="2024-03-07 12:00:00", isin="X", ticker="X", shares=0.1, price=102.0, price_ccy="EUR", total=10.2, ccy="EUR"),
+]
+_r = perf.compute(_tx, "EUR", {"X": (_ps, "EUR")}, perf.Rates({}), _days[-1])["days"]
+check("TWR: po predaji všetkého nevznikne nulový/nezmyselný index", all(d["idx"] and d["idx"] > 90 for d in _r) and not any(
+    d["idx"] == 0 for d in _r), [round(d["idx"] or 0, 2) for d in _r])
+
 # --- regresia: TWR musí presne sedieť s cenovým výnosom (obchody za cenu obchodu, náhodné toky + kurzy)
 import random as _rnd  # noqa: E402
 
