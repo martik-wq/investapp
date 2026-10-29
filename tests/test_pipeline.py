@@ -490,6 +490,36 @@ bs = perf.Series([d0, d0 + timedelta(5)], [100, 120])
 check("index: výnos za obdobie", abs(perf.benchmark_return(bs, d0, d0 + timedelta(5)) - 0.2) < 1e-9)
 
 # ------------------------------------------------------- rozhranie (Flask klient)
+# --- regresia: TWR musí presne sedieť s cenovým výnosom (obchody za cenu obchodu, náhodné toky + kurzy)
+import random as _rnd  # noqa: E402
+
+
+def _twr_property(seed):
+    rnd = _rnd.Random(seed)
+    days = [date(2024, 1, 2) + timedelta(days=i) for i in range(90)]
+    P, X = [100.0], [0.9]
+    for _ in range(len(days) - 1):
+        P.append(P[-1] * (1 + rnd.gauss(0, 0.03)))
+        X.append(X[-1] * (1 + rnd.gauss(0, 0.005)))
+    rates = perf.Rates({("USD", "EUR"): perf.Series(days, X)})
+    sh, tx = 0, []
+    for i, d in enumerate(days):
+        if i == 0 or rnd.random() < 0.15:
+            if sh <= 1 or rnd.random() < 0.6:
+                q = rnd.choice([1, 5, 20, 50])
+                kind, sh = "buy", sh + q
+            else:
+                q = min(sh - 1, rnd.choice([1, 3, 10]))
+                kind, sh = "sell", sh - q
+            tx.append(dict(kind=kind, time=d.isoformat() + " 21:00:00", isin="X", ticker="X", shares=q,
+                           price=P[i], price_ccy="USD", total=q * P[i], ccy="USD"))
+    ds = perf.compute(tx, "EUR", {"X": (perf.Series(days, P), "USD")}, rates, days[-1])["days"]
+    return abs(ds[-1]["idx"] / ds[0]["idx"] - (P[-1] * X[-1]) / (P[0] * X[0]))
+
+
+check("TWR: presný cenový výnos pri náhodných nákupoch/predajoch a kurzoch",
+      max(_twr_property(s) for s in range(60)) < 1e-9)
+
 import app as appmod  # noqa: E402
 
 cl = appmod.app.test_client()

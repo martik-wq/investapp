@@ -85,11 +85,23 @@ def _trade_amount(t):
     return 0.0, t.get("ccy")
 
 
+def _session_fraction(time_str):
+    """Podiel obchodného dňa (07:00–21:00 UTC), ktorý v čase obchodu už uplynul (0 až 1)."""
+    try:
+        h, m = int(time_str[11:13]), int(time_str[14:16])
+    except (ValueError, IndexError):
+        return 0.0
+    return min(1.0, max(0.0, (h + m / 60.0 - 7.0) / 14.0))
+
+
 def compute(txns, base, price_hist, rates, end):
     """Denné hodnoty a TWR.
 
     price_hist: {isin: (Series|None, mena ceny)} (Series v mene ceny, libry nie pence)
     rates: Rates; end: posledný deň výpočtu.
+    Deň sa rozdelí obchodmi na úseky. Pred každým obchodom sa portfólio ocení (obchodovaný
+    titul cenou obchodu, ostatné interpoláciou medzi včerajším a dnešným zatvorením podľa času),
+    takže výnos úseku nezávisí od veľkosti obchodu. Výnos dňa je súčin výnosov úsekov.
     Vráti dict: days (zoznam riadkov), warnings."""
     warnings = []
     items = sorted((t for t in txns if t["kind"] in ("buy", "sell", "spinoff", "dividend")),
@@ -98,73 +110,99 @@ def compute(txns, base, price_hist, rates, end):
         return {"days": [], "warnings": ["Žiadne obchody na výpočet."]}
     first_day = datetime.strptime(items[0]["time"][:10], "%Y-%m-%d").date()
     end = max(end, first_day)
-
     ev = defaultdict(list)
-    last_trade_price = {}
     for t in items:
-        d = datetime.strptime(t["time"][:10], "%Y-%m-%d").date()
-        ev[d].append(t)
+        ev[datetime.strptime(t["time"][:10], "%Y-%m-%d").date()].append(t)
 
     shares = defaultdict(float)
-    ticker = {}
-    days, prev_v, idx = [], 0.0, None
-    jumps = []
-    fb_price = {}                                   # posledná cena z obchodu (náhradná)
-    day = first_day
-    no_hist = set()
-    while day <= end:
-        buys = sells = div = 0.0
-        for t in ev.get(day, ()):
-            k = t["kind"]
-            ticker[t["isin"]] = t.get("ticker") or t["isin"]
-            if k in ("buy", "sell", "spinoff"):
-                sh = t.get("shares") or 0.0
-                amt, ccy = _trade_amount(t)
-                r = rates.rate(ccy, base, day)
-                if t.get("price") is not None:
-                    fb_price[t["isin"]] = (t["price"], t.get("price_ccy") or ccy)
-                if k == "buy":
-                    shares[t["isin"]] += sh
-                    buys += amt * r if r is not None else 0.0
-                elif k == "sell":
-                    tracked = min(sh, shares[t["isin"]])      # staršia história chýba -> len evidovaná časť
-                    shares[t["isin"]] -= tracked
-                    frac = tracked / sh if sh else 0.0
-                    sells += amt * frac * r if r is not None else 0.0
-                else:
-                    shares[t["isin"]] += sh
-            elif k == "dividend":
-                amt = abs(t.get("total") or 0.0)
-                r = rates.rate(t.get("ccy"), base, day)
-                div += amt * r if r is not None else 0.0
+    ticker, fb_price, no_hist = {}, {}, set()
+
+    def price_base(isin, day):
+        """Cena akcie v základnej mene ku koncu dňa (alebo None)."""
+        s, pccy = price_hist.get(isin, (None, None))
+        px = s.at(day) if s else None
+        if px is None:                                  # bez histórie: posledná cena z obchodu
+            fb = fb_price.get(isin)
+            if fb is None:
+                return None
+            px, pccy = fb
+            no_hist.add(ticker.get(isin, isin))
+        r = rates.rate(pccy, base, day)
+        return None if r is None else px * r
+
+    def value(day, at=None, traded=None, tprice=None, w=0.0):
+        """Hodnota portfólia: na konci dňa (at=None) alebo v čase obchodu."""
         v = 0.0
         for isin, sh in shares.items():
             if sh <= 1e-9:
                 continue
-            s, pccy = price_hist.get(isin, (None, None))
-            px = s.at(day) if s else None
-            if px is None:                            # bez histórie cien: posledná cena z obchodu
-                fb = fb_price.get(isin)
-                if fb is None:
-                    continue
-                px, pccy = fb
-                no_hist.add(ticker.get(isin, isin))
-            r = rates.rate(pccy, base, day)
-            if r is None:
-                continue
-            v += sh * px * r
-        flow = buys - sells
+            c = price_base(isin, day)
+            if at is not None:
+                if isin == traded and tprice is not None:
+                    c = tprice
+                else:
+                    c0 = price_base(isin, day - timedelta(days=1))
+                    if c is not None and c0 is not None:
+                        c = c0 + w * (c - c0)
+            if c is not None:
+                v += sh * c
+        return v
+
+    days, prev_v, idx, jumps = [], 0.0, None, []
+    day = first_day
+    while day <= end:
+        buys = sells = div = 0.0
+        factor, chk = 1.0, prev_v
+        trades = []
+        for t in ev.get(day, ()):
+            if t["kind"] == "dividend":
+                amt = abs(t.get("total") or 0.0)
+                r = rates.rate(t.get("ccy"), base, day)
+                div += amt * r if r is not None else 0.0
+            else:
+                trades.append(t)
+        for t in trades:
+            k, isin = t["kind"], t["isin"]
+            ticker[isin] = t.get("ticker") or isin
+            sh = t.get("shares") or 0.0
+            amt, ccy = _trade_amount(t)
+            r = rates.rate(ccy, base, day)
+            if t.get("price") is not None:
+                fb_price[isin] = (t["price"], t.get("price_ccy") or ccy)
+            tp = None                                   # cena obchodu v základnej mene
+            if t.get("price") is not None:
+                rp = rates.rate(t.get("price_ccy") or ccy, base, day)
+                tp = t["price"] * rp if rp is not None else None
+            if tp is None and sh and r is not None:
+                tp = amt * r / sh
+            vb = value(day, at=True, traded=isin, tprice=tp, w=_session_fraction(t["time"]))
+            if chk > MIN_VALUE:
+                factor *= vb / chk
+            if k == "buy":
+                f_cash = amt * r if r is not None else 0.0
+                shares[isin] += sh
+                buys += f_cash
+                chk = vb + f_cash
+            elif k == "sell":
+                tracked = min(sh, shares[isin])        # staršia história chýba -> len evidovaná časť
+                frac = tracked / sh if sh else 0.0
+                f_cash = amt * frac * r if r is not None else 0.0
+                shares[isin] -= tracked
+                sells += f_cash
+                chk = vb - f_cash
+            else:                                       # spin-off: nová akcia bez peňažného toku
+                shares[isin] += sh
+                chk = vb
+        v = value(day)
         if idx is None:
             if v > MIN_VALUE:
                 idx = 100.0
-        elif prev_v + buys > MIN_VALUE:
-            # nákupy sa berú ako kapitál od začiatku dňa, predaje sa započítajú do konca dňa:
-            # výnos nikdy nemôže byť menší ako −100 % (čitateľ ani menovateľ nie sú záporné)
-            f = (v + div + sells) / (prev_v + buys)
-            if f > 1.6 or f < 0.4:
-                jumps.append((day, f - 1.0))
-            idx *= f
-        days.append({"d": day, "v": v, "flow": flow, "div": div, "idx": idx})
+        elif chk > MIN_VALUE:
+            factor *= (v + div) / chk
+            if factor > 1.6 or factor < 0.4:
+                jumps.append((day, factor - 1.0))
+            idx *= factor
+        days.append({"d": day, "v": v, "flow": buys - sells, "div": div, "idx": idx})
         prev_v = v
         day += timedelta(days=1)
     if jumps:
