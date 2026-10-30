@@ -683,6 +683,17 @@ _bs = _ox.load_workbook(_io.BytesIO(_appmod.app.test_client().get("/company/DEMO
 _lab = [r[0] for r in _bs.iter_rows(min_row=3, values_only=True)]
 check("excel: súvaha obsahuje riadky záväzkov a vlastného imania", "Aktíva spolu" in _lab and "Pasíva spolu" in _lab, _lab[:6])
 
+# --- import a súbory ako samostatná záložka na konci portfólia
+_fc = _appmod.app.test_client()
+_fc.post("/portfolio/demo")
+_fh = _fc.get("/portfolio/files").get_data(as_text=True)
+_ov = _fc.get("/portfolio").get_data(as_text=True)
+check("portfólio: záložka Import a súbory (nahrávanie, zoznam súborov, zmazanie)",
+      "Nahrané súbory" in _fh and "Zmazať portfólio" in _fh and "Pridať ďalšie súbory" in _fh
+      and "Import a súbory" in _ov and "Nahrané súbory" not in _ov and "Zmazať portfólio" not in _ov)
+_fc.post("/portfolio/clear")
+check("portfólio: bez údajov presmeruje záložku súborov na úvodné nahrávanie", _fc.get("/portfolio/files").status_code == 302)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Import a súbory · mkej{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>💼 Portfólio</h1>
+  <div class="sub">Import z Trading 212 · {{ n_txn }} transakcií · {{ data_first }} – {{ data_last }} · údaje sú uložené len na tvojom počítači</div>
+</div>
+{% with tab = 'files' %}{% include "_pftabs.html" %}{% endwith %}
+{% for cat, msg in get_flashed_messages(with_categories=true) %}
+  <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
+{% endfor %}
+<div class="card">
+  <h2>Pridať ďalšie súbory z Trading 212</h2>
+  <ol class="stepsol">
+    <li>V Trading 212 otvor <strong>História</strong> a klikni na ikonu exportu (stiahnutie).</li>
+    <li>Označ všetky typy údajov (<strong>Objednávky, Dividendy, Transakcie</strong>), vyber obdobie, ktoré začína pred tvojím prvým vkladom, a klikni <strong>Export CSV</strong>.</li>
+    <li>Trading 212 dovoľuje najviac 12 mesiacov na jeden súbor. Pri dlhšej histórii stiahni viac súborov a nahraj ich naraz, duplicity sa zahodia.</li>
+  </ol>
+  <form action="{{ url_for('portfolio_import') }}" method="post" enctype="multipart/form-data" class="drop">
+    <input type="file" name="files" accept=".csv,text/csv" multiple required>
+    <button>Nahrať a spočítať</button>
+  </form>
+  <p class="note">Súbory sa nikam neodosielajú, spracujú sa na tvojom počítači (priečinok data). Nahrávaj export jedného účtu (viac peňaženiek a mien je v poriadku).</p>
+</div>
+<div class="card">
+  <h2>Nahrané súbory</h2>
+  <ul>{% for f in files %}<li>{{ f.name }} · {{ f.rows }} riadkov, {{ f.new }} nových · {{ f.at }}</li>{% endfor %}</ul>
+  <form action="{{ url_for('portfolio_clear') }}" method="post" onsubmit="return confirm('Naozaj zmazať všetky nahraté údaje o portfóliu z tohto počítača?')">
+    <button class="danger" type="submit">Zmazať portfólio</button>
+  </form>
+</div>
+{% endblock %}

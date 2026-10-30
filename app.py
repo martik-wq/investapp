@@ -651,6 +651,18 @@ def portfolio_performance():
         risk=risk, rw=rw, rf_pct=rf_pct, rb=rb, whatif=whatif_res, wi_rows=wi_rows)
 
 
+@app.route("/portfolio/files")
+def portfolio_files():
+    store = portfolio.load_store()
+    txns = list(store["txns"].values())
+    if not txns:
+        return redirect(url_for("portfolio_view"))
+    data = portfolio.build_positions(txns)
+    return render_template("portfolio_files.html", page="portfolio", ticker=None, section=None,
+                           files=store["files"], n_txn=len(txns), data_first=data["first"],
+                           data_last=data["last"])
+
+
 @app.route("/portfolio/import", methods=["POST"])
 def portfolio_import():
     files = [(f.filename or "súbor", _read_upload(f)) for f in request.files.getlist("files")

@@ -145,15 +145,6 @@
   </table></div>
 </details>
 
-{{ importbox('Pridať ďalšie súbory z Trading 212') }}
-
-<div class="card">
-  <h2>Nahrané súbory</h2>
-  <ul>{% for f in files %}<li>{{ f.name }} · {{ f.rows }} riadkov, {{ f.new }} nových · {{ f.at }}</li>{% endfor %}</ul>
-  <form action="{{ url_for('portfolio_clear') }}" method="post" onsubmit="return confirm('Naozaj zmazať všetky nahraté údaje o portfóliu z tohto počítača?')">
-    <button class="danger" type="submit">Zmazať portfólio</button>
-  </form>
-</div>
 {% endif %}
 
 <script>
