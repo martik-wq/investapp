@@ -14,6 +14,8 @@
   ];
   var CUR_SYM = {USD: '$', EUR: '€', GBP: '£', JPY: '¥', CHF: 'CHF ', CAD: 'C$', AUD: 'A$'}[D.currency];
   var mode = D.start, cat = 'basic';
+  var MODE_TXT = {annual: 'ročne', quarterly: 'kvartálne', ttm: 'kvartálne (TTM, posledné 4 kvartály)'};
+  var MODE_HEAD = {annual: 'Ročné údaje', quarterly: 'Kvartálne údaje', ttm: 'Kvartálne údaje (TTM)'};
   var grid = document.getElementById('g-grid');
   var tableBox = document.getElementById('trend-table');
   var cards = [];
@@ -69,7 +71,7 @@
   function drawBars(host, sr, d, opt) {
     host.textContent = '';
     var W = Math.max(260, host.clientWidth || 320), H = opt.big ? 380 : 230;
-    var L = opt.big ? 74 : 62, R = 8, T = opt.big ? 24 : 12, B = 28, n = d.labels.length;
+    var L = opt.big ? 74 : 62, R = 16, T = opt.big ? 24 : 12, B = 28, n = d.labels.length;
     var vals = sr.values.filter(function (v) { return v != null; });
     var ticks = niceTicks(Math.min.apply(null, vals.concat([0])), Math.max.apply(null, vals.concat([0])));
     var lo = ticks[0], hi = ticks[ticks.length - 1];
@@ -202,7 +204,7 @@
     var d = D[mode];
     modal.textContent = '';
     var box = h('div', 'gmbox');
-    var head = h('div', 'ghead'); head.appendChild(h('h3', 'gtitle', sr.label + ' · ' + (mode === 'annual' ? 'ročne' : 'kvartálne')));
+    var head = h('div', 'ghead'); head.appendChild(h('h3', 'gtitle', sr.label + ' · ' + MODE_TXT[mode]));
     var cl = h('button', 'gexp', '✕'); cl.type = 'button'; cl.setAttribute('aria-label', 'Zavrieť'); cl.onclick = closeModal;
     head.appendChild(cl); box.appendChild(head);
     var host = h('div', 'cwrap'); box.appendChild(host);
@@ -221,7 +223,7 @@
     var d = D[mode]; if (!d) return;
     var wrap = h('div', 'tablewrap'), t = h('table', 'ttable');
     var thead = h('thead'), hr = h('tr');
-    hr.appendChild(h('th', null, mode === 'annual' ? 'Ročné údaje' : 'Kvartálne údaje'));
+    hr.appendChild(h('th', null, MODE_HEAD[mode]));
     d.labels.forEach(function (lb, i) { var th = h('th', null, lb); th.title = d.dates[i]; hr.appendChild(th); });
     thead.appendChild(hr); t.appendChild(thead);
     var tb = h('tbody');
@@ -258,6 +260,7 @@
         function () { return cat; }, function (v) { cat = v; render(); });
   var mopts = [];
   if (D.quarterly) mopts.push(['quarterly', 'Kvartálne']);
+  if (D.ttm) mopts.push(['ttm', 'Kvartálne (TTM)']);
   if (D.annual) mopts.push(['annual', 'Ročne']);
   pills(document.getElementById('g-mode'), mopts, function () { return mode; }, function (v) { mode = v; render(); });
   render();

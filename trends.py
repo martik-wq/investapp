@@ -1,6 +1,7 @@
 """Časové rady (ročné aj kvartálne) pre grafy a tabuľku „Vývoj v čase“."""
 from edgar import EdgarError
 import statements
+from taxonomy import ITEM_BY_KEY
 
 
 def _div(a, b):
@@ -124,10 +125,42 @@ DEFAULTS = {
 }
 
 
+def _ttm_data(b, n):
+    """Z kvartálnych dát urobí TTM (súčet posledných 4 kvartálov) pre tokové položky;
+    zostatkové položky (súvaha) a nesčítateľné (počet akcií) berie z posledného kvartálu.
+    Vráti (display, data) alebo None, ak nie je dosť nadväzujúcich kvartálov."""
+    ends = b["ends"]
+    if len(ends) < 5:
+        return None
+    flow_keys = {k for k, it in ITEM_BY_KEY.items() if it.get("kind") == "flow" and it.get("additive", True)}
+    flow_keys |= {"fcf"}
+    data = {}
+    out_ends = []
+    for i in range(3, len(ends)):
+        win = ends[i - 3:i + 1]
+        gaps = [(win[j + 1] - win[j]).days for j in range(3)]
+        if all(60 <= g <= 125 for g in gaps):
+            out_ends.append(ends[i])
+    for k, series in b["data"].items():
+        d = {}
+        for i in range(3, len(ends)):
+            e = ends[i]
+            if e not in out_ends:
+                continue
+            if k in flow_keys:
+                vals = [series.get(x) for x in ends[i - 3:i + 1]]
+                d[e] = None if any(v is None for v in vals) else sum(vals)
+            else:
+                d[e] = series.get(e)
+        data[k] = d
+    display = out_ends[-n:]
+    return display, data
+
+
 def _label(e, mode):
     if mode == "annual":
         return str(e.year) if e.month == 12 else e.strftime("%m/%Y")
-    return f"Q{(e.month - 1) // 3 + 1} {e.year % 100:02d}"
+    return f"Q{(e.month - 1) // 3 + 1} {e.year % 100:02d}"  # kvartálne aj TTM
 
 
 def build_trends(company, btype, start_mode="annual", years=8):
@@ -135,14 +168,21 @@ def build_trends(company, btype, start_mode="annual", years=8):
            "defaults": DEFAULTS.get(btype, DEFAULTS["general"]) | {"eps": ["eps_diluted"]}}
     if btype == "tech":
         out["defaults"] = DEFAULTS["general"] | {"eps": ["eps_diluted"]}
-    for mode, n in (("annual", years), ("quarterly", years * 4)):
+    for mode, n in (("annual", years), ("quarterly", years * 4), ("ttm", years * 4)):
         try:
-            b = statements.build(company, mode, n)
+            if mode == "ttm":
+                b = statements.build(company, "quarterly", n + 3)
+                tt = _ttm_data(b, n)
+                if tt is None:
+                    out[mode] = None
+                    continue
+                disp, data = tt
+            else:
+                b = statements.build(company, mode, n)
+                disp, data = b["display"], b["data"]
         except EdgarError:
             out[mode] = None
             continue
-        disp = b["display"]
-        data = b["data"]
         g = lambda k, e, d=data: d.get(k, {}).get(e)  # noqa: E731
         series = []
         for sid, label, group, fn in _defs(btype):

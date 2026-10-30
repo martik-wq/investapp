@@ -589,6 +589,20 @@ _h3 = _pc2.get("/portfolio/performance?wi_s=A&wi_w=70&wi_s=B&wi_w=50").get_data(
 check("čo keby: súčet váh nad 100 % -> chybová hláška", "presahuje 100" in _h3)
 _pc2.post("/portfolio/clear")
 
+# --- TTM v grafoch firmy: súčet posledných 4 kvartálov, na konci fiškálneho roka = ročná hodnota
+import trends as _tr  # noqa: E402
+_cm, _ = edgar.find_company("DEMOCO")
+_comp = edgar.load_company(*_cm)
+_bt = metrics.detect_type(_comp, statements.build(_comp, "annual", 8))
+_tt = _tr.build_trends(_comp, _bt, "annual", 8)
+_ser = lambda mode, sid: [s for s in _tt[mode]["series"] if s["id"] == sid][0]["values"]  # noqa: E731
+_rq, _rt, _ra = _ser("quarterly", "revenue"), _ser("ttm", "revenue"), _ser("annual", "revenue")
+check("TTM: tržby = súčet posledných 4 kvartálov", abs(_rt[-1] - sum(_rq[-4:])) < 1e-6, (_rt[-1], sum(_rq[-4:])))
+_i = _tt["ttm"]["labels"].index("Q4 25") if "Q4 25" in _tt["ttm"]["labels"] else None
+check("TTM: na konci fiškálneho roka sa zhoduje s ročnou hodnotou", _i is not None and abs(_rt[_i] - _ra[-1]) / _ra[-1] < 0.001,
+      (_rt[_i] if _i is not None else None, _ra[-1]))
+check("TTM: čistá marža = TTM zisk / TTM tržby", abs(_ser("ttm", "nm")[-1] - _ser("ttm", "net_income")[-1] / _rt[-1]) < 1e-9)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]
