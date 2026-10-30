@@ -200,6 +200,33 @@
 
   /* --------------------------------------------------------------- modal */
   var modal = document.getElementById('g-modal');
+  /* CAGR za 1, 3, 5, 10 rokov a celé obdobie (u pomerov zmena v p. b.) */
+  function growthTiles(sr, d) {
+    var vals = sr.values, n = vals.length, per = d.lag === 1 ? 1 : 4, last = n - 1;
+    var wrap = h('div', 'cagr');
+    wrap.appendChild(h('h3', 'cagrh', sr.group === 'pct' ? 'Zmena za obdobie' : 'Rast (CAGR)'));
+    var grid = h('div', 'cagrg');
+    var spans = [1, 3, 5, 10];
+    var maxYears = Math.floor(last / per);
+    var items = [];
+    spans.forEach(function (y) { if (y * per <= last) items.push([y, y + (y === 1 ? ' rok' : y < 5 ? ' roky' : ' rokov')]); });
+    if (maxYears >= 1 && spans.indexOf(maxYears) < 0) items.push([maxYears, 'celé obdobie (' + maxYears + (maxYears < 5 ? ' roky' : ' rokov') + ')']);
+    if (!items.length) { wrap.appendChild(h('div', 'note', 'Na výpočet nie je dosť údajov (treba aspoň rok histórie).')); return wrap; }
+    items.forEach(function (it) {
+      var y = it[0], a = vals[last - y * per], b = vals[last], t = h('div', 'cagrt'), txt, cls = '';
+      if (a == null || b == null) txt = '–';
+      else if (sr.group === 'pct') { var pp = (b - a) * 100; txt = (pp >= 0 ? '+' : '−') + Math.abs(pp).toFixed(1).replace('.', ',') + ' p. b.'; cls = pp >= 0 ? 'up' : 'down'; }
+      else if (a <= 0 || b <= 0) txt = 'n/a';
+      else { var g = Math.pow(b / a, 1 / y) - 1; txt = pctTxt(g); cls = g >= 0 ? 'up' : 'down'; }
+      t.appendChild(h('div', 'cagrl', it[1])); t.appendChild(h('div', 'cagrv ' + cls, txt));
+      if (a != null && b != null && sr.group !== 'pct' && a > 0 && b > 0 && y > 1)
+        t.appendChild(h('div', 'note', 'spolu ' + pctTxt(b / a - 1)));
+      grid.appendChild(t);
+    });
+    wrap.appendChild(grid);
+    if (sr.group !== 'pct') wrap.appendChild(h('div', 'note', 'CAGR = priemerný ročný rast od hodnoty pred N rokmi po posledné obdobie. „n/a“ = základ alebo koniec je ≤ 0.' + (per === 4 ? ' Pri kvartáloch sa porovnáva rovnaký kvartál pred N rokmi.' : '')));
+    return wrap;
+  }
   function openModal(sr) {
     var d = D[mode];
     modal.textContent = '';
@@ -207,10 +234,23 @@
     var head = h('div', 'ghead'); head.appendChild(h('h3', 'gtitle', sr.label + ' · ' + MODE_TXT[mode]));
     var cl = h('button', 'gexp', '✕'); cl.type = 'button'; cl.setAttribute('aria-label', 'Zavrieť'); cl.onclick = closeModal;
     head.appendChild(cl); box.appendChild(head);
+    var cmp = h('div', 'gcmp'); box.appendChild(cmp);
     var host = h('div', 'cwrap'); box.appendChild(host);
-    box.appendChild(h('div', 'note', 'Kurzorom nad stĺpcom uvidíš hodnotu a zmenu oproti predchádzajúcemu obdobiu.'));
+    box.appendChild(h('div', 'note', 'Kurzorom nad stĺpcom uvidíš hodnotu a zmenu. Klikni na dva stĺpce a ukáže sa rast medzi nimi.'));
+    box.appendChild(growthTiles(sr, d));
     modal.appendChild(box); modal.hidden = false; document.body.classList.add('noscroll');
-    drawBars(host, sr, d, {big: true});
+    var pk = {a: null, b: null};
+    function redraw() {
+      drawBars(host, sr, d, {big: true, pick: pk, onPick: function (i) {
+        if (pk.a == null) pk.a = i; else if (pk.b == null) { if (i === pk.a) pk.a = null; else pk.b = i; } else { pk.a = i; pk.b = null; }
+        redraw();
+      }});
+      var t = cmpText(sr, d, pk);
+      cmp.textContent = t || ''; cmp.style.display = t ? 'block' : 'none';
+      if (t) { var x = h('button', 'cmpx', 'zrušiť'); x.type = 'button'; x.onclick = function () { pk = {a: null, b: null}; redraw(); };
+        cmp.appendChild(document.createTextNode(' ')); cmp.appendChild(x); }
+    }
+    redraw();
     modal.onclick = function (e) { if (e.target === modal) closeModal(); };
   }
   function closeModal() { modal.hidden = true; modal.textContent = ''; document.body.classList.remove('noscroll'); }

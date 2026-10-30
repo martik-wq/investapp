@@ -362,3 +362,12 @@ button.person strong{display:block}
 .plinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .plink{border:1px solid var(--line);border-radius:999px;padding:6px 14px;text-decoration:none;font-size:13px;color:var(--acc2);background:#fff}
 .plink:hover{background:var(--tint)}
+
+/* ---- CAGR pod veľkým grafom ---- */
+.cagr{margin-top:12px;border-top:1px solid var(--line);padding-top:6px}
+.cagrh{margin:8px 0 8px;font-size:13px}
+.cagrg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+.cagrt{background:#fffaf5;border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+.cagrl{font-size:12px;color:var(--mute)}
+.cagrv{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+.cagrv.up{color:var(--pos)}.cagrv.down{color:var(--neg)}
