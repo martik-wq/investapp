@@ -1,4 +1,4 @@
-{# Spoločný panel nastavení. Parametre: show = množina polí #}
+{# Spoločný panel nastavení. Parametre: show = množina polí. Viditeľné: obdobie, zobrazenie, cena, export; ostatné v ⚙ #}
 <form method="get" class="toolbar tbar">
   {% if 'mode' in show %}
   <label>Obdobie
@@ -7,32 +7,39 @@
       <option value="quarterly" {{ 'selected' if mode=='quarterly' }}>Kvartálne</option>
     </select></label>
   {% endif %}
-  {% if 'years' in show %}
-  <label>História
-    <select name="years" onchange="this.form.submit()">
-      {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ 'Všetko dostupné' if y == 30 else y ~ ' rokov' }}</option>{% endfor %}
-    </select></label>
-  {% endif %}
-  {% if 'type' in show %}
-  <label>Typ biznisu
-    <select name="type" onchange="this.form.submit()">
-      <option value="auto" {{ 'selected' if typ=='auto' }}>Automaticky ({{ types[auto_type] }})</option>
-      {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
-    </select></label>
-  {% endif %}
   {% if 'detail' in show %}
-  <label>Zobrazenie výkazov
+  <label>Zobrazenie
     <select name="detail" onchange="this.form.submit()">
-      <option value="0" {{ 'selected' if not detail }}>Zjednodušené (štandardizované)</option>
+      <option value="0" {{ 'selected' if not detail }}>Zjednodušené</option>
       <option value="1" {{ 'selected' if detail }}>Podrobné (ako firma uvádza)</option>
     </select></label>
   {% endif %}
   {% if 'price' in show %}
-  <label>Cena akcie ({{ built.currency }})
-    <input name="price" value="{{ price }}" size="9" placeholder="prázdne = z Yahoo"></label>
+  <label>Cena ({{ built.currency }})
+    <input name="price" value="{{ price }}" placeholder="z Yahoo"></label>
+  <button>Použiť</button>
   {% endif %}
-  {% if 'price' in show %}<button>Použiť cenu</button>{% endif %}
   {% if 'export' in show %}
   <a href="{{ url_for('export', ticker=ticker, **qs) }}"><button type="button" class="ghost">Export CSV</button></a>
+  {% endif %}
+  {% if 'years' in show or 'type' in show %}
+  <details class="gset">
+    <summary title="Ďalšie nastavenia" aria-label="Ďalšie nastavenia">⚙</summary>
+    <div class="gsetbox">
+      {% if 'years' in show %}
+      <label>História
+        <select name="years" onchange="this.form.submit()">
+          {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ 'Všetko dostupné' if y == 30 else y ~ ' rokov' }}</option>{% endfor %}
+        </select></label>
+      {% endif %}
+      {% if 'type' in show %}
+      <label>Typ biznisu
+        <select name="type" onchange="this.form.submit()">
+          <option value="auto" {{ 'selected' if typ=='auto' }}>Automaticky ({{ types[auto_type] }})</option>
+          {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
+        </select></label>
+      {% endif %}
+    </div>
+  </details>
   {% endif %}
 </form>
