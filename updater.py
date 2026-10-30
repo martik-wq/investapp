@@ -8,6 +8,7 @@ import io
 import os
 import shutil
 import tempfile
+import time
 import zipfile
 
 import requests
@@ -32,8 +33,11 @@ def current_version():
 def latest_version():
     """Skratka (sha) posledného commitu na GitHube, alebo None pri chybe."""
     try:
-        r = requests.get(f"https://api.github.com/repos/{REPO}/commits/{BRANCH}", timeout=TIMEOUT,
-                         headers={"Accept": "application/vnd.github+json", "User-Agent": "investapp"})
+        # čas v adrese obchádza krátkodobú vyrovnávaciu pamäť GitHubu (inak môže ukazovať starú verziu)
+        r = requests.get(f"https://api.github.com/repos/{REPO}/commits/{BRANCH}?t={int(time.time())}",
+                         timeout=TIMEOUT,
+                         headers={"Accept": "application/vnd.github+json", "User-Agent": "investapp",
+                                  "Cache-Control": "no-cache"})
         r.raise_for_status()
         return r.json()["sha"]
     except (requests.RequestException, KeyError, ValueError):
