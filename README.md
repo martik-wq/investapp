@@ -1,4 +1,4 @@
-# Investičná analýza – SEC EDGAR
+# mkej – investičná analýza (SEC EDGAR)
 
 Lokálna webová aplikácia: zadáš ticker a zobrazí sa súvaha, výkaz ziskov a strát,
 cash flow a metriky podľa typu biznisu (všeobecný, tech, banka/fintech, poisťovňa, REIT).

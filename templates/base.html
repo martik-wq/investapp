@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Investičná analýza{% endblock %}</title>
+<title>{% block title %}mkej{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <div class="app">
 <aside class="side">
-  <a class="brand" href="{{ url_for('index') }}">📊 Investičná analýza</a>
+  <a class="brand" href="{{ url_for('index') }}">📊 mkej</a>
   <form action="{{ url_for('search') }}" method="get" class="sideSearch">
     <input name="q" placeholder="Ticker alebo názov" required>
     <button aria-label="Hľadať">🔍</button>
