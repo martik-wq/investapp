@@ -13,6 +13,7 @@ from flask import (Flask, Response, abort, flash, jsonify, redirect, render_temp
                    url_for)
 
 import edgar
+import excel
 import filings
 import flow
 import metrics
@@ -760,6 +761,22 @@ def export(ticker):
     data = "\ufeff" + out.getvalue()
     return Response(data, mimetype="text/csv; charset=utf-8", headers={
         "Content-Disposition": f"attachment; filename={comp['ticker']}_{ctx['mode']}.csv"})
+
+
+@app.route("/company/<ticker>/export.xlsx")
+def export_xlsx(ticker):
+    try:
+        ctx = build_context(ticker.upper(), "statements")
+    except edgar.EdgarError as e:
+        return Response(str(e), status=400)
+    try:
+        data = excel.build_workbook(ctx)
+    except ImportError:
+        return Response("Chýba knižnica openpyxl. Zatvor okno s aplikáciou a spusti ju znova cez spustit.bat "
+                        "(doinštaluje sa sama).", status=500)
+    return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition":
+                             f"attachment; filename={ctx['comp']['ticker']}_vykazy_{ctx['mode']}.xlsx"})
 
 
 @app.route("/company/<ticker>/officer")

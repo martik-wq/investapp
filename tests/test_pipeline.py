@@ -667,6 +667,22 @@ check("biografia: mená sa čistia od titulov", _pr.clean_person_name("Dr. Werne
 _oc = _appmod.app.test_client().get("/company/DEMOCO/officer?name=Jana+Uk%C3%A1%C5%BEkov%C3%A1").get_json()
 check("biografia: odpoveď okna pre ukážkovú firmu (pozícia, odkazy)", _oc["title"] == "CEO" and _oc["demo"] and "google" in _oc["links"], _oc)
 
+# --- export všetkých výkazov do Excelu
+import openpyxl as _ox  # noqa: E402
+for _det in ("1", "0"):
+    _xr = _appmod.app.test_client().get(f"/company/DEMOCO/export.xlsx?detail={_det}")
+    _wb = _ox.load_workbook(_io.BytesIO(_xr.data))
+    _names = _wb.sheetnames
+    _ws = _wb["Výkaz ziskov a strát"]
+    _first = next(r for r in _ws.iter_rows(min_row=3, values_only=True) if r[0] and r[1] is not None)
+    check(f"excel (detail={_det}): hárky a hodnoty v miliónoch",
+          _xr.status_code == 200 and _names[:4] == ["Info", "Výkaz ziskov a strát", "Súvaha", "Cash flow"]
+          and "Metriky" in _names and abs(_ws["B2"].value.year - 2025) == 0 and 100 < abs(_first[1]) < 100000,
+          (_xr.status_code, _names, _first[:2]))
+_bs = _ox.load_workbook(_io.BytesIO(_appmod.app.test_client().get("/company/DEMOCO/export.xlsx?detail=0").data))["Súvaha"]
+_lab = [r[0] for r in _bs.iter_rows(min_row=3, values_only=True)]
+check("excel: súvaha obsahuje riadky záväzkov a vlastného imania", "Aktíva spolu" in _lab and "Pasíva spolu" in _lab, _lab[:6])
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

@@ -20,7 +20,8 @@
   <button>Použiť</button>
   {% endif %}
   {% if 'export' in show %}
-  <a href="{{ url_for('export', ticker=ticker, **qs) }}"><button type="button" class="ghost">Export CSV</button></a>
+  <a href="{{ url_for('export_xlsx', ticker=ticker, **qs) }}"><button type="button">⬇ Stiahnuť Excel</button></a>
+  <a href="{{ url_for('export', ticker=ticker, **qs) }}"><button type="button" class="ghost">CSV</button></a>
   {% endif %}
   {% if 'years' in show or 'type' in show %}
   <details class="gset">
