@@ -639,6 +639,34 @@ _up.requests.get, _up.latest_version = _og, _ol
 check("aktualizácia: zip sa sťahuje podľa čísla verzie a verzia sa zapíše až po inštalácii",
       _res["ok"] and _urls and _urls[0].endswith("/zip/abc123def") and open(_up.VERSION_FILE).read() == "abc123def", (_urls, _res))
 
+# --- biografia člena vedenia (Wikipédia je nahradená vymyslenými odpoveďami)
+import prices as _pr  # noqa: E402
+class _Resp:  # noqa: E302
+    def __init__(self, data, status=200): self._d, self.status_code = data, status
+    def raise_for_status(self): pass  # noqa: E704
+    def json(self): return self._d  # noqa: E704
+_cd = _pr.CACHE_DIR; _pr.CACHE_DIR = tempfile.mkdtemp()
+_og2 = _pr.requests.get
+def _fake(url, **kw):  # noqa: E302
+    if "list=search" in url:
+        return _Resp({"query": {"search": [{"title": "Jeff Bezos"}, {"title": "Bezos Academy"}]}})
+    if "Jeff_Bezos" in url:
+        return _Resp({"type": "standard", "title": "Jeff Bezos", "description": "American businessman",
+                      "extract": "Jeffrey Preston Bezos is an American businessman, founder of Amazon. " * 20,
+                      "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Jeff_Bezos"}}})
+    return _Resp({}, 404)
+_pr.requests.get = _fake
+_b = _pr.get_officer_bio("Mr. Jeffrey P. Bezos", "AMAZON.COM, INC.", "AMZN")
+check("biografia: nájde sa a dĺžka je skrátená na celé vety", _b and _b["title"] == "Jeff Bezos" and len(_b["extract"]) <= 900
+      and _b["extract"].endswith("."), _b)
+_b2 = _pr.get_officer_bio("Mr. Jeffrey P. Bezos", "Totally Different Company", "")
+check("biografia: ak sa firma v článku nespomína, nezobrazí sa (iný človek)", _b2 is None, _b2)
+_pr.requests.get = _og2; _pr.CACHE_DIR = _cd
+check("biografia: mená sa čistia od titulov", _pr.clean_person_name("Dr. Werner  Vogels") == "Werner Vogels"
+      and _pr.clean_person_name("Mr. David A. Zapolsky J.D.") == "David A. Zapolsky")
+_oc = _appmod.app.test_client().get("/company/DEMOCO/officer?name=Jana+Uk%C3%A1%C5%BEkov%C3%A1").get_json()
+check("biografia: odpoveď okna pre ukážkovú firmu (pozícia, odkazy)", _oc["title"] == "CEO" and _oc["demo"] and "google" in _oc["links"], _oc)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

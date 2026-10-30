@@ -88,12 +88,60 @@
     {% if profile and profile.officers %}
     <div class="people">
     {% for o in profile.officers %}
-      <div class="person"><div class="av">{{ (o.name or '?')[0] }}</div><div><strong>{{ o.name }}</strong><div class="note">{{ o.title or '–' }}{% if o.age %} · {{ o.age }} r.{% endif %}</div></div></div>
+      <button type="button" class="person" data-name="{{ o.name }}" title="Zobraziť informácie o osobe"><div class="av">{{ (o.name|replace('Mr. ', '')|replace('Ms. ', '')|replace('Dr. ', '')|replace('Mrs. ', '')|trim)[0] }}</div><div><strong>{{ o.name }}</strong><div class="note">{{ o.title or '–' }}{% if o.age %} · {{ o.age }} r.{% endif %}</div></div></button>
     {% endfor %}
     </div>
     {% else %}
     <p class="note">Údaje o vedení sa nepodarilo načítať (zdrojom je Yahoo Finance, SEC ich v štruktúrovanej podobe neposkytuje).</p>
     {% endif %}
+    {% if profile and profile.officers %}<p class="note" style="margin-top:10px">Klikni na meno a zobrazí sa krátky profil.</p>{% endif %}
   </div>
 </div>
+<div id="g-modal" class="gmodal" hidden></div>
+<script>
+(function () {
+  var modal = document.getElementById('g-modal'), T = {{ ticker|tojson }};
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function close() { modal.hidden = true; modal.textContent = ''; document.body.classList.remove('noscroll'); }
+  function box() {
+    modal.textContent = ''; var b = el('div', 'gmbox pbox'); var head = el('div', 'ghead');
+    var cl = el('button', 'gexp', '✕'); cl.type = 'button'; cl.setAttribute('aria-label', 'Zavrieť'); cl.onclick = close;
+    head.appendChild(el('span')); head.appendChild(cl); b.appendChild(head); modal.appendChild(b);
+    modal.hidden = false; document.body.classList.add('noscroll');
+    modal.onclick = function (e) { if (e.target === modal) close(); };
+    return b;
+  }
+  function open(name) {
+    var b = box(); b.appendChild(el('div', 'note', 'Načítavam…'));
+    fetch('/company/' + encodeURIComponent(T) + '/officer?name=' + encodeURIComponent(name))
+      .then(function (r) { return r.json(); }).then(function (d) {
+        b.removeChild(b.lastChild);
+        var top = el('div', 'ptop');
+        if (d.bio && d.bio.image) { var im = el('img', 'pimg'); im.src = d.bio.image; im.alt = d.name; top.appendChild(im); }
+        else top.appendChild(el('div', 'av pav', (d.name || '?')[0]));
+        var ti = el('div'); ti.appendChild(el('h2', null, d.name)); ti.style.margin = '0';
+        var sub = [d.title, d.age ? d.age + ' rokov' : null, d.company].filter(Boolean).join(' · ');
+        ti.appendChild(el('div', 'note', sub));
+        if (d.bio && d.bio.description) ti.appendChild(el('div', 'note', d.bio.description));
+        top.appendChild(ti); b.appendChild(top);
+        if (d.demo) { b.appendChild(el('p', 'note', 'Ukážková firma: biografia nie je k dispozícii.')); }
+        else if (d.bio) {
+          b.appendChild(el('p', 'pbio', d.bio.extract));
+          var src = el('p', 'note'); src.appendChild(document.createTextNode('Zdroj: Wikipédia (anglicky), licencia CC BY-SA. '));
+          var a = el('a', null, 'Celý článok'); a.href = d.bio.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          src.appendChild(a); b.appendChild(src);
+        } else {
+          b.appendChild(el('p', null, 'Overenú biografiu sa nepodarilo nájsť (člen vedenia nemusí mať článok na Wikipédii alebo sa nepodarilo pripojiť).'));
+        }
+        var links = el('div', 'plinks');
+        [['Hľadať na Googli', d.links.google], ['LinkedIn', d.links.linkedin], ['Wikipédia', d.links.wikipedia]].forEach(function (l) {
+          var a = el('a', 'plink', l[0]); a.href = l[1]; a.target = '_blank'; a.rel = 'noopener noreferrer'; links.appendChild(a);
+        });
+        b.appendChild(links);
+      }).catch(function () { b.lastChild.textContent = 'Nepodarilo sa načítať údaje.'; });
+  }
+  document.querySelectorAll('.person[data-name]').forEach(function (p) { p.addEventListener('click', function () { open(p.dataset.name); }); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(); });
+})();
+</script>
 {% endblock %}

@@ -214,3 +214,85 @@ def get_history(symbol, start):
     out = {"dates": dates, "close": c, "adj": a, "currency": ccy, "splits": splits}
     _store(name, out)
     return out
+
+
+# ------------------------------------------------------------ biografia člena vedenia
+_TITLE_RE = re.compile(r"^(mr|ms|mrs|miss|dr|prof|sir|dame|hon)\.?\s+", re.I)
+_SUFFIX_RE = re.compile(r",?\s+(j\.?d\.?|ph\.?d\.?|cpa|mba|esq\.?|m\.?d\.?|jr\.?|sr\.?|ii|iii|iv)\.?$", re.I)
+_CORP_WORDS = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "holdings", "group", "the",
+               "limited", "sa", "nv", "ag", "llc", "lp", "de", "com", "technologies", "technology"}
+
+
+def clean_person_name(name):
+    """„Mr. Jeffrey P. Bezos“ -> „Jeffrey P. Bezos“ (bez titulov a prípon)."""
+    n = re.sub(r"\s+", " ", (name or "")).strip()
+    for _ in range(3):
+        n = _TITLE_RE.sub("", n)
+        n = _SUFFIX_RE.sub("", n)
+    return n.strip(" ,")
+
+
+def _company_tokens(company):
+    toks = [w for w in re.findall(r"[A-Za-z0-9]+", company or "") if w.lower() not in _CORP_WORDS and len(w) > 2]
+    return [t.lower() for t in toks[:2]]
+
+
+def _trim_sentences(text, limit=900):
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    return (cut[:end + 1] if end > 200 else cut.rstrip() + "…")
+
+
+WIKI_API = ("https://en.wikipedia.org/w/api.php?action=query&list=search&srlimit=5&format=json"
+            "&srsearch={q}")
+WIKI_SUMMARY = "https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+
+
+def get_officer_bio(name, company, ticker=""):
+    """Krátka biografia z anglickej Wikipédie, len ak sa v nej spomína firma (overenie, že ide o toho
+    istého človeka). {'title','description','extract','url','image'} alebo None."""
+    clean = clean_person_name(name)
+    if not clean:
+        return None
+    key = re.sub(r"[^a-z0-9]+", "_", f"{clean}_{company}".lower())[:90]
+    hit = _cached(f"bio_{key}.json", 30 * 24 * 3600)
+    if hit is not None:
+        return hit.get("bio")
+    parts = clean.split()
+    last = parts[-1].lower()
+    first = parts[0].lower()
+    toks = _company_tokens(company) + ([ticker.lower()] if ticker and len(ticker) > 3 else [])
+    bio = None
+    try:
+        q = requests.utils.quote(f"{parts[0]} {parts[-1]} {toks[0] if toks else ''}".strip())
+        r = requests.get(WIKI_API.format(q=q), headers=HEADERS, timeout=10)
+        r.raise_for_status()
+        results = r.json().get("query", {}).get("search", [])
+        for res in results[:4]:
+            title = res.get("title", "")
+            if last not in title.lower():
+                continue
+            s = requests.get(WIKI_SUMMARY.format(title=requests.utils.quote(title.replace(" ", "_"), safe="")),
+                             headers=HEADERS, timeout=10)
+            if s.status_code != 200:
+                continue
+            d = s.json()
+            ext = d.get("extract") or ""
+            if d.get("type") != "standard" or not ext:
+                continue
+            low = ext.lower()
+            if not any(t in low for t in toks):
+                continue
+            img = (d.get("thumbnail") or {}).get("source")
+            bio = {"title": d.get("title"), "description": d.get("description"),
+                   "extract": _trim_sentences(ext), "image": img,
+                   "url": ((d.get("content_urls") or {}).get("desktop") or {}).get("page")
+                   or "https://en.wikipedia.org/wiki/" + title.replace(" ", "_")}
+            break
+    except (requests.RequestException, ValueError, KeyError, IndexError, AttributeError):
+        return None   # chyba siete sa neukladá, aby sa to skúsilo znova
+    _store(f"bio_{key}.json", {"bio": bio})
+    return bio

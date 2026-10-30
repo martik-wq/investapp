@@ -349,3 +349,16 @@ form.tbar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
 .person{display:flex;gap:12px;align-items:center}
 .av{width:38px;height:38px;border-radius:50%;background:var(--tint);color:var(--acc2);font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
 @media(max-width:900px){.hero{grid-template-columns:1fr}.heroR{text-align:left}.ownprice,.ownprice form{text-align:left;justify-content:flex-start}}
+
+/* ---- profil člena vedenia ---- */
+button.person{background:transparent;color:var(--ink);border:1px solid transparent;box-shadow:none;border-radius:12px;padding:8px 10px;text-align:left;width:100%;font-weight:400;cursor:pointer}
+button.person:hover{background:var(--tint);border-color:#f0d9c4}
+button.person strong{display:block}
+.pbox{max-width:640px}
+.ptop{display:flex;gap:16px;align-items:center;margin:0 0 12px}
+.pimg{width:88px;height:88px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:none}
+.pav{width:88px;height:88px;font-size:32px}
+.pbio{font-size:14.5px;line-height:1.6;margin:8px 0}
+.plinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.plink{border:1px solid var(--line);border-radius:999px;padding:6px 14px;text-decoration:none;font-size:13px;color:var(--acc2);background:#fff}
+.plink:hover{background:var(--tint)}

@@ -7,6 +7,7 @@ import io
 import os
 import re
 from datetime import date, timedelta
+from urllib.parse import quote
 
 from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
                    url_for)
@@ -759,6 +760,27 @@ def export(ticker):
     data = "\ufeff" + out.getvalue()
     return Response(data, mimetype="text/csv; charset=utf-8", headers={
         "Content-Disposition": f"attachment; filename={comp['ticker']}_{ctx['mode']}.csv"})
+
+
+@app.route("/company/<ticker>/officer")
+def officer_info(ticker):
+    """Údaje o členovi vedenia pre okno po kliknutí na meno (JSON)."""
+    name = request.args.get("name", "").strip()
+    if not name:
+        abort(400)
+    match, _ = edgar.find_company(ticker)
+    comp_name = match[2] if match else ticker
+    profile = DEMO_PROFILES.get(match[0]) if match and match[0] in DEMO_PROFILES else prices.get_profile(ticker)
+    off = next((o for o in (profile or {}).get("officers", []) if o.get("name") == name), {})
+    clean = prices.clean_person_name(name)
+    is_demo = bool(match and match[0] in DEMO_PROFILES)
+    bio = None if is_demo else prices.get_officer_bio(name, comp_name, ticker)
+    q = quote(f"{clean} {comp_name}")
+    return jsonify({"name": clean, "title": off.get("title"), "age": off.get("age"), "company": comp_name,
+                    "demo": is_demo, "bio": bio,
+                    "links": {"google": f"https://www.google.com/search?q={q}",
+                              "linkedin": f"https://www.linkedin.com/search/results/people/?keywords={q}",
+                              "wikipedia": f"https://en.wikipedia.org/w/index.php?search={q}"}})
 
 
 @app.route("/update/check")
