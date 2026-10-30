@@ -6,9 +6,6 @@
   <h1>Grafy <span class="badge">{{ comp.ticker }}</span></h1>
   <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong></div>
 </div>
-<div class="card">
-  {% with show = ['mode','years','type'] %}{% include "_toolbar.html" %}{% endwith %}
-</div>
 {{ warnings(built, n_req, mode, quote) }}
 {% if flow %}
 <div class="card" id="flowcard">
@@ -43,6 +40,21 @@
     <div class="gtabs" id="g-cat" role="tablist"></div>
     <span class="gsep"></span>
     <div class="gtabs" id="g-mode" role="group" aria-label="Obdobie"></div>
+    <details class="gset">
+      <summary title="Nastavenia grafov" aria-label="Nastavenia grafov">⚙</summary>
+      <form method="get" class="gsetbox">
+        {% for k, v in qs.items() if k not in ('years', 'type') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <label>História
+          <select name="years" onchange="this.form.submit()">
+            {% for y in years_options %}<option value="{{ y }}" {{ 'selected' if y==years }}>{{ 'Všetko dostupné' if y == 30 else y ~ ' rokov' }}</option>{% endfor %}
+          </select></label>
+        <label>Typ biznisu
+          <select name="type" onchange="this.form.submit()">
+            <option value="auto" {{ 'selected' if typ=='auto' }}>Automaticky ({{ types[auto_type] }})</option>
+            {% for k,v in types.items() %}<option value="{{ k }}" {{ 'selected' if typ==k }}>{{ v }}</option>{% endfor %}
+          </select></label>
+      </form>
+    </details>
   </div>
   <div id="g-grid" class="ggrid"></div>
   <p class="note">Kurzorom nad stĺpcom uvidíš hodnotu a zmenu. <strong>Klikni na dva stĺpce</strong> (napr. 2022 a 2025) a ukáže sa rast medzi nimi v %. Tlačidlo ⤢ otvorí väčší graf s hodnotami. <strong>Kvartálne (TTM)</strong> je súčet posledných štyroch kvartálov (pri maržiach ich pomer), takže vyhladzuje sezónnosť. EPS v TTM je súčet kvartálnych EPS.</p>

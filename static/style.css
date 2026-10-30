@@ -308,3 +308,21 @@ details.gtable>summary{cursor:pointer;font-weight:700;font-size:15px;color:var(-
 
 tr.sub td{font-size:13px;color:#7a6a5a;background:#fffdfa}
 tr.sub td:first-child{padding-left:44px;color:#7a6a5a}
+
+/* ---- kompaktný panel nastavení (Výkazy) ---- */
+form.tbar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.tbar label{flex-direction:row;align-items:center;gap:8px;font-size:12.5px;color:var(--mute);background:#fffaf5;border:1px solid var(--line);
+  border-radius:999px;padding:4px 6px 4px 14px;display:flex}
+.tbar label select,.tbar label input{border:0;background:transparent;font-weight:600;color:var(--ink);padding:6px 8px;border-radius:999px;box-shadow:none;cursor:pointer;max-width:260px}
+.tbar label input{cursor:text;width:120px}
+.tbar label:hover{border-color:#e9c4a3}
+.tbar button{padding:8px 16px}
+.tbar a{text-decoration:none}
+/* ---- nastavenia grafov (ozubené koliesko) ---- */
+.gset{position:relative;margin-left:4px}
+.gset>summary{list-style:none;cursor:pointer;width:38px;height:38px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#7a6a5a;font-size:17px;transition:background .18s var(--ease),color .18s var(--ease)}
+.gset>summary::-webkit-details-marker{display:none}
+.gset>summary:hover,.gset[open]>summary{background:var(--tint);color:var(--acc2)}
+.gsetbox{position:absolute;right:0;top:46px;z-index:30;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(80,50,20,.18);
+  padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:260px}
+.gsetbox label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}

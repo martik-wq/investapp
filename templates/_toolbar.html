@@ -1,5 +1,5 @@
 {# Spoločný panel nastavení. Parametre: show = množina polí #}
-<form method="get" class="controls toolbar">
+<form method="get" class="toolbar tbar">
   {% if 'mode' in show %}
   <label>Obdobie
     <select name="mode" onchange="this.form.submit()">
@@ -31,7 +31,7 @@
   <label>Cena akcie ({{ built.currency }})
     <input name="price" value="{{ price }}" size="9" placeholder="prázdne = z Yahoo"></label>
   {% endif %}
-  <button>Prepočítať</button>
+  {% if 'price' in show %}<button>Použiť cenu</button>{% endif %}
   {% if 'export' in show %}
   <a href="{{ url_for('export', ticker=ticker, **qs) }}"><button type="button" class="ghost">Export CSV</button></a>
   {% endif %}
