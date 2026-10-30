@@ -91,6 +91,8 @@ BALANCE = [
         "AccountsReceivableNetCurrent", "ReceivablesNetCurrent",
         "ifrs:TradeAndOtherCurrentReceivables"], "instant"),
     I("inventory", "Zásoby", ["InventoryNet", "ifrs:Inventories"], "instant"),
+    I("other_current_assets", "Ostatné obežné aktíva (vr. platených nákladov)", [
+        "PrepaidExpenseAndOtherAssetsCurrent", "OtherAssetsCurrent", "PrepaidExpenseCurrent"], "instant"),
     I("current_assets", "Obežné aktíva spolu", ["AssetsCurrent", "ifrs:CurrentAssets"],
       "instant", bold=True),
     # banky
@@ -106,14 +108,27 @@ BALANCE = [
         "FinancingReceivableAllowanceForCreditLosses"], "instant", indent=1),
     I("ppe", "Pozemky, budovy a zariadenia", [
         "PropertyPlantAndEquipmentNet", "ifrs:PropertyPlantAndEquipment"], "instant"),
+    I("lt_investments", "Dlhodobé investície a cenné papiere", [
+        "MarketableSecuritiesNoncurrent", "LongTermInvestments", "AvailableForSaleSecuritiesNoncurrent"],
+      "instant"),
+    I("rou_assets", "Právo na užívanie majetku (lízingy)", ["OperatingLeaseRightOfUseAsset"], "instant"),
     I("goodwill", "Goodwill", ["Goodwill", "ifrs:Goodwill"], "instant"),
     I("intangibles", "Nehmotný majetok", [
         "IntangibleAssetsNetExcludingGoodwill",
         "FiniteLivedIntangibleAssetsNet",
         "ifrs:IntangibleAssetsOtherThanGoodwill"], "instant"),
+    I("other_assets_nc", "Ostatné dlhodobé aktíva", ["OtherAssetsNoncurrent", "OtherAssetsMiscellaneousNoncurrent"],
+      "instant"),
     I("total_assets", "Aktíva spolu", ["Assets", "ifrs:Assets"], "instant", bold=True),
     I("payables", "Záväzky z obchodného styku", [
         "AccountsPayableCurrent", "ifrs:TradeAndOtherCurrentPayables"], "instant"),
+    I("accrued", "Časovo rozlíšené náklady a ostatné záväzky", ["AccruedLiabilitiesCurrent"], "instant"),
+    I("employee_liab", "Záväzky voči zamestnancom", ["EmployeeRelatedLiabilitiesCurrent"], "instant"),
+    I("taxes_payable", "Splatné dane z príjmov (krátkodobé)", ["AccruedIncomeTaxesCurrent", "TaxesPayableCurrent",
+                                                              "IncomeTaxesPayableCurrent"], "instant"),
+    I("deferred_rev", "Výnosy budúcich období (krátkodobé)", [
+        "ContractWithCustomerLiabilityCurrent", "DeferredRevenueCurrent"], "instant"),
+    I("other_cl", "Ostatné krátkodobé záväzky", ["OtherLiabilitiesCurrent"], "instant"),
     I("deposits", "Vklady", ["Deposits", "ifrs:DepositsFromCustomers"], "instant"),
     I("debt_current", "Krátkodobý dlh", [
         "DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings"], "instant"),
@@ -122,8 +137,23 @@ BALANCE = [
     I("debt_lt", "Dlhodobý dlh", [
         "LongTermDebtNoncurrent", "LongTermDebt", "ifrs:NoncurrentPortionOfNoncurrentLoansReceived"],
       "instant"),
+    I("lease_nc", "Dlhodobé záväzky z lízingov (operatívne)", ["OperatingLeaseLiabilityNoncurrent"], "instant"),
+    I("deferred_rev_nc", "Výnosy budúcich období (dlhodobé)", [
+        "ContractWithCustomerLiabilityNoncurrent", "DeferredRevenueNoncurrent"], "instant"),
+    I("deferred_tax_liab", "Odložené daňové záväzky", ["DeferredIncomeTaxLiabilitiesNet",
+                                                       "DeferredIncomeTaxLiabilities"], "instant"),
+    I("other_liab_nc", "Ostatné dlhodobé záväzky", ["OtherLiabilitiesNoncurrent"], "instant"),
     I("total_liabilities", "Záväzky spolu", ["Liabilities", "ifrs:Liabilities"],
       "instant", bold=True),
+    I("common_stock", "Základné imanie a emisné ážio", [
+        "CommonStocksIncludingAdditionalPaidInCapital", "CommonStockValue"], "instant", indent=1),
+    I("apic", "Dodatočne splatený kapitál", ["AdditionalPaidInCapital", "AdditionalPaidInCapitalCommonStock"],
+      "instant", indent=1),
+    I("treasury", "Vlastné akcie v držbe (odpočítava sa)", ["TreasuryStockValue", "TreasuryStockCommonValue"],
+      "instant", indent=1),
+    I("retained", "Nerozdelený zisk", ["RetainedEarningsAccumulatedDeficit"], "instant", indent=1),
+    I("aoci", "Ostatný súhrnný zisk/strata (AOCI)", ["AccumulatedOtherComprehensiveIncomeLossNetOfTax"],
+      "instant", indent=1),
     I("equity", "Vlastné imanie", [
         "StockholdersEquity",
         "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
