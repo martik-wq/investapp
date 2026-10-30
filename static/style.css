@@ -279,3 +279,29 @@ button.upd-new{background:linear-gradient(180deg,#1b8a4a,#16743e);border-color:#
 /* čo keby */
 .wirows{display:flex;flex-direction:column;gap:8px;max-width:520px}
 .wirow{display:grid;grid-template-columns:1fr 110px;gap:8px}
+
+/* ---- grafy firmy: jednoduché karty ---- */
+.gbar{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;margin:4px auto 18px;width:fit-content;max-width:100%;
+  background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 8px;box-shadow:var(--shadow)}
+.gtabs{display:flex;gap:2px;flex-wrap:wrap}
+.gtab{background:transparent;color:#6b5d50;border:0;box-shadow:none;border-radius:999px;padding:9px 18px;font-weight:600;font-size:14px}
+.gtab:hover{background:var(--tint);color:var(--acc2)}
+#g-cat .gtab.on{background:var(--acc);color:#fff}
+#g-mode .gtab.on{background:var(--ink);color:#fff}
+.gsep{width:1px;height:26px;background:var(--line);margin:0 8px}
+.ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:12px}
+.gcard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px 20px 12px;box-shadow:var(--shadow);transition:box-shadow .2s var(--ease),border-color .2s var(--ease)}
+.gcard:hover{border-color:#e9c4a3;box-shadow:0 2px 4px rgba(80,50,20,.05),0 12px 30px rgba(196,87,15,.10)}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.gtitle{margin:0;font-size:17px;font-weight:700;text-transform:none;letter-spacing:-.01em;color:var(--ink)}
+.gexp{background:#fff;color:#7a6a5a;border:1px solid var(--line);border-radius:10px;width:34px;height:34px;padding:0;font-size:16px;box-shadow:none;flex:none}
+.gexp:hover{background:var(--tint);color:var(--acc2);border-color:#e9c4a3}
+.gcmp{font-size:12.5px;color:var(--acc2);background:var(--tint);border-radius:10px;padding:5px 10px;margin:2px 0 4px;display:none;font-variant-numeric:tabular-nums}
+.gcard text.ax{font-size:11px;fill:#7a6a5a}
+.gmodal{position:fixed;inset:0;z-index:150;background:rgba(40,25,10,.45);display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(2px)}
+.gmodal[hidden]{display:none}
+.gmbox{background:#fff;border-radius:20px;padding:22px 26px 16px;width:min(1100px,100%);max-height:92vh;overflow:auto;box-shadow:0 30px 80px rgba(40,25,10,.35)}
+.gmbox text.ax{font-size:12px;fill:#6b5d50}
+body.noscroll{overflow:hidden}
+details.gtable>summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--ink)}
+@media(max-width:640px){.gbar{border-radius:20px}.gsep{display:none}.ggrid{grid-template-columns:1fr}}

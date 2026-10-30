@@ -38,16 +38,17 @@
 <script src="{{ url_for('static', filename='sankey.js') }}"></script>
 {% endif %}
 {% if trend %}
-<div class="card" id="trends">
-  <div class="controls" style="margin-bottom:10px">
-    <label>Obdobie<div class="seg" id="trend-mode"></div></label>
-    <label>Typ grafu<div class="seg" id="trend-kind"></div></label>
-    <span class="note">Klikni na položky nad grafom (max. 4 naraz). Kurzorom nad grafom uvidíš hodnotu a zmenu oproti predchádzajúcemu obdobiu a minulému roku. <strong>Klikni v grafe na dve obdobia</strong> (napr. 2022 a 2025) a ukáže sa rast medzi nimi v %.</span>
+<div id="trends">
+  <div class="gbar">
+    <div class="gtabs" id="g-cat" role="tablist"></div>
+    <span class="gsep"></span>
+    <div class="gtabs" id="g-mode" role="group" aria-label="Obdobie"></div>
   </div>
-  <div id="trend-charts"></div>
-  <h3>Tabuľka vývoja (zľava doprava od najstaršieho obdobia)</h3>
-  <div id="trend-table"></div>
+  <div id="g-grid" class="ggrid"></div>
+  <p class="note">Kurzorom nad stĺpcom uvidíš hodnotu a zmenu. <strong>Klikni na dva stĺpce</strong> (napr. 2022 a 2025) a ukáže sa rast medzi nimi v %. Tlačidlo ⤢ otvorí väčší graf s hodnotami.</p>
+  <details class="card gtable"><summary>Tabuľka vývoja (zľava doprava od najstaršieho obdobia)</summary><div id="trend-table"></div></details>
 </div>
+<div id="g-modal" class="gmodal" hidden></div>
 <script type="application/json" id="trend-data">{{ trend|tojson }}</script>
 <script src="{{ url_for('static', filename='trends.js') }}"></script>
 {% else %}
