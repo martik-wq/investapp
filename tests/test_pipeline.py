@@ -623,6 +623,22 @@ check("podúčty: ak súčet nesedí, nepridá sa nič (nič sa nedomýšľa)", 
 _o3 = filings.attach_subaccounts({}, [{"acc": "A", "form": "10-K"}], [_mk("Accrued expenses and other", -6.8e9, -5.0e9)], _D, fetch=_fx)
 check("podúčty: pri zápornom riadku (odliv v cash flow) majú podúčty rovnaké znamienko", len(_o3) == 4 and _o3[1]["vals"][_D[0]] == -1.0e9)
 
+# --- aktualizácia sťahuje zip podľa čísla verzie (nie podľa vetvy, ktorú GitHub drží v pamäti)
+_urls = []
+class _R:  # noqa: E302
+    content = _bio.getvalue()
+    def raise_for_status(self): pass  # noqa: E704
+_og, _ol = _up.requests.get, _up.latest_version
+_up.requests.get = lambda url, **kw: (_urls.append(url), _R())[1]
+_up.latest_version = lambda: "abc123def"
+_bak = _up.BASE
+_up.BASE = tempfile.mkdtemp(); _up.VERSION_FILE = os.path.join(_up.BASE, "version.txt")
+_up.install_zip.__defaults__ = (_up.BASE,)
+_res = _up.apply()
+_up.requests.get, _up.latest_version = _og, _ol
+check("aktualizácia: zip sa sťahuje podľa čísla verzie a verzia sa zapíše až po inštalácii",
+      _res["ok"] and _urls and _urls[0].endswith("/zip/abc123def") and open(_up.VERSION_FILE).read() == "abc123def", (_urls, _res))
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

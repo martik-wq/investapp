@@ -87,8 +87,12 @@ def install_zip(data, base=BASE):
 def apply():
     """Stiahne a nainštaluje poslednú verziu. Vráti {'ok', 'changed', 'version', 'error'}."""
     ver = latest_version()
+    # zip podľa čísla verzie (sha) sa nikdy nevyrovnáva starou kópiou; zip podľa vetvy GitHub chvíľu
+    # drží vo vyrovnávacej pamäti, takže po čerstvej zmene mohol priniesť starý obsah
+    url = (f"https://codeload.github.com/{REPO}/zip/{ver}" if ver
+           else f"https://github.com/{REPO}/archive/refs/heads/{BRANCH}.zip")
     try:
-        r = requests.get(f"https://github.com/{REPO}/archive/refs/heads/{BRANCH}.zip", timeout=60)
+        r = requests.get(url, timeout=60, headers={"Cache-Control": "no-cache", "User-Agent": "investapp"})
         r.raise_for_status()
         changed = install_zip(r.content)
     except (requests.RequestException, zipfile.BadZipFile, ValueError, OSError) as e:
