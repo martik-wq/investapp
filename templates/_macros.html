@@ -3,7 +3,7 @@
   <thead><tr><th>{{ 'mil. ' ~ currency }}</th>{% for e in ends %}<th>{{ e.strftime('%d.%m.%Y') }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for r in rows %}
-    <tr class="{{ 'bold' if r.bold }} {{ 'ind1' if r.indent }}">
+    <tr class="{{ 'bold' if r.bold }} {{ 'ind2 sub' if r.sub else ('ind1' if r.indent) }}">
       <td>{{ r.label }}</td>
       {% for e in ends %}{% set v = r.vals[e] %}
         <td class="{{ 'neg' if v is not none and v < 0 }}">{{ v|fmt(unit_to_fmt(r.unit)) }}</td>

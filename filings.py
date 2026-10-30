@@ -547,6 +547,19 @@ def get_detailed(company, mode, years):
            "capped": (years > yrs)}
     for k in KINDS:
         out[k] = _build_statement(k, by_kind[k], mode, display) or []
+    out["subs"] = False
+    if mode == "annual":
+        try:
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                futs = {k: ex.submit(attach_subaccounts, company, chosen, out[k], display)
+                        for k in ("balance", "cashflow")}
+                for k, fu in futs.items():
+                    new = fu.result()
+                    if len(new) != len(out[k]):
+                        out["subs"] = True
+                    out[k] = new
+        except Exception:  # noqa: BLE001 - podúčty sú len bonus, výkazy musia ostať
+            pass
     return out
 
 
@@ -631,19 +644,8 @@ def extract_breakdown(rep, end, months, expected_total=None, tol=0.012):
     return best
 
 
-def extract_window(rep, end, months, target, tol=0.004):
-    """Súvislý úsek riadkov výkazu, ktorých súčet sedí s `target` (napr. prevádzkové
-    náklady). Podsúčty sa rozpadnú na zložky. Vráti {'items': [...]} alebo None."""
-    ci = _col_index(rep, end, months)
-    if ci is None or not target or target <= 0:
-        return None
-    pi = _col_index(rep, date(end.year - 1, end.month, min(end.day, 28)), months, tol=12)
-    rows = []
-    for r in rep["rows"]:
-        if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
-            continue
-        rows.append((_clean_label(r["label"]), r["vals"][ci],
-                     r["vals"][pi] if pi is not None else None))
+def _window_from_rows(rows, target, tol=0.004):
+    """rows = [(label, hodnota, predošlá)]. Súvislý úsek, ktorého súčet sedí s `target`."""
     cands = []
     for i in range(len(rows)):
         acc = 0.0
@@ -665,6 +667,153 @@ def extract_window(rep, end, months, target, tol=0.004):
         if len(items) >= 2 and len(set(keys)) == len(keys):  # bez zdvojených (súčet + zložky)
             return {"items": [{"label": a, "value": b, "prev": c} for a, b, c in items]}
     return None
+
+
+def extract_window(rep, end, months, target, tol=0.004):
+    """Súvislý úsek riadkov výkazu, ktorých súčet sedí s `target` (napr. prevádzkové
+    náklady). Podsúčty sa rozpadnú na zložky. Vráti {'items': [...]} alebo None."""
+    ci = _col_index(rep, end, months)
+    if ci is None or not target or target <= 0:
+        return None
+    pi = _col_index(rep, date(end.year - 1, end.month, min(end.day, 28)), months, tol=12)
+    rows = []
+    for r in rep["rows"]:
+        if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
+            continue
+        rows.append((_clean_label(r["label"]), r["vals"][ci],
+                     r["vals"][pi] if pi is not None else None))
+    return _window_from_rows(rows, target, tol)
+
+
+# ------------------------------------------- podúčty k riadkom súvahy a cash flow
+SUB_STOP = {"and", "the", "of", "in", "on", "to", "for", "net", "other", "total", "details", "detail",
+            "additional", "information", "components", "component", "schedule", "summary", "table",
+            "tables", "current", "non", "noncurrent", "balance", "sheet", "sheets", "narrative",
+            "parenthetical", "policies", "accounting", "disclosures", "supplemental", "description",
+            "business", "from", "with", "by", "at", "or", "a", "an", "less", "plus"}
+SUB_SKIP_LABEL = re.compile(r"beginning|ending|balance at|balances at|end of|start of|"
+                            r"accumulated|\bnet of\b|^total\b", re.I)
+
+
+def _tokens(text):
+    out = set()
+    for w in re.findall(r"[a-z]+", text.lower()):
+        if w in SUB_STOP or len(w) < 3:
+            continue
+        out.add(w[:-1] if w.endswith("s") and len(w) > 4 else w)
+    return out
+
+
+def _detail_page_list(summary_xml):
+    """[(súbor, názov časti za poslednou pomlčkou)] pre stránky „(Details)“."""
+    out = []
+    for _, short, fname, cat in _reports(summary_xml):
+        if not fname or (cat or "").lower() != "details":
+            continue
+        low = short.lower()
+        if "parenthetical" in low or "(details" not in low:
+            continue
+        title = short.split(" - ")[-1]
+        out.append((fname, title))
+    return out
+
+
+def _col_by_date(rep, end, tol=5):
+    best = None
+    for i, c in enumerate(rep["cols"]):
+        d = abs((c["end"] - end).days)
+        if d <= tol and (best is None or d < best[0]):
+            best = (d, i)
+    return best[1] if best else None
+
+
+def attach_subaccounts(company, filings_list, rows, display_ends, fetch=None, max_pages_per_row=4):
+    """Ku riadkom súvahy / cash flow doplní podúčty z poznámok („Details“ stránok podania).
+    Podúčet sa pridá len vtedy, keď súčet zložiek na stránke sedí s hodnotou riadku (±0,4 %),
+    takže sa nič nedomýšľa. Vráti nový zoznam riadkov."""
+    fetch = fetch or fetch_text
+    if not rows or not filings_list:
+        return rows
+    page_cache = {}
+
+    def page(acc, fname):
+        k = (acc, fname)
+        if k not in page_cache:
+            html = fetch(company, acc, fname)
+            try:
+                page_cache[k] = parse_report(html) if html else None
+            except Exception:  # noqa: BLE001
+                page_cache[k] = None
+        return page_cache[k]
+
+    lists = {}
+    for f in filings_list:
+        summary = fetch(company, f["acc"], "FilingSummary.xml")
+        lists[f["acc"]] = _detail_page_list(summary) if summary else []
+    used_pages = set()
+    children = {}   # index riadku -> {norm: {'label', 'vals'}} + poradie
+    for idx, row in enumerate(rows):
+        if row.get("header") or row.get("kind") != "money" or row.get("sub"):
+            continue
+        if TOTAL_RE.match(row["label"]):
+            continue
+        rt = _tokens(row["label"])
+        if not rt:
+            continue
+        targets = {e: v for e, v in row["vals"].items() if v not in (None, 0) and e in display_ends}
+        if not targets:
+            continue
+        found = {}
+        order = []
+        for f in filings_list:
+            cands = []
+            for fname, title in lists[f["acc"]]:
+                pt = _tokens(title)
+                ov = len(rt & pt)
+                if ov and (f["acc"], fname) not in used_pages:
+                    cands.append((ov / len(rt | pt), fname))
+            cands.sort(reverse=True)
+            for _score, fname in cands[:max_pages_per_row]:
+                rep = page(f["acc"], fname)
+                if not rep:
+                    continue
+                matched = False
+                for e, tv in targets.items():
+                    ci = _col_by_date(rep, e)
+                    if ci is None:
+                        continue
+                    pi = None
+                    rws = []
+                    for r in rep["rows"]:
+                        if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
+                            continue
+                        rws.append((_clean_label(r["label"]), r["vals"][ci], None))
+                    w = _window_from_rows(rws, abs(tv))
+                    if not w or len(w["items"]) > 25:
+                        continue
+                    if any(SUB_SKIP_LABEL.search(it["label"]) for it in w["items"]):
+                        continue
+                    sign = 1.0 if tv > 0 else -1.0
+                    for it in w["items"]:
+                        key = _norm(it["label"])
+                        if key not in found:
+                            found[key] = {"label": it["label"], "vals": {}}
+                            order.append(key)
+                        found[key]["vals"][e] = sign * it["value"]
+                    matched = True
+                if matched:
+                    used_pages.add((f["acc"], fname))
+                    break
+        if found and len(order) >= 2:
+            children[idx] = [found[k] for k in order]
+    out = []
+    for idx, row in enumerate(rows):
+        out.append(row)
+        for ch in children.get(idx, ()):
+            vals = {e: ch["vals"].get(e) for e in display_ends}
+            out.append({"label": ch["label"], "kind": "money", "indent": 2, "bold": False,
+                        "header": False, "sub": True, "vals": vals})
+    return out
 
 
 def _income_window_candidates(company, filing, end, months, target):

@@ -27,7 +27,7 @@
   {% if det_error %}<div class="warn">Podrobné výkazy sa nepodarilo načítať: {{ det_error }} Zobrazujem zjednodušené údaje.</div>{% endif %}
   {% if det %}
   {% set dends = det.ends|reverse|list %}
-  <p class="note" style="margin:0 0 8px"><strong>Podrobné výkazy:</strong> riadky a znamienka sú presne tak, ako ich firma uvádza vo svojich podaniach ({{ det.filings }} podaní zo SEC){% if det.capped %}, zobrazených je najviac {{ det.years }} rokov{% endif %}. Výdavky v cash flow sú preto záporné. Kvartály, ktoré firma neuvádza samostatne (štvrtý kvartál, cash flow), sú dopočítané z rozdielov.</p>
+  <p class="note" style="margin:0 0 8px"><strong>Podrobné výkazy:</strong> riadky a znamienka sú presne tak, ako ich firma uvádza vo svojich podaniach ({{ det.filings }} podaní zo SEC){% if det.capped %}, zobrazených je najviac {{ det.years }} rokov{% endif %}. Výdavky v cash flow sú preto záporné. Kvartály, ktoré firma neuvádza samostatne (štvrtý kvartál, cash flow), sú dopočítané z rozdielov.{% if det.subs %} <strong>Podúčty</strong> (šedšie, odsadené riadky) sú z poznámok k výkazom: pridávajú sa len tam, kde súčet zložiek presne sedí s riadkom výkazu.{% endif %}</p>
   <div class="pane on" id="p-income">{{ detail_table(det.income, dends, built.currency) }}</div>
   <div class="pane" id="p-balance">{{ detail_table(det.balance, dends, built.currency) }}</div>
   <div class="pane" id="p-cashflow">{{ detail_table(det.cashflow, dends, built.currency) }}</div>

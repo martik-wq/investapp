@@ -603,6 +603,26 @@ check("TTM: na konci fiškálneho roka sa zhoduje s ročnou hodnotou", _i is not
       (_rt[_i] if _i is not None else None, _ra[-1]))
 check("TTM: čistá marža = TTM zisk / TTM tržby", abs(_ser("ttm", "nm")[-1] - _ser("ttm", "net_income")[-1] / _rt[-1]) < 1e-9)
 
+# --- podúčty z poznámok (Details) k riadkom súvahy a cash flow
+_sm = ("<FilingSummary><MyReports><Report><Position>50</Position><ShortName>Notes - Accrued Expenses and Other (Details)"
+       "</ShortName><HtmlFileName>R50.htm</HtmlFileName><MenuCategory>Details</MenuCategory></Report></MyReports></FilingSummary>")
+_pg = ('<table class="report"><tr><th class="tl">Accrued Expenses and Other (Details) - USD ($) $ in Millions</th>'
+       '<th>Dec. 31, 2025</th><th>Dec. 31, 2024</th></tr>'
+       '<tr class="re"><td class="pl">Accrued compensation</td><td class="nump">$ 1,000</td><td class="nump">$ 900</td></tr>'
+       '<tr class="re"><td class="pl">Accrued taxes</td><td class="nump">2,500</td><td class="nump">1,500</td></tr>'
+       '<tr class="re"><td class="pl">Accrued marketing</td><td class="nump">3,300</td><td class="nump">2,600</td></tr></table>')
+_fx = lambda c, a, n: {"FilingSummary.xml": _sm, "R50.htm": _pg}.get(n)  # noqa: E731
+_D = [date(2025, 12, 31), date(2024, 12, 31)]
+_mk = lambda lab, a, b: {"label": lab, "kind": "money", "indent": 0, "bold": False, "header": False, "vals": {_D[0]: a, _D[1]: b}}  # noqa: E731
+_o = filings.attach_subaccounts({}, [{"acc": "A", "form": "10-K"}], [_mk("Accrued expenses and other", 6.8e9, 5.0e9), _mk("Long-term debt", 5e9, 4e9)], _D, fetch=_fx)
+check("podúčty: pridajú sa tam, kde súčet zložiek sedí s riadkom (3 podúčty pod riadkom)",
+      [r["label"] for r in _o] == ["Accrued expenses and other", "Accrued compensation", "Accrued taxes", "Accrued marketing", "Long-term debt"]
+      and _o[1].get("sub") and abs(_o[2]["vals"][_D[0]] - 2.5e9) < 1, [r["label"] for r in _o])
+_o2 = filings.attach_subaccounts({}, [{"acc": "A", "form": "10-K"}], [_mk("Accrued expenses and other", 7.0e9, 5.5e9)], _D, fetch=_fx)
+check("podúčty: ak súčet nesedí, nepridá sa nič (nič sa nedomýšľa)", len(_o2) == 1)
+_o3 = filings.attach_subaccounts({}, [{"acc": "A", "form": "10-K"}], [_mk("Accrued expenses and other", -6.8e9, -5.0e9)], _D, fetch=_fx)
+check("podúčty: pri zápornom riadku (odliv v cash flow) majú podúčty rovnaké znamienko", len(_o3) == 4 and _o3[1]["vals"][_D[0]] == -1.0e9)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

@@ -305,3 +305,6 @@ button.upd-new{background:linear-gradient(180deg,#1b8a4a,#16743e);border-color:#
 body.noscroll{overflow:hidden}
 details.gtable>summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--ink)}
 @media(max-width:640px){.gbar{border-radius:20px}.gsep{display:none}.ggrid{grid-template-columns:1fr}}
+
+tr.sub td{font-size:13px;color:#7a6a5a;background:#fffdfa}
+tr.sub td:first-child{padding-left:44px;color:#7a6a5a}
