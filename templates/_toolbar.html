@@ -10,8 +10,8 @@
   {% if 'detail' in show %}
   <label>Zobrazenie
     <select name="detail" onchange="this.form.submit()">
+      <option value="1" {{ 'selected' if detail }}>Ako firma uvádza</option>
       <option value="0" {{ 'selected' if not detail }}>Zjednodušené</option>
-      <option value="1" {{ 'selected' if detail }}>Podrobné (ako firma uvádza)</option>
     </select></label>
   {% endif %}
   {% if 'price' in show %}

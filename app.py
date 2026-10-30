@@ -156,7 +156,7 @@ def _params():
     typ = typ if typ in BUSINESS_TYPES else "auto"
     return {"mode": mode, "typ": typ, "price_raw": request.args.get("price", ""),
             "years": parse_years(request.args.get("years")),
-            "detail": request.args.get("detail") == "1"}
+            "detail": request.args.get("detail", "1") != "0"}
 
 
 def _qs(p):
@@ -170,8 +170,8 @@ def _qs(p):
         q["type"] = p["typ"]
     if p["price_raw"]:
         q["price"] = p["price_raw"]
-    if p["detail"]:
-        q["detail"] = "1"
+    if not p["detail"]:
+        q["detail"] = "0"
     return q
 
 
