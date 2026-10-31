@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Watchlist · mkej{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>👁 Watchlist</h1>
+  <div class="sub">Akcie, ktorých cenu chceš sledovať · uložené len na tvojom počítači · ceny sa obnovujú po 15 minútach</div>
+</div>
+{% for cat, msg in get_flashed_messages(with_categories=true) %}
+  <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
+{% endfor %}
+<div class="card">
+  <h2>Pridať akciu</h2>
+  <form action="{{ url_for('watchlist_add') }}" method="post" class="wlform">
+    <input name="ticker" placeholder="Ticker (napr. NVDA, ASML.AS)" required maxlength="15" autocomplete="off">
+    <input name="target" placeholder="Cieľová cena (nepovinné)" inputmode="decimal" maxlength="12">
+    <button>Pridať</button>
+  </form>
+</div>
+{% if rows %}
+<div class="card">
+  <div class="tablewrap"><table class="pf sortable" id="wltable">
+    <thead><tr>
+      <th>Ticker</th><th>Názov</th><th>Cena</th><th>Dnes</th><th>Od pridania</th><th>52-týždňový rozsah</th>
+      <th>Od maxima</th><th>Cieľ</th><th>Do cieľa</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}"><strong>{{ r.ticker }}</strong></a></td>
+        <td>{{ r.name }}<div class="note">od {{ r.added }}</div></td>
+        <td data-v="{{ r.price or 0 }}">{% if r.price is not none %}{{ '%.2f'|format(r.price) }} {{ r.ccy or '' }}{% else %}–{% endif %}</td>
+        <td data-v="{{ r.day_pct or 0 }}" class="{{ 'neg' if r.day_pct is not none and r.day_pct < 0 }}">{{ r.day_pct|fmt('pct') if r.day_pct is not none else '–' }}</td>
+        <td data-v="{{ r.since_add or 0 }}" class="{{ 'neg' if r.since_add is not none and r.since_add < 0 }}">{{ r.since_add|fmt('pct') if r.since_add is not none else '–' }}</td>
+        <td data-v="{{ r.range_pos or 0 }}">
+          {% if r.range_pos is not none %}
+          <div class="wlrange" title="{{ '%.0f'|format(r.range_pos*100) }} % rozsahu medzi minimom a maximom za 52 týždňov"><i style="left:{{ '%.1f'|format(r.range_pos*100) }}%"></i></div>
+          <div class="note">{{ '%.2f'|format(r.quote.low52) }} – {{ '%.2f'|format(r.quote.high52) }}</div>
+          {% else %}–{% endif %}
+        </td>
+        <td data-v="{{ r.from_high or 0 }}" class="{{ 'neg' if r.from_high is not none and r.from_high < 0 }}">{{ r.from_high|fmt('pct') if r.from_high is not none else '–' }}</td>
+        <td data-v="{{ r.target or 0 }}">
+          <form action="{{ url_for('watchlist_target') }}" method="post" class="wlinline">
+            <input type="hidden" name="ticker" value="{{ r.ticker }}">
+            <input name="target" value="{{ r.target or '' }}" placeholder="–" inputmode="decimal" maxlength="12" aria-label="Cieľová cena {{ r.ticker }}">
+          </form>
+        </td>
+        <td data-v="{{ r.to_target or 0 }}">{% if r.hit %}<strong>cieľ dosiahnutý</strong>{% elif r.to_target is not none %}{{ r.to_target|fmt('pct') }}{% else %}–{% endif %}</td>
+        <td><form action="{{ url_for('watchlist_remove') }}" method="post"><input type="hidden" name="ticker" value="{{ r.ticker }}"><button class="danger" title="Odstrániť {{ r.ticker }}">×</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="note">„Od pridania“ sa počíta od ceny v deň pridania. „Do cieľa“ ukazuje, o koľko % musí cena vyrásť na cieľovú cenu. Cieľ zmeníš v bunke a potvrdíš Enterom. Ticker otvorí analýzu firmy.</p>
+</div>
+{% else %}
+<div class="card"><p>Watchlist je prázdny. Pridaj hore prvú akciu.</p></div>
+{% endif %}
+{% endblock %}

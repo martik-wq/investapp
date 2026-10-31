@@ -917,6 +917,38 @@ check("fundamentálna: vlastné vstupy sa prenesú do formulára a poznačí sa 
       'name="d_g1"' in _fu2 and 'value="20,0"' in _fu2 and "tvoja hodnota sa líši" in _fu2)
 check("fundamentálna: nezmyselné vstupy (WACC ≤ terminálny rast) dajú hlášku, nie pád",
       "Diskontná sadzba musí byť" in cl.get("/company/DEMOCO/fundamental?d_wacc=3&d_gt=3").get_data(as_text=True))
+# ---- watchlist
+import watchlist as _wl  # noqa: E402
+_wl.PATH = os.path.join(tempfile.mkdtemp(), "watchlist.json")        # nedotkne sa tvojho zoznamu
+_fake = {"WLA": {"price": 110.0, "currency": "USD", "name": "Alfa Inc", "change_pct": 0.02, "high52": 120.0, "low52": 80.0},
+         "WLB": {"price": 50.0, "currency": "EUR", "name": "Beta AG", "change_pct": -0.01, "high52": 90.0, "low52": 45.0}}
+_orig_gp = _appmod.prices.get_price
+_appmod.prices.get_price = lambda t: _fake.get(t.upper())
+_c = _appmod.app.test_client()
+_c.post("/watchlist/add", data={"ticker": "wla", "target": "132"})
+_c.post("/watchlist/add", data={"ticker": "WLB"})
+_c.post("/watchlist/add", data={"ticker": "WLA"})            # duplicita
+_c.post("/watchlist/add", data={"ticker": "NEEXISTUJE"})     # bez ceny
+_items = _wl.load()
+check("watchlist: pridanie, duplicita a neznámy ticker", [i["ticker"] for i in _items] == ["WLA", "WLB"]
+      and _items[0]["target"] == 132.0 and _items[0]["price_at_add"] == 110.0, _items)
+_rows = {r["ticker"]: r for r in _wl.enrich(_items, _appmod.prices.get_price)}
+check("watchlist: poloha v 52-týždňovom rozsahu, od maxima a vzdialenosť k cieľu",
+      abs(_rows["WLA"]["range_pos"] - 0.75) < 1e-9 and abs(_rows["WLA"]["from_high"] - (110 / 120 - 1)) < 1e-9
+      and abs(_rows["WLA"]["to_target"] - 0.2) < 1e-9 and _rows["WLB"]["to_target"] is None)
+_fake["WLA"] = dict(_fake["WLA"], price=140.0)
+_r2 = {r["ticker"]: r for r in _wl.enrich(_items, _appmod.prices.get_price)}
+check("watchlist: zmena od pridania a dosiahnutý cieľ", abs(_r2["WLA"]["since_add"] - (140 / 110 - 1)) < 1e-9 and _r2["WLA"]["hit"])
+_h = _c.get("/watchlist").get_data(as_text=True)
+check("watchlist: stránka zobrazí tabuľku a odkaz v menu", "Alfa Inc" in _h and "cieľ dosiahnutý" in _h and "Watchlist" in _h)
+_c.post("/watchlist/target", data={"ticker": "WLB", "target": "60,5"})
+check("watchlist: úprava cieľa (aj s desatinnou čiarkou)", _wl.load()[1]["target"] == 60.5)
+_c.post("/watchlist/remove", data={"ticker": "WLA"})
+check("watchlist: odstránenie", [i["ticker"] for i in _wl.load()] == ["WLB"])
+_appmod.prices.get_price = lambda t: None
+check("watchlist: nedostupná cena nezhodí stránku", _c.get("/watchlist").status_code == 200)
+_appmod.prices.get_price = _orig_gp
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

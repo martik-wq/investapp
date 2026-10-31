@@ -15,6 +15,7 @@
     <button aria-label="Hľadať">🔍</button>
   </form>
   <a class="gnav {{ 'on' if page == 'portfolio' }}" href="{{ url_for('portfolio_view') }}"><span class="ic">💼</span>Portfólio</a>
+  <a class="gnav {{ 'on' if page == 'watchlist' }}" href="{{ url_for('watchlist_view') }}"><span class="ic">👁</span>Watchlist</a>
   {% if ticker %}
   <div class="coBox">
     <div class="coTick">{{ ticker }}</div>

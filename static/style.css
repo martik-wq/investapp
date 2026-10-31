@@ -465,3 +465,10 @@ button.mtile.weak{opacity:.72}
 
 .rref{font-size:11px;color:#a58b74;margin:-1px 0 5px 20px;line-height:1.35}
 details.reftab{margin:6px 0 10px}details.reftab>summary{cursor:pointer;font-size:13px;color:var(--acc2);font-weight:600}
+
+/* watchlist */
+.wlform{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wlform input{padding:9px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;min-width:220px}
+.wlinline input{width:84px;padding:5px 8px;border:1px solid var(--line,#e5e7eb);border-radius:8px;text-align:right}
+.wlrange{position:relative;height:6px;border-radius:3px;background:#e5e7eb;min-width:110px;margin:6px 0 2px}
+.wlrange i{position:absolute;top:-3px;width:4px;height:12px;border-radius:2px;background:#c2410c;transform:translateX(-50%)}

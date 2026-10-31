@@ -24,6 +24,7 @@ import quality
 import valuation
 import trends
 import updater
+import watchlist
 import statements
 from taxonomy import BUSINESS_TYPES
 
@@ -816,6 +817,45 @@ def portfolio_symbol():
         portfolio.set_symbol(isin, request.form.get("symbol", ""))
         flash("Symbol uložený.", "ok")
     return redirect(url_for("portfolio_view"))
+
+
+# ------------------------------------------------------------------ watchlist
+@app.route("/watchlist")
+def watchlist_view():
+    items = watchlist.load()
+    rows = watchlist.enrich(items, prices.get_price) if items else []
+    return render_template("watchlist.html", page="watchlist", ticker=None, section=None, rows=rows)
+
+
+@app.route("/watchlist/add", methods=["POST"])
+def watchlist_add():
+    raw = request.form.get("ticker", "").strip()
+    if not raw:
+        return redirect(url_for("watchlist_view"))
+    t = re.split(r"[,\s;]+", raw.upper())[0]
+    q = None
+    try:
+        q = prices.get_price(t)
+    except Exception:  # noqa: BLE001
+        q = None
+    if not q:
+        flash(f"Cenu pre „{t[:20]}“ som nenašiel. Skontroluj ticker (európske akcie majú príponu, napr. ASML.AS).", "warn")
+        return redirect(url_for("watchlist_view"))
+    ok, msg = watchlist.add(t, q["price"], q.get("name") or t, request.form.get("target"))
+    flash(msg, "ok" if ok else "warn")
+    return redirect(url_for("watchlist_view"))
+
+
+@app.route("/watchlist/remove", methods=["POST"])
+def watchlist_remove():
+    watchlist.remove(request.form.get("ticker", ""))
+    return redirect(url_for("watchlist_view"))
+
+
+@app.route("/watchlist/target", methods=["POST"])
+def watchlist_target():
+    watchlist.set_target(request.form.get("ticker", ""), request.form.get("target", ""))
+    return redirect(url_for("watchlist_view"))
 
 
 @app.route("/")
