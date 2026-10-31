@@ -231,3 +231,71 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
         out["notes"].append(quote_note)
     out["wacc_parts"] = {"ke": ke, "rf": rf_used, "beta": beta_used, "w_d": w_d, "kd": kd}
     return out
+
+
+# ------------------------------------------------------------------ porovnanie s konkurenciou
+import quality as Q  # noqa: E402
+
+
+def peer_metrics(name, ticker, built, facts, btype, quote, shares_out):
+    """Jeden stĺpec porovnania: dict kľúč -> hodnota (None = chýba)."""
+    t = built["display"][-1]
+    g = lambda k: built["data"].get(k, {}).get(t)  # noqa: E731
+    rev = g("revenue")
+    ebitda = (g("op_income") + g("da")) if g("op_income") is not None and g("da") is not None else None
+    ni = g("net_income")
+    ro = None
+    pio = alt = None
+    if btype not in ("bank", "insurance"):
+        try:
+            ro, pio, alt = Q.roic(built), Q.piotroski(built), Q.altman(built)
+        except (TypeError, ZeroDivisionError):
+            pass
+    price = quote.get("price") if quote and not quote.get("mismatch") else None
+    mcap = price * shares_out if price and shares_out else None
+    eps = facts.get("eps_ttm")
+    nd = facts.get("net_debt")
+    fcf = g("fcf")
+    return {
+        "ticker": ticker, "name": name, "currency": built["currency"], "fy": t,
+        "revenue": rev, "rev_cagr3": facts.get("rev_cagr3"),
+        "op_margin": (g("op_income") / rev) if rev and g("op_income") is not None else None,
+        "net_margin": (ni / rev) if rev and ni is not None else None,
+        "fcf_margin": facts.get("fcf_margin_avg3"),
+        "roe": facts.get("roe_avg3") if facts.get("roe_avg3") is not None else facts.get("roe_last"),
+        "roic": ro["roic"] if ro else None,
+        "nd_ebitda": (nd / ebitda) if ebitda and ebitda > 0 and nd is not None else None,
+        "piotroski": pio["score"] if pio else None,
+        "altman": alt["z"] if alt else None,
+        "mcap": mcap,
+        "pe": (price / eps) if price and eps and eps > 0 else None,
+        "ps": (mcap / rev) if mcap and rev else None,
+        "ev_ebitda": ((mcap + nd) / ebitda) if mcap and ebitda and ebitda > 0 and nd is not None else None,
+        "fcf_yield": (fcf / mcap) if mcap and fcf is not None else None,
+    }
+
+
+# (kľúč, názov, formát, lepšie: 'hi' / 'lo' / None)
+PEER_ROWS = [
+    ("revenue", "Tržby (posledný rok)", "money", None), ("rev_cagr3", "Rast tržieb 3 roky (CAGR)", "pct", "hi"),
+    ("op_margin", "Prevádzková marža", "pct", "hi"), ("net_margin", "Čistá marža", "pct", "hi"),
+    ("fcf_margin", "FCF marža (priemer 3 roky)", "pct", "hi"), ("roe", "ROE (priemer 3 roky)", "pct", "hi"),
+    ("roic", "ROIC", "pct", "hi"), ("nd_ebitda", "Čistý dlh / EBITDA", "x", "lo"),
+    ("piotroski", "Piotroski F-score (0 až 9)", "int", "hi"), ("altman", "Altman Z''", "num2", "hi"),
+    ("mcap", "Trhová kapitalizácia", "big", None), ("pe", "P/E", "x", "lo"), ("ps", "P/S", "x", "lo"),
+    ("ev_ebitda", "EV / EBITDA", "x", "lo"), ("fcf_yield", "FCF výnos", "pct", "hi"),
+]
+
+
+def peer_table(cols):
+    """cols = zoznam výstupov peer_metrics (prvý = analyzovaná firma). Označí najlepšiu hodnotu v riadku."""
+    rows = []
+    for key, label, fmt, better in PEER_ROWS:
+        vals = [c.get(key) for c in cols]
+        best = None
+        known = [(v, i) for i, v in enumerate(vals) if v is not None]
+        if better and len(known) >= 2:
+            pool = [(v, i) for v, i in known if not (key == "nd_ebitda" and v < 0 and False)]
+            best = (max(pool) if better == "hi" else min(pool))[1]
+        rows.append({"key": key, "label": label, "fmt": fmt, "vals": vals, "best": best})
+    return rows

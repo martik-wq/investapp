@@ -14,6 +14,52 @@
 <div class="warn">Oceňovacie modely stoja na predpokladoch. Pri každom vstupe nájdeš odporúčanie z histórie firmy a odhadov analytikov a vstup môžeš zmeniť. Výsledok je rozpätie hodnôt (pesimistický, základný a optimistický variant), nie jedna „správna“ cena a nie je to investičné odporúčanie.</div>
 {% for n in fund.notes %}<div class="warn">{{ n }}</div>{% endfor %}
 
+
+{% set q = fund.quality %}
+<div class="card" id="quality">
+  <h2>Kvalita podniku</h2>
+  {% if not q or q.skip %}
+    <p class="note">Piotroski F-score, Altman Z'' a ROIC sa pri bankách a poisťovniach nepoužívajú (majú inú štruktúru súvahy). Pre ne pozri záložku Výkazy, Metriky (ROE, efficiency ratio, úverové straty) a model P/B nižšie.</p>
+  {% else %}
+  <div class="rtiles">
+    {% for g in q.ratings %}
+    <div class="rtile">
+      <div class="rhead"><span>{{ g.name }}</span><span class="rbadge r{{ g.level if g.level is not none else 'n' }}">{{ g.label }}</span></div>
+      {% for name, val, sc in g.parts %}<div class="rpart"><span class="rdot r{{ sc if sc is not none else 'n' }}"></span><span class="rname">{{ name }}</span><strong>{{ val }}</strong></div>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="note">Hodnotenie je priemer bodov za ukazovatele v dlaždici (zelená bodka = silné, oranžová = priemerné, červená = slabé; šedá = chýbajú údaje). Hranice: rast tržieb ≥ 10 % silný, &lt; 3 % slabý; prevádzková marža ≥ 20 %; ROIC ≥ 15 %; čistý dlh / EBITDA ≤ 1; krytie úrokov ≥ 8; cash flow / zisk ≥ 1; akciové odmeny ≤ 3 % tržieb.</p>
+  <div class="grid2">
+    <div>
+      <h3>Piotroski F-score {% if q.pio %}<span class="rbadge r{{ 2 if q.pio.score >= 7 else (1 if q.pio.score >= 4 else 0) }}">{{ q.pio.score }} z {{ q.pio.n }}</span>{% endif %}</h3>
+      {% if q.pio %}
+      <div class="tests">{% for name, ok, why in q.pio['items'] %}<div class="test"><span class="tk {{ 'ok' if ok else ('no' if ok is not none else 'na') }}">{{ '✓' if ok else ('✗' if ok is not none else '–') }}</span><span>{{ name }}<span class="note"> · {{ why }}</span></span></div>{% endfor %}</div>
+      <p class="note">7 až 9 = silná finančná kondícia, 0 až 3 = slabá. Počíta sa z posledných dvoch fiškálnych rokov ({{ q.pio.year.year }}).</p>
+      {% else %}<p class="note">Na výpočet nie je dosť údajov.</p>{% endif %}
+    </div>
+    <div>
+      <h3>Altman Z'' {% if q.alt %}<span class="rbadge r{{ 2 if q.alt.zone == 'bezpečná' else (1 if q.alt.zone == 'šedá' else 0) }}">{{ ('%.2f'|format(q.alt.z)).replace('.', ',') }} · {{ q.alt.zone }} zóna</span>{% endif %}</h3>
+      {% if q.alt %}
+      <div class="tests">{% for name, v in q.alt.parts %}<div class="test pair"><span class="rname">{{ name }}</span><strong>{{ ('%.2f'|format(v)).replace('.', ',') }}</strong></div>{% endfor %}</div>
+      <p class="note">Model rizika bankrotu (verzia pre firmy bez trhovej hodnoty): nad 2,6 bezpečná zóna, 1,1 až 2,6 šedá, pod 1,1 riziková.</p>
+      {% else %}<p class="note">Na výpočet nie je dosť údajov (chýba súvaha).</p>{% endif %}
+      {% if q.roic %}<h3>ROIC</h3><div class="bigprice" style="font-size:28px">{{ pc(q.roic.roic) }}</div><p class="note">Zisk z prevádzky po dani ({{ pc(q.roic.tax, 0) }}) lomený investovaným kapitálom (dlh + vlastné imanie − hotovosť). Nad 10 % firma zvyčajne vytvára hodnotu.</p>{% endif %}
+    </div>
+  </div>
+  {% if q.dupont %}
+  <h3>Rozklad ROE (DuPont)</h3>
+  <div class="tablewrap"><table class="pf"><thead><tr><th></th>{% for r in q.dupont %}<th>{{ r.end.year }}</th>{% endfor %}</tr></thead><tbody>
+    <tr><td style="text-align:left">Čistá marža (zisk / tržby)</td>{% for r in q.dupont %}<td>{{ pc(r.margin) }}</td>{% endfor %}</tr>
+    <tr><td style="text-align:left">× Obrat aktív (tržby / aktíva)</td>{% for r in q.dupont %}<td>{{ ('%.2f'|format(r.turnover)).replace('.', ',') }}×</td>{% endfor %}</tr>
+    <tr><td style="text-align:left">× Finančná páka (aktíva / vlastné imanie)</td>{% for r in q.dupont %}<td>{{ ('%.2f'|format(r.leverage)).replace('.', ',') }}×</td>{% endfor %}</tr>
+    <tr><td style="text-align:left"><strong>= ROE</strong></td>{% for r in q.dupont %}<td><strong>{{ pc(r.roe) }}</strong></td>{% endfor %}</tr>
+  </tbody></table></div>
+  <p class="note">Ukáže, či vysoké ROE vzniká zo ziskovosti, z efektívneho využitia majetku, alebo len z dlhu (vysoká páka).</p>
+  {% endif %}
+  {% endif %}
+</div>
+
 <div class="card">
   <div class="flowhead"><h2>Súhrn: rozpätie hodnoty na akciu</h2>
     <div class="note">{% if fund.price %}Cena na trhu: <strong>{{ money(fund.price) }} {{ fund.currency }}</strong>{% else %}Cena akcie nie je k dispozícii{% endif %}</div></div>
@@ -37,6 +83,7 @@
   <input type="hidden" name="m" id="fund-m" value="{{ fund.model }}">
   {% for k, v in qs.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
   {% if price %}<input type="hidden" name="price" value="{{ price }}">{% endif %}
+  {% if fund.peers.input %}<input type="hidden" name="peers" value="{{ fund.peers.input }}">{% endif %}
   <div class="gbar" style="margin-top:0">
     <div class="gtabs" id="fund-tabs" role="tablist">
       <button type="button" class="gtab" data-m="dcf">DCF (voľný cash flow)</button>
@@ -129,6 +176,28 @@
     </div>
   </div>
 </form>
+
+
+<div class="card" id="peers">
+  <h2>Porovnanie s konkurenciou</h2>
+  <form method="get" action="#peers" class="controls">
+    {% for k, v in qs.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="m" value="{{ fund.model }}">
+    <label style="min-width:380px">Tickery konkurentov (najviac 4, oddelené čiarkou)
+      <input name="peers" value="{{ fund.peers.input }}" placeholder="napr. SOFI, NU, ALLY, COF" autocomplete="off"></label>
+    <button>Porovnať</button>
+  </form>
+  {% for e in fund.peers.errors %}<div class="warn">{{ e }}</div>{% endfor %}
+  {% if fund.peers.table %}
+  <div class="tablewrap"><table class="pf peers"><thead><tr><th></th>{% for c in fund.peers.cols %}<th class="{{ 'me' if loop.first }}">{{ c.ticker }}<div class="note" style="font-weight:400">{{ c.name }}</div></th>{% endfor %}</tr></thead><tbody>
+    {% for r in fund.peers.table %}<tr><td style="text-align:left">{{ r.label }}</td>
+      {% for v in r.vals %}<td class="{{ 'best' if r.best == loop.index0 }} {{ 'me' if loop.first }}">{% if v is none %}–{% elif r.fmt == 'pct' %}{{ pc(v) }}{% elif r.fmt == 'x' %}{{ ('%.1f'|format(v)).replace('.', ',') }}×{% elif r.fmt == 'int' %}{{ v }}{% elif r.fmt == 'num2' %}{{ ('%.2f'|format(v)).replace('.', ',') }}{% else %}{{ v|fmt('big') }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div>
+  <p class="note">Oranžovo je najlepšia hodnota v riadku (vyšší rast, marža, ROE alebo nižší dlh a nižšie násobky). Tržby a trhová kapitalizácia sú v mene výkazov každej firmy (preto ich nepreváraj medzi menami). „–“ = údaj chýba alebo sa nedá spočítať (napr. P/E pri strate). Najlepšia hodnota pri násobkoch neznamená „najlacnejšia = najlepšia“, nižšie P/E môže odrážať nižší rast.</p>
+  {% elif fund.peers.input %}<p class="note">Na porovnanie treba aspoň jednu ďalšiu firmu s dostupnými výkazmi.</p>
+  {% else %}<p class="note">Zadaj 1 až 4 tickery konkurentov a uvidíš ich vedľa seba v rovnakých ukazovateľoch (rast, marže, návratnosť, zadlženosť, kvalita a násobky). Firmy z USA a zahraničné firmy podávajúce 20-F (napr. Nu Holdings) sú podporované.</p>
+  {% endif %}
+</div>
 
 {% if fund.analyst and (fund.analyst.target_mean or fund.analyst.recommendation) %}
 <div class="card">

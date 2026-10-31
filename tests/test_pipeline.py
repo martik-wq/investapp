@@ -711,6 +711,31 @@ check("P/E model: EPS 2 × 1,10 × P/E 18 / 1,09", abs(_va.multiple_model(2.0, 0
 check("odporúčaný rast: priemer analytikov a 5-ročného CAGR",
       abs(_va.recommend_growth({"rev_cagr5": 0.30}, {"rev_growth": {"+1y": 0.20}})[0] - 0.25) < 1e-12)
 
+# --- kvalita podniku a porovnanie s konkurenciou
+import quality as _qa  # noqa: E402
+from datetime import date as _dt  # noqa: E402
+_y1, _y2, _y3 = _dt(2023, 12, 31), _dt(2024, 12, 31), _dt(2025, 12, 31)
+_bt = {"display": [_y1, _y2, _y3], "data": {
+    "total_assets": {_y1: 1000, _y2: 1100, _y3: 1200}, "net_income": {_y1: 80, _y2: 100, _y3: 130},
+    "cfo": {_y1: 120, _y2: 140, _y3: 170}, "debt_lt": {_y1: 300, _y2: 280, _y3: 250},
+    "current_assets": {_y1: 400, _y2: 450, _y3: 520}, "current_liabilities": {_y1: 300, _y2: 310, _y3: 320},
+    "shares_diluted": {_y1: 100, _y2: 100, _y3: 99}, "gross_profit": {_y1: 400, _y2: 450, _y3: 600},
+    "revenue": {_y1: 1000, _y2: 1100, _y3: 1300}, "op_income": {_y3: 180}, "equity": {_y3: 600},
+    "total_liabilities": {_y3: 600}, "retained": {_y3: 300}}}
+_pio = _qa.piotroski(_bt)
+check("Piotroski: firma so zlepšením vo všetkých kritériách má 9 z 9", _pio and _pio["score"] == 9 and _pio["n"] == 9, _pio and _pio["score"])
+_al = _qa.altman(_bt)
+_exp = 6.56 * (200 / 1200) + 3.26 * (300 / 1200) + 6.72 * (180 / 1200) + 1.05 * (600 / 600)
+check("Altman Z'': zhoda s ručným výpočtom", _al and abs(_al["z"] - _exp) < 1e-9 and _al["zone"] == "bezpečná", _al and _al["z"])
+_dpt = _qa.dupont(_bt)[-1]
+check("DuPont: marža × obrat × páka = ROE", abs(_dpt["margin"] * _dpt["turnover"] * _dpt["leverage"] - _dpt["roe"]) < 1e-12)
+_fq = _appmod.app.test_client().get("/company/DEMOCO/fundamental?peers=DEMOBANK").get_data(as_text=True)
+check("fundamentálna: karta Kvalita podniku a porovnanie s konkurenciou (ukážkové firmy)",
+      "Kvalita podniku" in _fq and "Piotroski" in _fq and "Porovnanie s konkurenciou" in _fq and "DEMOBANK" in _fq
+      and "Čistá marža" in _fq)
+check("fundamentálna: neexistujúci konkurent dá hlášku, nie pád",
+      "nenašiel" in _appmod.app.test_client().get("/company/DEMOCO/fundamental?peers=NEEXISTUJE123").get_data(as_text=True))
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

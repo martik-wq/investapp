@@ -393,3 +393,22 @@ table.sens td.sbase{background:var(--tint);font-weight:700}
 @media(max-width:800px){.ffrow{grid-template-columns:1fr}}
 
 #fund-tabs .gtab.on{background:var(--acc);color:#fff}
+
+/* ---- kvalita podniku, porovnanie ---- */
+.rtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:8px 0 6px}
+.rtile{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#fffaf5}
+.rhead{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:8px}
+.rbadge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#eee;color:#555}
+.rbadge.r2{background:#e3f4e9;color:#16743e}.rbadge.r1{background:var(--tint);color:var(--acc2)}.rbadge.r0{background:#fde6e4;color:#b3261e}
+.rpart{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;font-size:13px;margin:4px 0}
+.rdot{width:9px;height:9px;border-radius:50%;background:#cfc7bf}.rdot.r2{background:#2e9e5b}.rdot.r1{background:#e0932f}.rdot.r0{background:#d64b43}
+.rname{color:#5c4f43}
+.tests{display:flex;flex-direction:column;gap:5px;margin:6px 0}
+.test{display:flex;gap:8px;align-items:flex-start;font-size:13px;justify-content:space-between}
+.tk{width:18px;font-weight:700;flex:none}.tk.ok{color:#16743e}.tk.no{color:#b3261e}.tk.na{color:#aaa}
+table.peers td,table.peers th{text-align:right}table.peers th:first-child,table.peers td:first-child{text-align:left}
+table.peers td.best{background:var(--tint);font-weight:700;color:var(--acc2)}
+table.peers td.me,table.peers th.me{border-left:2px solid #e9c4a3}
+
+.test{justify-content:flex-start;text-align:left}
+.test.pair{justify-content:space-between}

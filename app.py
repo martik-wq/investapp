@@ -20,6 +20,8 @@ import metrics
 import perf
 import portfolio
 import prices
+import quality
+import valuation
 import trends
 import updater
 import statements
@@ -339,7 +341,54 @@ def _fundamental(comp, ticker, btype, price, quote, is_demo):
     view = fundamental.build_view(request.args, facts, analyst, price, annual["currency"], btype, beta, rf, mcap,
                                   shares, note)
     view["profile"] = profile
+    view["quality"] = quality.build(annual, facts, btype)
+    view["peers"] = _peers(comp, ticker, btype, annual, facts, quote, is_demo)
     return view
+
+
+def _peers(comp, ticker, btype, built, facts, quote, is_demo):
+    """Porovnanie s konkurenciou: tickery z poľa ?peers=A,B,C (najviac 4). Chyby jednotlivých firiem nezhodia stránku."""
+    import fundamental
+    from concurrent.futures import ThreadPoolExecutor
+    raw = request.args.get("peers", "")
+    wanted, bad = [], []
+    for t in re.split(r"[,\s;]+", raw.upper()):
+        t = t.strip()
+        if not t or t == ticker or t in wanted:
+            continue
+        (wanted if re.fullmatch(r"[A-Z0-9.\-]{1,10}", t) else bad).append(t)
+    wanted = wanted[:4]
+    out = {"input": ", ".join(wanted), "errors": [f"Ticker „{t[:20]}“ sa nenašiel." for t in bad],
+           "table": None, "cols": []}
+    if not wanted:
+        return out
+    me = fundamental.peer_metrics(comp["name"], ticker, built, facts, btype, quote, comp.get("shares_out"))
+
+    def load(t):
+        try:
+            m, _ = edgar.find_company(t)
+            if not m:
+                return t, None, f"Ticker „{t}“ sa nenašiel."
+            c = edgar.load_company(*m)
+            b = statements.build(c, "annual", 8)
+            f = valuation.history_facts(b, None)
+            bt = metrics.detect_type(c, b)
+            q = DEMO_QUOTE if c["is_demo"] else prices.get_price(m[0])
+            q = dict(q) if q else None
+            if q and q["currency"] != b["currency"]:
+                q["mismatch"] = True
+            return t, fundamental.peer_metrics(c["name"], m[0], b, f, bt, q, c.get("shares_out")), None
+        except Exception as e:  # noqa: BLE001 - jedna zlá firma nesmie zhodiť stránku
+            return t, None, f"{t}: {e}"
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(load, wanted))
+    cols = [me] + [c for _t, c, _e in res if c]
+    out["errors"] = [e for _t, c, e in res if e]
+    if len(cols) >= 2:
+        out["cols"] = cols
+        out["table"] = fundamental.peer_table(cols)
+    return out
 
 
 # ------------------------------------------------------------------ portfólio
