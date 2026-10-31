@@ -484,12 +484,13 @@ def peer_metrics(name, ticker, built, facts, btype, quote, shares_out):
     eps = facts.get("eps_ttm")
     nd = facts.get("net_debt")
     fcf = g("fcf")
+    fin = btype in ("bank", "insurance")   # u bánk je prevádzkový cash flow poznačený úvermi, FCF nemá zmysel
     return {
         "ticker": ticker, "name": name, "currency": built["currency"], "fy": t,
         "revenue": rev, "rev_cagr3": facts.get("rev_cagr3"),
         "op_margin": (g("op_income") / rev) if rev and g("op_income") is not None else None,
         "net_margin": (ni / rev) if rev and ni is not None else None,
-        "fcf_margin": facts.get("fcf_margin_avg3"),
+        "fcf_margin": None if fin else facts.get("fcf_margin_avg3"),
         "roe": facts.get("roe_avg3") if facts.get("roe_avg3") is not None else facts.get("roe_last"),
         "roic": ro["roic"] if ro else None,
         "nd_ebitda": (nd / ebitda) if ebitda and ebitda > 0 and nd is not None else None,
@@ -499,7 +500,7 @@ def peer_metrics(name, ticker, built, facts, btype, quote, shares_out):
         "pe": (price / eps) if price and eps and eps > 0 else None,
         "ps": (mcap / rev) if mcap and rev else None,
         "ev_ebitda": ((mcap + nd) / ebitda) if mcap and ebitda and ebitda > 0 and nd is not None else None,
-        "fcf_yield": (fcf / mcap) if mcap and fcf is not None else None,
+        "fcf_yield": (fcf / mcap) if mcap and fcf is not None and not fin else None,
     }
 
 
