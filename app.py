@@ -276,7 +276,12 @@ def build_context(ticker, section):
             except edgar.EdgarError as e:
                 ctx["det_error"] = str(e)
     elif section == "fundamental":
-        ctx["fund"] = _fundamental(comp, match[0], btype, price, quote, is_demo)
+        try:
+            ctx["fund"] = _fundamental(comp, match[0], btype, price, quote, is_demo)
+        except Exception as e:  # noqa: BLE001 - chyba v jednom modeli nesmie zhodiť celú stránku
+            app.logger.exception("Fundamentálna analýza zlyhala")
+            ctx["fund"] = None
+            ctx["fund_error"] = f"{type(e).__name__}: {e}"
     elif section == "charts":
         ctx["trend"] = trends.build_trends(comp, btype, p["mode"], min(p["years"], 20))
         opts = _flow_options(built, p["mode"])

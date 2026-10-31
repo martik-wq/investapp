@@ -766,6 +766,13 @@ check("reverzný DCF: s nájdeným rastom vychádza DCF presne na cenu", abs(_va
 _pg = _appmod.app.test_client().get("/company/DEMOCO/fundamental?m=evebitda&ee_m=15").get_data(as_text=True)
 check("fundamentálna: dlaždice modelov, reverzný DCF, vlastný vstup v ďalšom modeli", "mtile" in _pg and "Čo očakáva trh" in _pg and 'value="15,0"' in _pg)
 
+# --- záporný DCF (tv_share None) nesmie zhodiť stránku (chyba z reálneho SoFi)
+_neg = _appmod.app.test_client().get("/company/DEMOCO/fundamental?m=dcf&d_m5=-15&d_g1=5")
+check("fundamentálna: záporný DCF nespadne (500) a ukáže upozornenie", _neg.status_code == 200 and "nekladný" in _neg.get_data(as_text=True), _neg.status_code)
+for _tk in ("DEMOBANK", "DEMOCO"):
+    check(f"fundamentálna: {_tk} so všetkými modelmi a konkurentmi (200)",
+          _appmod.app.test_client().get(f"/company/{_tk}/fundamental?peers=DEMOCO,DEMOBANK").status_code == 200)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

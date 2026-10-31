@@ -9,7 +9,7 @@
   <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong>{% if comp.is_demo %} · <strong>fiktívne ukážkové dáta</strong>{% endif %}</div>
 </div>
 {% if not fund %}
-  <div class="warn">Pre túto firmu sa nepodarilo načítať ročné výkazy, preto sa modely nedajú spočítať.</div>
+  <div class="warn">Pre túto firmu sa nepodarilo načítať ročné výkazy alebo spočítať modely.{% if fund_error %} <br><span class="note">Technický detail: {{ fund_error }}</span>{% endif %}</div>
 {% else %}
 {% for n in fund.notes %}<div class="warn">{{ n }}</div>{% endfor %}
 
@@ -175,9 +175,12 @@
             </div>
             {% endfor %}
           </div>
-          {% if m.key == 'dcf' and d.base %}
+          {% if m.key == 'dcf' and d.base and d.base.per_share <= 0 %}<div class="warn">DCF vychádza nekladný, lebo pri týchto vstupoch je voľný cash flow záporný alebo veľmi nízky. Skús vyššiu FCF maržu v roku 5 (pozri hint pri vstupe) alebo použi iný model.</div>{% endif %}
+          {% if m.key == 'dcf' and d.base and d.base.tv_share is not none %}
           <h3>Z čoho sa skladá hodnota firmy</h3>
           <div class="evbar"><div class="evfcf" style="width:{{ (100 - d.base.tv_share * 100)|round(1) }}%">FCF 10 rokov {{ pc(1 - d.base.tv_share, 0) }}</div><div class="evtv" style="width:{{ (d.base.tv_share * 100)|round(1) }}%">Po roku 10: {{ pc(d.base.tv_share, 0) }}</div></div>
+          {% endif %}
+          {% if m.key == 'dcf' and d.base %}
           <h3>Voľný cash flow v rokoch 1 až 10 (mil. {{ fund.currency }})</h3>
           <div class="fcfbars">{% for b in d.bars %}<div class="fb"><div class="fbv">{{ '{:,.0f}'.format(b.v).replace(',', ' ') }}</div><div class="fbar {{ 'neg' if b.neg }}" style="height:{{ b.h|round(1) }}%"></div><div class="fbl">{{ b.t }}</div></div>{% endfor %}</div>
           {% endif %}
