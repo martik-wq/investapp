@@ -744,6 +744,13 @@ check("excel fundamentálna: hárky a živé vzorce v DCF, P/B a P/E",
       and str(_fwb["DCF"]["B35"].value).startswith("=B33/B34") and str(_fwb["Férové P-B"]["B9"].value).startswith("=(B4-B6)")
       and abs(_fwb["DCF"]["B4"].value - 0.14) < 1e-9, (_fx2.status_code, _fwb.sheetnames))
 
+# --- Microsoft vykazuje odpisy pod značkou Depreciation (inak chýbalo EBITDA a EV/EBITDA)
+import taxonomy as _tx  # noqa: E402
+check("taxonómia: odpisy majú záložnú značku Depreciation", "Depreciation" in _tx.ITEM_BY_KEY["da"]["tags"])
+_nd = _va.history_facts({"display": [_dt(2025, 12, 31)], "data": {"cash": {_dt(2025, 12, 31): 100.0}, "st_investments": {_dt(2025, 12, 31): 50.0},
+      "lt_investments": {_dt(2025, 12, 31): 30.0}, "total_debt": {_dt(2025, 12, 31): 400.0}, "revenue": {_dt(2025, 12, 31): 1000.0}}})
+check("čistý dlh = dlh − hotovosť − krátkodobé aj dlhodobé investície (400 − 150 − 30)", _nd["net_debt"] == 220.0, _nd["net_debt"])
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

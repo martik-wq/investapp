@@ -85,6 +85,12 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
         h_m.append(f"Priemer 5 rokov: {_pct(facts['fcf_margin_avg5'])}")
     if facts.get("fcf_margin_max") is not None:
         h_m.append(f"Najvyššia za sledované obdobie: {_pct(facts['fcf_margin_max'])}")
+    om, fm = facts.get("op_margin_fy"), facts.get("fcf_margin_now")
+    if om is not None:
+        h_m.append(f"Prevádzková marža (posledný rok): {_pct(om)}")
+        if fm is not None and om > 0.05 and fm < 0.5 * om:
+            h_m.append("Pozor: voľný cash flow je dnes oveľa nižší ako prevádzkový zisk, firma pravdepodobne veľa investuje. "
+                       "Ak čakáš, že investície spomalia, marža v roku 5 môže byť vyššia než odporúčanie.")
     h_w = [f"Požadovaná návratnosť akcií (CAPM): bezriziková sadzba {_pct(rf_used)} + beta {beta_used:.2f} × prémia 5 % = {_pct(ke)}"]
     if w_d and kd:
         h_w.append(f"Podiel dlhu {_pct(w_d, 0)}, cena dlhu {_pct(kd)}, po zdanení (21 %): WACC {_pct(wacc_rec)}")
@@ -97,7 +103,7 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
              "Rast sa potom v rokoch 6 až 10 postupne znižuje na terminálny rast."),
         _fld("d_m5", "FCF marža v roku 5", "% z tržieb", m5, round(m_rec * 100, 1),
              "Vychádza z: priemer FCF marže za 3 roky a dnešnej marže.", h_m,
-             "Voľný cash flow lomený tržbami. Marža sa lineárne mení z dnešnej na túto hodnotu."),
+             "Voľný cash flow (prevádzkový cash flow − CapEx) lomený tržbami. Obsahuje späť pripočítané akciové odmeny, preto počítaj aj s ročným riedením. Marža sa lineárne mení z dnešnej na túto hodnotu."),
         _fld("d_wacc", "Diskontná sadzba (WACC)", "%", wacc, round(wacc_rec * 100, 1),
              "Vychádza z: CAPM a štruktúra kapitálu (vlastné imanie a dlh).", h_w,
              "Čím vyššia, tým nižšia dnešná hodnota budúcich peňazí. Typicky 7 až 11 %."),
@@ -111,8 +117,9 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
         _fld("d_rev", f"Základ tržieb ({facts.get('rev_base_label', '')})", f"mil. {currency}", rv, round(rev_mil, 1),
              "Z výkazov firmy.", [], None, "1", "{:.1f}"),
         _fld("d_nd", "Čistý dlh (dlh − hotovosť)", f"mil. {currency}", nd, round(nd_mil, 1),
-             "Z poslednej súvahy: dlh mínus hotovosť a krátkodobé investície.",
-             [f"Dlh {(facts.get('debt') or 0) / 1e6:,.0f} mil., hotovosť a investície {(facts.get('cash') or 0) / 1e6:,.0f} mil."],
+             "Z poslednej súvahy: dlh mínus hotovosť a investície (krátkodobé aj dlhodobé cenné papiere).",
+             [f"Dlh {(facts.get('debt') or 0) / 1e6:,.0f} mil., hotovosť a krátkodobé investície {(facts.get('cash') or 0) / 1e6:,.0f} mil."
+              + (f", dlhodobé investície a cenné papiere {(facts.get('lt_inv') or 0) / 1e6:,.0f} mil. (tiež odpočítané)" if facts.get("lt_inv") else "")],
              "Záporný = firma má viac hotovosti ako dlhu.", "1", "{:.1f}"),
         _fld("d_sh", "Počet akcií", "mil.", sh, round(sh_mil, 2), "Z titulnej strany výkazov (všetky triedy akcií).",
              [], None, "0.01", "{:.2f}"),

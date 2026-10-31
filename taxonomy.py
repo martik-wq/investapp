@@ -170,7 +170,7 @@ CASHFLOW = [
     I("da", "Odpisy a amortizácia", [
         "DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
         "DepreciationAmortizationAndAccretionNet",
-        "DepreciationAmortizationAndOther",
+        "DepreciationAmortizationAndOther", "Depreciation",   # Microsoft vykazuje odpisy pod značkou Depreciation
         "ifrs:DepreciationAndAmortisationExpense"], indent=1),
     I("sbc", "Akciová kompenzácia", [
         "ShareBasedCompensation", "AllocatedShareBasedCompensationExpense",

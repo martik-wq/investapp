@@ -60,6 +60,7 @@ def history_facts(built, ttm=None):
     last = built["display"][-1]
     g = lambda k: built["data"].get(k, {}).get(last)  # noqa: E731
     cash = (g("cash") or 0) + (g("st_investments") or 0)
+    lt_inv = g("lt_investments") or 0
     debt = g("total_debt")
     if debt is None:
         debt = (g("debt_current") or 0) + (g("debt_lt") or 0)
@@ -83,7 +84,8 @@ def history_facts(built, ttm=None):
         "equity": eq[-1][1] if eq else None,
         "roe_last": roe[-1][1] if roe else None,
         "roe_avg3": _avg([r for _, r in roe[-3:]]), "roe_avg5": _avg([r for _, r in roe[-5:]]),
-        "cash": cash, "debt": debt, "net_debt": (debt or 0) - cash,
+        "cash": cash, "lt_inv": lt_inv, "debt": debt, "net_debt": (debt or 0) - cash - lt_inv,
+        "op_margin_fy": (g("op_income") / g("revenue")) if g("op_income") is not None and g("revenue") else None,
         "interest_expense": g("interest_expense"),
     }
     out["rev_base"] = out["rev_ttm"] or out["rev_fy"]
