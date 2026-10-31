@@ -192,7 +192,8 @@ def build_fundamental_workbook(ctx):
     head(ws, 5, ["Model", "Pesimistický", "Základný", "Optimistický", "Základný vs. cena"], [34, 16, 16, 16, 18])
     names = {"dcf": "DCF", "pb": "Férové P/B", "pe": "Cieľové P/E"}
     r = 6
-    for key in ("dcf", "pb", "pe"):
+    names.update({"evebitda": "EV / EBITDA", "fcfy": "FCF výnos", "ps": "Cieľové P/S", "ddm": "Dividendy (DDM)", "graham": "Graham (hrubý odhad)"})
+    for key in ("dcf", "evebitda", "fcfy", "pe", "ps", "ddm", "pb", "graham"):
         sc = fund[key]["scenarios"]
         if len(sc) != 3 or any(s.get("value") is None for s in sc):
             continue
@@ -399,6 +400,48 @@ def build_fundamental_workbook(ctx):
     we.cell(12, 2, price).number_format = "#,##0.00"
     we.cell(13, 1, "Oproti cene")
     we.cell(13, 2, '=IF(B12>0,B11/B12-1,"")').number_format = "0.0%"
+
+    # ---- ďalšie modely (hodnoty z aplikácie)
+    extra = [m for m in fund.get("models", []) if m["key"] in ("evebitda", "fcfy", "ps", "ddm", "graham")]
+    if extra:
+        wx = wb.create_sheet("Ďalšie modely")
+        wx["A1"] = "Ďalšie oceňovacie modely (vstupy a výsledky z aplikácie, pesimistický / základný / optimistický variant)"
+        wx["A1"].font = TITLE
+        wx.column_dimensions["A"].width = 44
+        for c in "BCD":
+            wx.column_dimensions[c].width = 18
+        r = 3
+        for m in extra:
+            wx.cell(r, 1, m["name"]).font = Font(bold=True, color=ORANGE, size=12)
+            for i in range(1, 5):
+                wx.cell(r, i).fill = SF
+            r += 1
+            wx.cell(r, 1, "Vstup").font = Font(bold=True)
+            wx.cell(r, 2, "Hodnota").font = Font(bold=True)
+            wx.cell(r, 3, "Odporúčané").font = Font(bold=True)
+            r += 1
+            for f in fund[m["key"]]["fields"]:
+                wx.cell(r, 1, f"{f['label']} ({f['unit']})")
+                wx.cell(r, 2, f["value"]).fill = INP
+                if f["rec"] is not None:
+                    wx.cell(r, 3, f["rec"])
+                r += 1
+            r += 1
+            wx.cell(r, 1, "Variant").font = Font(bold=True)
+            wx.cell(r, 2, f"Hodnota na akciu ({cur})").font = Font(bold=True)
+            wx.cell(r, 3, "Oproti cene").font = Font(bold=True)
+            r += 1
+            for sc in m["scenarios"]:
+                wx.cell(r, 1, sc["name"])
+                if sc["value"] is not None:
+                    wx.cell(r, 2, sc["value"]).number_format = "#,##0.00"
+                if sc.get("upside") is not None:
+                    _pct_cell(wx.cell(r, 3, sc["upside"]))
+                r += 1
+            r += 2
+        if fund.get("reverse"):
+            wx.cell(r, 1, "Reverzný DCF: rast tržieb v rokoch 1 až 5, ktorý je v dnešnej cene").font = Font(bold=True)
+            _pct_cell(wx.cell(r, 2, fund["reverse"]["g"]))
 
     # ---- Konkurencia
     pe_ = fund.get("peers") or {}

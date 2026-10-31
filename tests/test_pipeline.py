@@ -740,8 +740,8 @@ check("fundamentálna: neexistujúci konkurent dá hlášku, nie pád",
 _fx2 = _appmod.app.test_client().get("/company/DEMOCO/fundamental.xlsx?peers=DEMOBANK&d_g1=14")
 _fwb = _ox.load_workbook(_io.BytesIO(_fx2.data))
 check("excel fundamentálna: hárky a živé vzorce v DCF, P/B a P/E",
-      _fx2.status_code == 200 and _fwb.sheetnames == ["Súhrn", "Kvalita", "DCF", "Férové P-B", "Cieľové P-E", "Konkurencia"]
-      and str(_fwb["DCF"]["B35"].value).startswith("=B33/B34") and str(_fwb["Férové P-B"]["B9"].value).startswith("=(B4-B6)")
+      _fx2.status_code == 200 and _fwb.sheetnames == ["Súhrn", "Kvalita", "DCF", "Férové P-B", "Cieľové P-E", "Ďalšie modely", "Konkurencia"]
+      and str(_fwb["DCF"]["B35"].value).startswith("=B33/B34") and "Ďalšie modely" in _fwb.sheetnames and str(_fwb["Férové P-B"]["B9"].value).startswith("=(B4-B6)")
       and abs(_fwb["DCF"]["B4"].value - 0.14) < 1e-9, (_fx2.status_code, _fwb.sheetnames))
 
 # --- Microsoft vykazuje odpisy pod značkou Depreciation (inak chýbalo EBITDA a EV/EBITDA)
@@ -750,6 +750,21 @@ check("taxonómia: odpisy majú záložnú značku Depreciation", "Depreciation"
 _nd = _va.history_facts({"display": [_dt(2025, 12, 31)], "data": {"cash": {_dt(2025, 12, 31): 100.0}, "st_investments": {_dt(2025, 12, 31): 50.0},
       "lt_investments": {_dt(2025, 12, 31): 30.0}, "total_debt": {_dt(2025, 12, 31): 400.0}, "revenue": {_dt(2025, 12, 31): 1000.0}}})
 check("čistý dlh = dlh − hotovosť − krátkodobé aj dlhodobé investície (400 − 150 − 30)", _nd["net_debt"] == 220.0, _nd["net_debt"])
+
+# --- ďalšie oceňovacie modely a reverzný DCF
+check("EV/EBITDA: (EBITDA 100 × 1,1 × 12 − dlh 200) / 50 akcií / 1,09", abs(_va.ev_ebitda_model(100, 0.1, 12, 200, 50, 0.09)["value"] - (100 * 1.1 * 12 - 200) / 50 / 1.09) < 1e-9)
+check("FCF výnos: 80 × 1,08 / 50 / 4 % / 1,09", abs(_va.fcf_yield_model(80, 0.08, 0.04, 50, 0.09)["value"] - 80 * 1.08 / 50 / 0.04 / 1.09) < 1e-9)
+check("P/S: 500 × 1,1 / 50 × 5 / 1,09", abs(_va.ps_model(500, 0.1, 5, 50, 0.09)["value"] - 500 * 1.1 / 50 * 5 / 1.09) < 1e-9)
+_gr = _va.graham(5, 30, 8, 4.4)
+check("Graham: číslo √(22,5×5×30) a vzorec 5×(8,5+16)×4,4/4,4", abs(_gr["number"] - (22.5 * 5 * 30) ** 0.5) < 1e-9 and abs(_gr["formula"] - 122.5) < 1e-9)
+_dd = _va.ddm(2.0, 0.06, 0.025, 0.08)
+_man = sum(2.0 * 1.06 ** t / 1.08 ** t for t in range(1, 6)) + 2.0 * 1.06 ** 5 * 1.025 / (0.08 - 0.025) / 1.08 ** 5
+check("DDM: zhoda s ručným výpočtom", abs(_dd["value"] - _man) < 1e-9)
+_pp = dict(rev0=1000, margin0=0.15, margin5=0.20, wacc=0.09, g_term=0.025, net_debt=200, shares=100, dilution=0.01)
+_ig = _va.implied_growth(50, _pp)
+check("reverzný DCF: s nájdeným rastom vychádza DCF presne na cenu", abs(_va.dcf(1000, _ig["g"], 0.15, 0.20, 0.09, 0.025, 200, 100, 0.01)["per_share"] - 50) < 1e-6, _ig)
+_pg = _appmod.app.test_client().get("/company/DEMOCO/fundamental?m=evebitda&ee_m=15").get_data(as_text=True)
+check("fundamentálna: dlaždice modelov, reverzný DCF, vlastný vstup v ďalšom modeli", "mtile" in _pg and "Čo očakáva trh" in _pg and 'value="15,0"' in _pg)
 
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
@@ -872,7 +887,8 @@ _fu = cl.get("/company/DEMOCO/fundamental")
 _fh2 = _fu.get_data(as_text=True)
 check("fundamentálna: modely DCF, P/B a P/E s odporúčanými vstupmi a súhrnom",
       _fu.status_code == 200 and "DCF" in _fh2 and "Odporúčame" in _fh2 and "Férové P/B" in _fh2
-      and "Cieľové P/E" in _fh2 and "Súhrn: rozpätie hodnoty" in _fh2, _fu.status_code)
+      and "Cieľové P/E" in _fh2 and "Odhad hodnoty na akciu" in _fh2 and "EV / EBITDA" in _fh2
+      and "FCF výnos" in _fh2 and "Dividendy (DDM)" in _fh2 and "Čo očakáva trh" in _fh2, _fu.status_code)
 _fu2 = cl.get("/company/DEMOCO/fundamental?m=dcf&d_g1=20&d_wacc=9&d_gt=3").get_data(as_text=True)
 check("fundamentálna: vlastné vstupy sa prenesú do formulára a poznačí sa odchýlka od odporúčania",
       'name="d_g1"' in _fu2 and 'value="20,0"' in _fu2 and "tvoja hodnota sa líši" in _fu2)

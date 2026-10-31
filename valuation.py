@@ -64,8 +64,23 @@ def history_facts(built, ttm=None):
     debt = g("total_debt")
     if debt is None:
         debt = (g("debt_current") or 0) + (g("debt_lt") or 0)
+    divs = _series(built, "div_paid")
+    dps = []
+    for (e, dv) in divs:
+        shd = built["data"].get("shares_diluted", {}).get(e)
+        if shd:
+            dps.append((e, abs(dv) / shd))
+    ebitda = []
+    for e in built["display"]:
+        oi, da = built["data"].get("op_income", {}).get(e), built["data"].get("da", {}).get(e)
+        if oi is not None and da is not None:
+            ebitda.append((e, oi + da))
     out = {
         "last_end": last,
+        "dps": dps[-1][1] if dps else None,
+        "dps_cagr3": _cagr_n(dps, 3), "dps_cagr5": _cagr_n(dps, 5),
+        "ebitda": ebitda[-1][1] if ebitda else None, "ebitda_cagr3": _cagr_n(ebitda, 3),
+        "fcf_fy": fcf[-1][1] if fcf else None, "fcf_ttm": (ttm or {}).get("fcf"),
         "rev_fy": rev[-1][1] if rev else None,
         "rev_ttm": (ttm or {}).get("revenue"),
         "fcf_margin_fy": margins[-1][1] if margins else None,
@@ -248,3 +263,124 @@ def multiple_scenarios(p, price=None):
         out.append({"name": name, "g_eps": p["g_eps"] + dg, "pe": p["target_pe"] * (1 + dpe),
                     "value": r.get("value"), "upside": r.get("upside")})
     return out
+
+
+# ------------------------------------------------------------------ ďalšie modely
+def ddm(dps0, g_high, g_term, ke, years_high=5):
+    """Dvojstupňový dividendový model: dividenda rastie g_high prvých 5 rokov, potom g_term navždy."""
+    if ke <= g_term + 0.005:
+        return {"error": "Požadovaná návratnosť musí byť aspoň o 0,5 p. b. vyššia ako terminálny rast."}
+    if not dps0 or dps0 <= 0:
+        return {"error": "Firma neplatí dividendu, dividendový model sa nedá použiť."}
+    pv, d, rows = 0.0, dps0, []
+    for t in range(1, years_high + 1):
+        d *= 1 + g_high
+        pv += d / (1 + ke) ** t
+        rows.append({"t": t, "dps": d})
+    tv = d * (1 + g_term) / (ke - g_term)
+    pv_tv = tv / (1 + ke) ** years_high
+    return {"rows": rows, "pv_div": pv, "pv_tv": pv_tv, "value": pv + pv_tv, "dps1": rows[0]["dps"]}
+
+
+def ddm_scenarios(p, price=None):
+    out = []
+    for name, dg, dk in (("Pesimistický", -0.03, 0.01), ("Základný", 0, 0), ("Optimistický", 0.03, -0.01)):
+        r = ddm(p["dps0"], p["g_high"] + dg, p["g_term"], p["ke"] + dk)
+        v = r.get("value")
+        out.append({"name": name, "cols": [("Rast dividendy", p["g_high"] + dg, "pct"), ("Požad. návratnosť", p["ke"] + dk, "pct")],
+                    "value": v, "upside": (v / price - 1) if v and price else None})
+    return out
+
+
+def ev_ebitda_model(ebitda0, g, target_mult, net_debt, shares, r):
+    """Hodnota firmy o rok = EBITDA × (1 + g) × cieľový násobok; mínus čistý dlh, delené akciami, diskontované."""
+    if not ebitda0 or ebitda0 <= 0 or not shares or target_mult <= 0:
+        return {"error": "EBITDA musí byť kladná (pri strate sa tento model nedá použiť)."}
+    ev1 = ebitda0 * (1 + g) * target_mult
+    eq = ev1 - net_debt
+    return {"ev1": ev1, "value": eq / shares / (1 + r), "value_in_year": eq / shares}
+
+
+def ev_ebitda_scenarios(p, price=None):
+    out = []
+    for name, dg, dm in (("Pesimistický", -0.05, -0.20), ("Základný", 0, 0), ("Optimistický", 0.05, 0.20)):
+        r = ev_ebitda_model(p["ebitda0"], p["g"] + dg, p["mult"] * (1 + dm), p["net_debt"], p["shares"], p["r"])
+        v = r.get("value")
+        out.append({"name": name, "cols": [("Rast EBITDA", p["g"] + dg, "pct"), ("Cieľový násobok", p["mult"] * (1 + dm), "x")],
+                    "value": v, "upside": (v / price - 1) if v and price else None})
+    return out
+
+
+def fcf_yield_model(fcf0, g, target_yield, shares, r):
+    """Hodnota = FCF na akciu o rok ÷ cieľový FCF výnos, diskontovaná na dnes."""
+    if not fcf0 or fcf0 <= 0 or not shares or target_yield <= 0:
+        return {"error": "Voľný cash flow musí byť kladný (pri zápornom sa tento model nedá použiť)."}
+    fps1 = fcf0 * (1 + g) / shares
+    return {"fps1": fps1, "value": fps1 / target_yield / (1 + r)}
+
+
+def fcf_yield_scenarios(p, price=None):
+    out = []
+    for name, dg, dy in (("Pesimistický", -0.05, 0.01), ("Základný", 0, 0), ("Optimistický", 0.05, -0.01)):
+        r = fcf_yield_model(p["fcf0"], p["g"] + dg, p["yield"] + dy, p["shares"], p["r"])
+        v = r.get("value")
+        out.append({"name": name, "cols": [("Rast FCF", p["g"] + dg, "pct"), ("Cieľový FCF výnos", p["yield"] + dy, "pct")],
+                    "value": v, "upside": (v / price - 1) if v and price else None})
+    return out
+
+
+def ps_model(rev0, g, target_ps, shares, r):
+    if not rev0 or rev0 <= 0 or not shares or target_ps <= 0:
+        return {"error": "Chýbajú tržby alebo počet akcií."}
+    rps1 = rev0 * (1 + g) / shares
+    return {"rps1": rps1, "value": rps1 * target_ps / (1 + r)}
+
+
+def ps_scenarios(p, price=None):
+    out = []
+    for name, dg, dm in (("Pesimistický", -0.05, -0.25), ("Základný", 0, 0), ("Optimistický", 0.05, 0.25)):
+        r = ps_model(p["rev0"], p["g"] + dg, p["target_ps"] * (1 + dm), p["shares"], p["r"])
+        v = r.get("value")
+        out.append({"name": name, "cols": [("Rast tržieb", p["g"] + dg, "pct"), ("Cieľové P/S", p["target_ps"] * (1 + dm), "x")],
+                    "value": v, "upside": (v / price - 1) if v and price else None})
+    return out
+
+
+def graham(eps, bvps, g_pct, yield_aaa):
+    """Grahamovo číslo √(22,5 × EPS × BVPS) a Grahamov vzorec EPS × (8,5 + 2g) × 4,4 / Y (g a Y v %)."""
+    if not eps or eps <= 0 or not bvps or bvps <= 0:
+        return {"error": "Grahamove vzorce potrebujú kladný zisk aj kladnú účtovnú hodnotu na akciu."}
+    num = (22.5 * eps * bvps) ** 0.5
+    formula = eps * (8.5 + 2 * g_pct) * 4.4 / yield_aaa if yield_aaa > 0 else None
+    return {"number": num, "formula": formula}
+
+
+def graham_scenarios(p, price=None):
+    out = []
+    for name, dg in (("Pesimistický", -3.0), ("Základný", 0.0), ("Optimistický", 3.0)):
+        r = graham(p["eps"], p["bvps"], max(0.0, p["g"] + dg), p["y"])
+        v = r.get("formula")
+        out.append({"name": name, "cols": [("Rast zisku (% ročne)", (p["g"] + dg) / 100, "pct"), ("Grahamovo číslo", r.get("number"), "money")],
+                    "value": v, "upside": (v / price - 1) if v and price else None})
+    return out
+
+
+def implied_growth(price, p, lo=-0.20, hi=0.60):
+    """Reverzný DCF: aký rast tržieb v rokoch 1 až 5 trh očakáva pri daných ostatných vstupoch? (bisekcia)."""
+    def val(g):
+        r = dcf(p["rev0"], g, p["margin0"], p["margin5"], p["wacc"], p["g_term"], p["net_debt"], p["shares"], p["dilution"])
+        return None if "error" in r else r["per_share"]
+    a, b = val(lo), val(hi)
+    if a is None or b is None or not price:
+        return None
+    if price <= a:
+        return {"g": lo, "edge": "low"}
+    if price >= b:
+        return {"g": hi, "edge": "high"}
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if val(mid) < price:
+            lo = mid
+        else:
+            hi = mid
+    return {"g": (lo + hi) / 2, "edge": None}

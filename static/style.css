@@ -412,3 +412,53 @@ table.peers td.me,table.peers th.me{border-left:2px solid #e9c4a3}
 
 .test{justify-content:flex-start;text-align:left}
 .test.pair{justify-content:space-between}
+
+/* ---- fundamentálna analýza v2 ---- */
+.hero2{padding:24px 28px}
+.h2top{display:grid;grid-template-columns:1.2fr 1fr auto;gap:28px;align-items:center;margin-bottom:12px}
+.hero2 .bigprice{font-size:46px}
+.verdict{display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:700;font-size:13px}
+.verdict.up{background:#e3f4e9;color:#16743e}.verdict.down{background:#fde6e4;color:#b3261e}
+.h2act{text-align:right}
+a.ffrow{text-decoration:none;color:inherit;display:grid;grid-template-columns:150px 1fr 230px;gap:16px;align-items:center;padding:7px 8px;border-radius:12px;transition:background .15s var(--ease)}
+a.ffrow:hover{background:#fffaf5}
+.ffname{font-weight:650;font-size:14px}
+.fftrack{position:relative;height:20px;background:#fbf1e7;border-radius:10px}
+.fftrack.axis{background:none;height:16px}
+.fftick{position:absolute;top:0;bottom:0;width:1px;background:#f0dfcf}
+.fftl{position:absolute;font-size:11px;color:#a58b74;transform:translateX(-50%)}
+.ffaxis{display:grid;grid-template-columns:150px 1fr 230px;gap:16px}
+.ffbar{height:20px;border-radius:10px}
+.ffmid{top:4px;width:12px;height:12px}
+.ffprice{top:-6px;height:32px;width:3px}
+.sech{margin:24px 0 10px;font-size:20px}
+.mtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+button.mtile{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);font-weight:400;transition:all .18s var(--ease)}
+button.mtile:hover{border-color:#e9c4a3;background:#fffaf5}
+button.mtile.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(196,87,15,.18),var(--shadow);background:#fffaf5}
+button.mtile.weak{opacity:.72}
+.mname{font-weight:700;font-size:15px}.mdesc{font-size:12px;color:var(--mute);min-height:30px}
+.mval{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums;margin-top:6px}.mval small{font-size:12px;color:var(--mute);font-weight:500}
+.mup{font-size:13px;font-weight:700}.mup em{font-style:normal;color:#a58b74;font-weight:500;font-size:12px}
+.mgrid{display:grid;grid-template-columns:minmax(320px,0.9fr) 1.3fr;gap:18px;align-items:start}
+.minputs .finputs{grid-template-columns:1fr}
+@media(max-width:1100px){.mgrid{grid-template-columns:1fr}.h2top{grid-template-columns:1fr}.h2act{text-align:left}}
+.sccards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 12px}
+.sccard{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#fffaf5}
+.sccard.base{background:#fff;border-color:var(--acc);box-shadow:0 0 0 2px rgba(196,87,15,.12)}
+.scname{font-size:12px;color:var(--mute);font-weight:600}.scval{font-size:26px;font-weight:750;font-variant-numeric:tabular-nums;margin-top:2px}
+.scup{font-weight:700;font-size:13px;margin-bottom:6px}
+.scrow{display:flex;justify-content:space-between;font-size:12px;color:#7a6a5a;padding:2px 0;border-top:1px dashed #f0dfcf}
+.evbar{display:flex;height:34px;border-radius:10px;overflow:hidden;font-size:12px;color:#fff;font-weight:600;margin:6px 0 4px}
+.evfcf{background:#e0a96f;display:flex;align-items:center;padding-left:10px;white-space:nowrap;overflow:hidden}
+.evtv{background:var(--acc);display:flex;align-items:center;padding-left:10px;white-space:nowrap;overflow:hidden}
+.fcfbars{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;align-items:end;height:150px;padding:6px 0}
+.fb{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:11px;color:#7a6a5a}
+.fbar{width:100%;background:linear-gradient(180deg,#e0a96f,var(--acc));border-radius:6px 6px 2px 2px;min-height:2px}
+.fbar.neg{background:#94a3b8}.fbv{margin-bottom:3px;font-variant-numeric:tabular-nums}.fbl{margin-top:4px}
+.rev .revrow{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center}
+.revtxt{font-size:14px;line-height:1.55;color:#4a3f35}
+@media(max-width:700px){.sccards{grid-template-columns:1fr}.rev .revrow{grid-template-columns:1fr}a.ffrow,.ffaxis{grid-template-columns:1fr}}
+
+.mup em{margin-left:6px}
+.rel{margin-left:6px;font-size:10.5px;font-weight:600;color:#a58b74;background:#fbf1e7;border-radius:999px;padding:1px 7px;vertical-align:2px}

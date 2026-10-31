@@ -127,7 +127,11 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
     p = dict(rev0=rv * 1e6, g1=g1 / 100, margin0=facts.get("fcf_margin_now") if facts.get("fcf_margin_now") is not None else m5 / 100,
              margin5=m5 / 100, wacc=wacc / 100, g_term=gt / 100, net_debt=nd * 1e6, shares=sh * 1e6, dilution=dil / 100)
     base = V.dcf(p["rev0"], p["g1"], p["margin0"], p["margin5"], p["wacc"], p["g_term"], p["net_debt"], p["shares"], p["dilution"])
-    out["dcf"] = {"fields": dcf_fields, "p": p, "error": base.get("error"), "base": None if "error" in base else base,
+    bars = []
+    if "error" not in base:
+        mx = max(abs(r["fcf"]) for r in base["rows"]) or 1
+        bars = [{"t": r["t"], "h": max(2, abs(r["fcf"]) / mx * 100), "v": r["fcf"] / 1e6, "neg": r["fcf"] < 0} for r in base["rows"]]
+    out["dcf"] = {"fields": dcf_fields, "p": p, "bars": bars, "error": base.get("error"), "base": None if "error" in base else base,
                   "scenarios": V.dcf_scenarios(p, price) if "error" not in base else [],
                   "sens": V.dcf_sensitivity(p) if "error" not in base else None,
                   "price_value": None if "error" in base else base["per_share"]}
@@ -214,22 +218,28 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
     out["pe"] = {"fields": pe_fields, "p": pep, "error": peb.get("error"), "base": None if "error" in peb else peb,
                  "scenarios": V.multiple_scenarios(pep, price) if "error" not in peb else [], "pe_now": pe_now}
 
-    # ------------------------------------------------------------------ súhrn
-    summary = []
-    for key, name in (("dcf", "DCF"), ("pb", "Férové P/B"), ("pe", "Cieľové P/E")):
-        # DCF z FCF nedáva pri bankách a poisťovniach zmysel, P/B model zase pri bežných firmách
-        if (key == "dcf" and is_fin) or (key == "pb" and not is_fin):
-            continue
-        sc = out[key]["scenarios"]
-        vals = [s["value"] for s in sc if s.get("value") is not None]
-        if len(vals) == 3:
-            summary.append({"key": key, "name": name, "low": min(vals), "mid": sc[1]["value"], "high": max(vals)})
-    out["summary"] = summary
-    if summary:
-        hi = max([s["high"] for s in summary] + [price or 0]) * 1.05
-        for s in summary:
-            s["pl"], s["pw"], s["pm"] = s["low"] / hi * 100, (s["high"] - s["low"]) / hi * 100, s["mid"] / hi * 100
+    # ------------------------------------------------------------------ ďalšie modely
+    _more_models(out, args, facts, analyst, price, currency, is_fin, ke, rf_used, g_rec, shares, sh, nd, rv, wacc, mcap, an_txt)
+
+    # ------------------------------------------------------------------ zoznam modelov a súhrn
+    out["models"] = _models_list(out, is_fin, price)
+    core = [m for m in out["models"] if m["core"] and m["ok"]]
+    out["summary"] = []
+    for m in core:
+        vals = [sc["value"] for sc in m["scenarios"]]
+        out["summary"].append({"key": m["key"], "name": m["name"], "low": min(vals), "mid": m["scenarios"][1]["value"], "high": max(vals)})
+    out["central"] = None
+    if out["summary"]:
+        mids = sorted(x["mid"] for x in out["summary"])
+        n = len(mids)
+        med = mids[n // 2] if n % 2 else (mids[n // 2 - 1] + mids[n // 2]) / 2
+        out["central"] = {"value": med, "low": mids[0], "high": mids[-1], "n": n,
+                          "upside": (med / price - 1) if price else None}
+        hi = max([x["high"] for x in out["summary"]] + [price or 0]) * 1.05
+        for x in out["summary"]:
+            x["pl"], x["pw"], x["pm"] = x["low"] / hi * 100, (x["high"] - x["low"]) / hi * 100, x["mid"] / hi * 100
         out["price_pos"] = (price / hi * 100) if price else None
+        out["axis"] = [(round(hi * f / 4, 2), f * 25) for f in range(0, 5)]
     if facts.get("rev_years", 0) < 3:
         out["notes"].append("Firma má krátku históriu (menej ako 3 roky), odporúčania sú preto menej spoľahlivé.")
     if price is None:
@@ -237,7 +247,218 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
     if quote_note:
         out["notes"].append(quote_note)
     out["wacc_parts"] = {"ke": ke, "rf": rf_used, "beta": beta_used, "w_d": w_d, "kd": kd}
+    # reverzný DCF: aký rast trh očakáva
+    out["reverse"] = None
+    if price and out["dcf"]["base"]:
+        ig = V.implied_growth(price, out["dcf"]["p"])
+        if ig:
+            out["reverse"] = {"g": ig["g"], "edge": ig["edge"], "rec": g_rec, "hist": facts.get("rev_cagr5")}
     return out
+
+
+def _fmt_col(v, kind):
+    if v is None:
+        return "–"
+    if kind == "pct":
+        return f"{v * 100:.1f} %".replace(".", ",")
+    if kind == "x":
+        return f"{v:.1f}×".replace(".", ",")
+    return f"{v:,.2f}".replace(",", " ").replace(".", ",")
+
+
+def _norm_scen(key, scen):
+    """Zjednotí varianty modelov do tvaru {'name','value','upside','cols':[(popis, text)]}."""
+    out = []
+    for s in scen:
+        if "cols" in s:
+            cols = [(lab, _fmt_col(v, k)) for lab, v, k in s["cols"]]
+        elif key == "dcf":
+            cols = [("Rast tržieb", _fmt_col(s["g1"], "pct")), ("FCF marža (rok 5)", _fmt_col(s["margin5"], "pct")), ("WACC", _fmt_col(s["wacc"], "pct"))]
+        elif key == "pb":
+            cols = [("ROE", _fmt_col(s["roe"], "pct")), ("Požad. návratnosť", _fmt_col(s["ke"], "pct")), ("Férové P/B", _fmt_col(s["fair_pb"], "x"))]
+        else:
+            cols = [("Rast EPS", _fmt_col(s["g_eps"], "pct")), ("Cieľové P/E", _fmt_col(s["pe"], "x"))]
+        out.append({"name": s["name"], "value": s.get("value"), "upside": s.get("upside"), "cols": cols})
+    return out
+
+
+MODEL_INTRO = {
+    "dcf": "Odhadne sa 10 rokov voľného cash flow (FCF) a hodnota po roku 10, všetko sa diskontuje na dnešok. Od hodnoty firmy sa odpočíta čistý dlh a delí sa počtom akcií. Najlepšie pre firmy so stabilným alebo rastúcim cash flow.",
+    "evebitda": "Hodnota firmy = EBITDA o rok × cieľový násobok. Odpočíta sa čistý dlh, delí sa akciami a diskontuje. Hodí sa pri firmách s kladnou EBITDA a rôznou kapitálovou štruktúrou.",
+    "fcfy": "Koľko voľného cash flow na akciu požaduješ. Hodnota = FCF na akciu o rok ÷ cieľový FCF výnos, diskontované na dnes. Prístup „majiteľa firmy“.",
+    "pe": "Najjednoduchší model: zisk na akciu o rok × férové P/E, diskontovaný na dnešok. Dáva zmysel len pri firmách so ziskom.",
+    "ps": "Tržby na akciu o rok × férové P/S. Používa sa pri rýchlo rastúcich firmách, ktorých zisk ešte nie je stabilný. Ignoruje ziskovosť, preto ber výsledok opatrne.",
+    "ddm": "Dvojstupňový dividendový model: dividenda rastie 5 rokov danou rýchlosťou, potom stabilne. Použiteľné len pri firmách, ktoré platia podstatnú dividendu (výnos aspoň 1 %).",
+    "pb": "Férové P/B = (ROE − g) / (požadovaná návratnosť − g). Hodnota = férové P/B × účtovná hodnota na akciu. Vhodné hlavne pre banky a poisťovne.",
+    "graham": "Klasické vzorce Benjamina Grahama: Grahamov vzorec EPS × (8,5 + 2g) × 4,4 / Y a Grahamovo číslo √(22,5 × EPS × BVPS). Hrubý odhad, v súhrne sa nepoužíva.",
+}
+
+MODEL_META = [  # kľúč, názov, krátky popis, patrí do súhrnu
+    ("dcf", "DCF", "Diskontovaný voľný cash flow na 10 rokov", True),
+    ("evebitda", "EV / EBITDA", "Cieľový násobok z prevádzkového zisku pred odpismi", True),
+    ("fcfy", "FCF výnos", "Koľko voľného cash flow chceš za akciu", True),
+    ("pe", "Cieľové P/E", "Zisk na akciu × férové P/E", True),
+    ("ps", "Cieľové P/S", "Tržby na akciu × férové P/S", True),
+    ("ddm", "Dividendy (DDM)", "Hodnota budúcich dividend", True),
+    ("pb", "Férové P/B", "Účtovná hodnota × (ROE − g) / (ke − g)", True),
+    ("graham", "Graham", "Klasický vzorec a Grahamovo číslo", False),
+]
+
+
+def _models_list(out, is_fin, price):
+    order = ["pb", "pe", "ddm", "graham", "evebitda", "fcfy", "ps", "dcf"] if is_fin else \
+        ["dcf", "evebitda", "fcfy", "pe", "ps", "ddm", "pb", "graham"]
+    meta = {k: (n, d, c) for k, n, d, c in MODEL_META}
+    res = []
+    for key in order:
+        m = out.get(key)
+        if m is None:
+            continue
+        name, desc, core = meta[key]
+        scen = _norm_scen(key, m.get("scenarios") or [])
+        ok = bool(scen) and all(sc["value"] is not None for sc in scen) and not m.get("error")
+        suitable = m.get("suitable", True)
+        if key == "dcf" and is_fin:
+            suitable = False
+        if key == "pb" and not is_fin:
+            suitable = False
+        base = scen[1]["value"] if ok else None
+        res.append({"key": key, "name": name, "desc": desc, "intro": MODEL_INTRO.get(key, ""),
+                    "relative": key in ("evebitda", "fcfy", "pe", "ps"), "core": core and suitable, "ok": ok, "suitable": suitable,
+                    "scenarios": scen, "base": base,
+                    "upside": (base / price - 1) if base and price else None, "error": m.get("error")})
+    return res
+
+
+def _more_models(out, args, facts, analyst, price, currency, is_fin, ke, rf_used, g_rec, shares, sh, nd, rv, wacc, mcap, an_txt):
+    """DDM, EV/EBITDA, FCF výnos, P/S a Graham s odporúčanými vstupmi."""
+    ke_pct = round(ke * 100, 1)
+    h_ke = [f"Požadovaná návratnosť akcií (CAPM): {_pct(ke)}"]
+    shares_n = (sh or 0) * 1e6
+    sh_f = shares or shares_n
+    # ---------------- DDM
+    dps = facts.get("dps")
+    dps_g = facts.get("dps_cagr5") if facts.get("dps_cagr5") is not None else facts.get("dps_cagr3")
+    g_hi_rec = round(max(0.0, min(0.12, dps_g if dps_g is not None else 0.05)), 3)
+    dd_dps, _ = _num_in(args, "dd_dps", round(dps, 2) if dps else 0.0, 1)
+    dd_g, _ = _num_in(args, "dd_g", g_hi_rec * 100, 1, 0, 25)
+    dd_gt, _ = _num_in(args, "dd_gt", 2.5, 1, 0, 6)
+    dd_ke, _ = _num_in(args, "dd_ke", ke_pct, 1, 3, 25)
+    h_dps = []
+    if facts.get("dps_cagr5") is not None:
+        h_dps.append(f"Rast dividendy na akciu za 5 rokov (CAGR): {_pct(facts['dps_cagr5'])}")
+    if facts.get("dps_cagr3") is not None:
+        h_dps.append(f"Za 3 roky: {_pct(facts['dps_cagr3'])}")
+    if dps and facts.get("eps_ttm"):
+        h_dps.append(f"Výplatný pomer (dividenda / zisk): {_pct(dps / facts['eps_ttm'], 0)}")
+    ddf = [
+        _fld("dd_dps", "Dividenda na akciu (posledný rok)", currency, dd_dps, round(dps, 2) if dps else None,
+             "Vyplatené dividendy lomené počtom akcií.", [], "Dividenda, z ktorej model vychádza.", "0.01", "{:.2f}"),
+        _fld("dd_g", "Rast dividendy v rokoch 1 až 5", "% ročne", dd_g, round(g_hi_rec * 100, 1),
+             "Vychádza z: historický rast dividendy (najviac 12 %).", h_dps, "Potom dividenda rastie terminálnym tempom."),
+        _fld("dd_gt", "Terminálny rast dividendy", "% ročne", dd_gt, 2.5, "Vychádza z: dlhodobý rast ekonomiky.", [], None),
+        _fld("dd_ke", "Požadovaná návratnosť", "%", dd_ke, ke_pct, "Vychádza z: CAPM.", h_ke, "Čím vyššia, tým nižšia hodnota akcie."),
+    ]
+    ddp = dict(dps0=dd_dps, g_high=dd_g / 100, g_term=dd_gt / 100, ke=dd_ke / 100)
+    ddb = V.ddm(ddp["dps0"], ddp["g_high"], ddp["g_term"], ddp["ke"])
+    ddm_ok = bool(dps) and (not price or dps / price >= 0.01)
+    out["ddm"] = {"fields": ddf, "p": ddp, "error": ddb.get("error"), "base": None if "error" in ddb else ddb,
+                  "scenarios": V.ddm_scenarios(ddp, price) if "error" not in ddb else [], "suitable": ddm_ok}
+    # ---------------- EV / EBITDA
+    eb = facts.get("ebitda")
+    eb_mil = round((eb or 0) / 1e6, 1)
+    ebg_rec = facts.get("ebitda_cagr3")
+    ebg_rec = round(max(-0.1, min(0.4, g_rec if ebg_rec is None else (ebg_rec + g_rec) / 2)), 3)
+    ev_now = ((mcap + facts["net_debt"]) / eb) if mcap and eb and eb > 0 and facts.get("net_debt") is not None else None
+    mult_rec = round(max(6.0, min(30.0, ev_now)), 1) if ev_now else 12.0
+    ee_eb, _ = _num_in(args, "ee_eb", eb_mil, 1)
+    ee_g, _ = _num_in(args, "ee_g", ebg_rec * 100, 1, -50, 100)
+    ee_m, _ = _num_in(args, "ee_m", mult_rec, 1, 1, 100)
+    ee_nd, _ = _num_in(args, "ee_nd", nd, 1)
+    ee_sh, _ = _num_in(args, "ee_sh", sh, 1, 0.000001)
+    ee_r, _ = _num_in(args, "ee_r", ke_pct, 1, 3, 25)
+    h_em = ([f"Dnešný EV/EBITDA: {ev_now:.1f}×"] if ev_now else []) + ["Zrelé firmy sa obchodujú zvyčajne za 8 až 14×, rastové technologické za 15 až 30×."]
+    h_eg = []
+    if facts.get("ebitda_cagr3") is not None:
+        h_eg.append(f"Rast EBITDA za 3 roky (CAGR): {_pct(facts['ebitda_cagr3'])}")
+    h_eg.append(f"Odporúčaný rast tržieb z DCF: {_pct(g_rec)}")
+    eef = [
+        _fld("ee_eb", f"EBITDA (posledný rok, mil. {currency})", f"mil. {currency}", ee_eb, eb_mil, "Prevádzkový zisk + odpisy.", [], None, "1", "{:.1f}"),
+        _fld("ee_g", "Rast EBITDA na budúci rok", "%", ee_g, round(ebg_rec * 100, 1), "Vychádza z: priemer histórie EBITDA a rastu tržieb.", h_eg, None),
+        _fld("ee_m", "Cieľový EV/EBITDA", "×", ee_m, mult_rec, "Vychádza z: dnešný násobok (obmedzený na 6 až 30×).", h_em, "Koľkonásobok EBITDA je férová hodnota firmy."),
+        _fld("ee_nd", f"Čistý dlh (mil. {currency})", f"mil. {currency}", ee_nd, round(nd, 1), "Z poslednej súvahy.", [], None, "1", "{:.1f}"),
+        _fld("ee_sh", "Počet akcií", "mil.", ee_sh, round(sh, 2), "Z titulnej strany výkazov.", [], None, "0.01", "{:.2f}"),
+        _fld("ee_r", "Diskontná sadzba", "%", ee_r, ke_pct, "Vychádza z: CAPM.", h_ke, "Hodnotu o rok prepočíta na dnes."),
+    ]
+    eep = dict(ebitda0=ee_eb * 1e6, g=ee_g / 100, mult=ee_m, net_debt=ee_nd * 1e6, shares=ee_sh * 1e6, r=ee_r / 100)
+    eeb = V.ev_ebitda_model(eep["ebitda0"], eep["g"], eep["mult"], eep["net_debt"], eep["shares"], eep["r"])
+    out["evebitda"] = {"fields": eef, "p": eep, "error": eeb.get("error"), "base": None if "error" in eeb else eeb,
+                       "scenarios": V.ev_ebitda_scenarios(eep, price) if "error" not in eeb else [], "ev_now": ev_now}
+    # ---------------- FCF výnos
+    fcf0 = facts.get("fcf_ttm") if facts.get("fcf_ttm") is not None else facts.get("fcf_fy")
+    fcf_mil = round((fcf0 or 0) / 1e6, 1)
+    fy_now = (fcf0 / mcap) if mcap and fcf0 is not None else None
+    fy_rec = round(max(0.025, min(0.08, fy_now if fy_now and fy_now > 0 else 0.05)), 3)
+    fg_rec = round(max(0.0, min(0.15, g_rec * 0.8)), 3)
+    ff_f, _ = _num_in(args, "ff_f", fcf_mil, 1)
+    ff_g, _ = _num_in(args, "ff_g", fg_rec * 100, 1, -30, 60)
+    ff_y, _ = _num_in(args, "ff_y", fy_rec * 100, 1, 0.5, 30)
+    ff_sh, _ = _num_in(args, "ff_sh", sh, 1, 0.000001)
+    ff_r, _ = _num_in(args, "ff_r", ke_pct, 1, 3, 25)
+    h_fy = ([f"Dnešný FCF výnos (FCF / trhová kapitalizácia): {_pct(fy_now)}"] if fy_now is not None else []) + \
+           ["Štátne dlhopisy dávajú okolo 4 %, od akcie sa zvyčajne chce viac (5 až 7 %)."]
+    fff = [
+        _fld("ff_f", f"Voľný cash flow (mil. {currency})", f"mil. {currency}", ff_f, fcf_mil, "Posledných 12 mesiacov (alebo fiškálny rok).", [], None, "1", "{:.1f}"),
+        _fld("ff_g", "Rast FCF na budúci rok", "%", ff_g, round(fg_rec * 100, 1), "Vychádza z: 80 % z odporúčaného rastu tržieb.", [f"Odporúčaný rast tržieb: {_pct(g_rec)}"], None),
+        _fld("ff_y", "Cieľový FCF výnos", "%", ff_y, round(fy_rec * 100, 1), "Vychádza z: dnešný FCF výnos (obmedzený na 2,5 až 8 %).", h_fy, "Nižší požadovaný výnos = vyššia hodnota akcie."),
+        _fld("ff_sh", "Počet akcií", "mil.", ff_sh, round(sh, 2), "Z titulnej strany výkazov.", [], None, "0.01", "{:.2f}"),
+        _fld("ff_r", "Diskontná sadzba", "%", ff_r, ke_pct, "Vychádza z: CAPM.", h_ke, None),
+    ]
+    ffp = dict(fcf0=ff_f * 1e6, g=ff_g / 100, **{"yield": ff_y / 100}, shares=ff_sh * 1e6, r=ff_r / 100)
+    ffb = V.fcf_yield_model(ffp["fcf0"], ffp["g"], ffp["yield"], ffp["shares"], ffp["r"])
+    out["fcfy"] = {"fields": fff, "p": ffp, "error": ffb.get("error"), "base": None if "error" in ffb else ffb,
+                   "scenarios": V.fcf_yield_scenarios(ffp, price) if "error" not in ffb else [], "fy_now": fy_now}
+    # ---------------- P/S
+    ps_now = (mcap / (rv * 1e6)) if mcap and rv else None
+    psr = round(max(0.5, min(15.0, ps_now)), 1) if ps_now else 3.0
+    pp_r, _ = _num_in(args, "ps_rev", rv, 1)
+    pp_g, _ = _num_in(args, "ps_g", g_rec * 100, 1, -30, 80)
+    pp_ps, _ = _num_in(args, "ps_ps", psr, 1, 0.1, 50)
+    pp_sh, _ = _num_in(args, "ps_sh", sh, 1, 0.000001)
+    pp_k, _ = _num_in(args, "ps_r", ke_pct, 1, 3, 25)
+    h_ps = ([f"Dnešné P/S: {ps_now:.1f}×"] if ps_now else []) + ["P/S je užitočné pri rýchlo rastúcich firmách bez stabilného zisku, ale ignoruje maržu."]
+    psf = [
+        _fld("ps_rev", f"Tržby (mil. {currency})", f"mil. {currency}", pp_r, rv, "Posledných 12 mesiacov.", [], None, "1", "{:.1f}"),
+        _fld("ps_g", "Rast tržieb na budúci rok", "%", pp_g, round(g_rec * 100, 1), f"Vychádza z: rovnaký odporúčaný rast ako v DCF.", [f"Odporúčaný rast tržieb: {_pct(g_rec)}"], None),
+        _fld("ps_ps", "Cieľové P/S", "×", pp_ps, psr, "Vychádza z: dnešné P/S (obmedzené na 0,5 až 15×).", h_ps, "Koľkonásobok tržieb na akciu je férová cena o rok."),
+        _fld("ps_sh", "Počet akcií", "mil.", pp_sh, round(sh, 2), "Z titulnej strany výkazov.", [], None, "0.01", "{:.2f}"),
+        _fld("ps_r", "Diskontná sadzba", "%", pp_k, ke_pct, "Vychádza z: CAPM.", h_ke, None),
+    ]
+    psp = dict(rev0=pp_r * 1e6, g=pp_g / 100, target_ps=pp_ps, shares=pp_sh * 1e6, r=pp_k / 100)
+    psb = V.ps_model(psp["rev0"], psp["g"], psp["target_ps"], psp["shares"], psp["r"])
+    out["ps"] = {"fields": psf, "p": psp, "error": psb.get("error"), "base": None if "error" in psb else psb,
+                 "scenarios": V.ps_scenarios(psp, price) if "error" not in psb else [], "ps_now": ps_now}
+    # ---------------- Graham
+    eps0 = facts.get("eps_ttm")
+    bv = (facts.get("equity") or 0) / sh_f if sh_f else None
+    g_gr = facts.get("eps_cagr5") if facts.get("eps_cagr5") is not None else facts.get("eps_cagr3")
+    g_gr_rec = round(max(0.0, min(15.0, (g_gr if g_gr is not None else 0.05) * 100)), 1)
+    y_rec = round((rf_used + 0.01) * 100, 1)
+    gr_e, _ = _num_in(args, "gr_eps", round(eps0, 2) if eps0 else 0.0, 1)
+    gr_b, _ = _num_in(args, "gr_bv", round(bv, 2) if bv else 0.0, 1)
+    gr_g, _ = _num_in(args, "gr_g", g_gr_rec, 1, 0, 30)
+    gr_y, _ = _num_in(args, "gr_y", y_rec, 1, 1, 15)
+    grf = [
+        _fld("gr_eps", "Zisk na akciu (EPS)", currency, gr_e, round(eps0, 2) if eps0 else None, "Zriedený EPS za 12 mesiacov.", [], None, "0.01", "{:.2f}"),
+        _fld("gr_bv", "Účtovná hodnota na akciu", currency, gr_b, round(bv, 2) if bv else None, "Vlastné imanie lomené počtom akcií.", [], None, "0.01", "{:.2f}"),
+        _fld("gr_g", "Očakávaný rast zisku (7 až 10 rokov)", "% ročne", gr_g, g_gr_rec, "Vychádza z: historický CAGR zisku na akciu (0 až 15 %).",
+             [f"Rast EPS za 5 rokov: {_pct(facts.get('eps_cagr5'))}"] if facts.get("eps_cagr5") is not None else [], "Do vzorca vstupuje ako číslo v percentách."),
+        _fld("gr_y", "Výnos podnikových dlhopisov AAA", "%", gr_y, y_rec, "Vychádza z: bezriziková sadzba + 1 p. b.", [], "Graham pôvodne použil 4,4 % z roku 1962."),
+    ]
+    grp = dict(eps=gr_e, bvps=gr_b, g=gr_g, y=gr_y)
+    grb = V.graham(grp["eps"], grp["bvps"], grp["g"], grp["y"])
+    out["graham"] = {"fields": grf, "p": grp, "error": grb.get("error"), "base": None if "error" in grb else grb,
+                     "scenarios": V.graham_scenarios(grp, price) if "error" not in grb else [], "suitable": True}
 
 
 # ------------------------------------------------------------------ porovnanie s konkurenciou
