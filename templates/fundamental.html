@@ -104,6 +104,35 @@
   {% endif %}
 </div>
 
+{% set mo = fund.moat %}
+{% if mo %}
+<div class="card" id="moat">
+  <h2>Prečo trh platí prémiu? <span class="info" tabindex="0" data-tip="Značku, sieťové efekty ani patenty z výkazov vyčítať nejde. Karta meria ich dôsledky v číslach: či kapitál dlhodobo zarába viac, než stojí, či sú marže vysoké a stabilné a či sa zisk mení na hotovosť.">ⓘ</span></h2>
+  {% if mo.skip %}
+    <p class="note">{{ mo.reason }}</p>
+  {% else %}
+  <div class="revrow">
+    <div><div class="bigprice" style="font-size:30px">{{ mo.verdict }}</div><div class="note">stopy konkurenčnej výhody v číslach</div></div>
+    <div class="revtxt">
+      {% if mo.mult.pe or mo.mult.ps %}Trh dnes platí{% if mo.mult.pe %} P/E <strong>{{ '%.1f'|format(mo.mult.pe) }}×</strong>{% endif %}{% if mo.mult.ps %}, P/S <strong>{{ '%.1f'|format(mo.mult.ps) }}×</strong>{% endif %}{% if mo.mult.ev_ebitda %}, EV/EBITDA <strong>{{ '%.1f'|format(mo.mult.ev_ebitda) }}×</strong>{% endif %}{% if mo.mult.fcf_yield is not none %}, FCF výnos <strong>{{ pc(mo.mult.fcf_yield) }}</strong>{% endif %}.{% endif %}
+      {% if mo.verdict == 'silné' and mo.priced_for_more %}Čísla podporujú prémiu (kvalitný podnik), no cena vyžaduje aj rast nad odporúčanie, takže prémia už zahŕňa veľa dobrého.
+      {% elif mo.verdict == 'silné' %}Čísla prémiu zdôvodňujú: firma dlhodobo zarába viac, než kapitál stojí.
+      {% elif mo.priced_for_more %}Čísla moat nepotvrdzujú a cena zároveň čaká viac rastu, než firma historicky dodáva. Prémia stojí hlavne na očakávaniach.
+      {% else %}Čísla potvrdzujú moat len čiastočne.{% endif %}
+    </div>
+  </div>
+  <div class="tablewrap" style="margin-top:10px"><table class="plain">
+    <thead><tr><th>Ukazovateľ</th><th>Hodnota</th><th>Hodnotenie</th></tr></thead>
+    <tbody>{% for i in mo.indicators %}
+      <tr><td>{{ i.name }} <span class="info" tabindex="0" data-tip="{{ i.why }}">ⓘ</span></td><td>{{ i.value }}</td>
+          <td>{% if i.score is none %}–{% else %}{{ ['slabé','priemerné','silné'][i.score] }}{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="note">Hodnotenie sú jednoduché prahy z posledných rokov vo výkazoch, nie dôkaz moatu. Čo čísla nezachytia: značka, sieťové efekty, regulácia a patenty, ani to, či ich konkurencia práve nenapáda. Posúď to vlastným úsudkom.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if fund.reverse %}
 <div class="card rev">
   <h2>Čo očakáva trh <span class="info" tabindex="0" data-tip="Reverzný DCF: pri tvojich ostatných vstupoch (marža, WACC, terminálny rast) hľadá takú mieru rastu tržieb v rokoch 1 až 5, pri ktorej DCF zodpovedá dnešnej cene akcie.">ⓘ</span></h2>

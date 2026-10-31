@@ -94,8 +94,12 @@ def dupont(built, n=5):
 
 
 def roic(built, tax_default=0.21):
-    """NOPAT / investovaný kapitál (dlh + vlastné imanie − hotovosť)."""
-    t = _years(built)[-1]
+    """NOPAT / investovaný kapitál (dlh + vlastné imanie − hotovosť) za posledný rok."""
+    return roic_at(built, _years(built)[-1], tax_default)
+
+
+def roic_at(built, t, tax_default=0.21):
+    """To isté pre ľubovoľný rok t."""
     g = lambda k: _g(built, k, t)  # noqa: E731
     ebit, eq = g("op_income"), g("equity")
     if ebit is None or eq is None:

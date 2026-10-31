@@ -246,6 +246,7 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
         out["notes"].append("Bez ceny akcie sa neukáže porovnanie s trhom. Cenu môžeš zadať v záložke Úvod.")
     if quote_note:
         out["notes"].append(quote_note)
+    out["wacc_used"] = wacc / 100
     out["wacc_parts"] = {"ke": ke, "rf": rf_used, "beta": beta_used, "w_d": w_d, "kd": kd}
     # reverzný DCF: aký rast trh očakáva
     out["reverse"] = None

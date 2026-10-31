@@ -17,6 +17,7 @@ import excel
 import filings
 import flow
 import metrics
+import moat
 import perf
 import portfolio
 import prices
@@ -348,6 +349,7 @@ def _fundamental(comp, ticker, btype, price, quote, is_demo):
                                   shares, note)
     view["profile"] = profile
     view["quality"] = quality.build(annual, facts, btype)
+    view["moat"] = moat.build(annual, facts, btype, view.get("wacc_used"), price, mcap, view.get("reverse"))
     view["peers"] = _peers(comp, ticker, btype, annual, facts, quote, is_demo)
     return view
 

@@ -949,6 +949,25 @@ _appmod.prices.get_price = lambda t: None
 check("watchlist: nedostupná cena nezhodí stránku", _c.get("/watchlist").status_code == 200)
 _appmod.prices.get_price = _orig_gp
 
+# ---- moat / prémia
+import moat as _moat  # noqa: E402
+_mh = cl.get("/company/DEMOCO/fundamental").get_data(as_text=True)
+check("moat: karta „Prečo trh platí prémiu?“ sa zobrazí (alebo vysvetlí, prečo nie) a nezhodí stránku",
+      "Prečo trh platí prémiu" in _mh and ("Hrubá marža" in _mh or "málo rokov" in _mh), _mh[:0])
+_mb = cl.get("/company/DEMOBANK/fundamental")
+check("moat: banka dostane vysvetlenie namiesto karty", _mb.status_code == 200 and "ROE a kapitálové pomery" in _mb.get_data(as_text=True))
+_syn = {"display": [f"Y{i}" for i in range(6)], "data": {
+    "revenue": {f"Y{i}": 100 + 10 * i for i in range(6)}, "gross_profit": {f"Y{i}": 60 + 6 * i for i in range(6)},
+    "op_income": {f"Y{i}": 30 + 3 * i for i in range(6)}, "net_income": {f"Y{i}": 24 + 2 * i for i in range(6)},
+    "fcf": {f"Y{i}": 25 + 2 * i for i in range(6)}, "equity": {f"Y{i}": 100 for i in range(6)},
+    "total_debt": {f"Y{i}": 0 for i in range(6)}, "cash": {f"Y{i}": 0 for i in range(6)}}}
+_ind = {i["name"]: i for i in _moat.indicators(_syn, 0.09)}
+check("moat: syntetická firma s ROIC ~30 % a 60 % maržou dostane silné hodnotenia",
+      _ind["ROIC nad nákladmi kapitálu"]["score"] == 2 and _ind["Hrubá marža"]["score"] == 2
+      and _ind["Stabilita tržieb"]["score"] == 2 and _ind["Najslabšia prevádzková marža"]["score"] == 2)
+_syn["data"]["revenue"]["Y3"] = 60
+check("moat: prepad tržieb o viac než 5 % zníži hodnotenie stability", {i["name"]: i for i in _moat.indicators(_syn, 0.09)}["Stabilita tržieb"]["score"] == 0)
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

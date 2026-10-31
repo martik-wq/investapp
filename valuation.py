@@ -11,6 +11,10 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+def safe_div(a, b):
+    return None if a is None or b in (None, 0) else a / b
+
+
 def net_revenue(built, end):
     """Tržby firmy. U bánk a fintech firiem je „revenue“ často len čiastkový riadok, preto sa berie
     čistý výnos (čistý úrokový výnos + neúrokové výnosy), ak je zjavne väčší."""
