@@ -462,3 +462,6 @@ button.mtile.weak{opacity:.72}
 
 .mup em{margin-left:6px}
 .rel{margin-left:6px;font-size:10.5px;font-weight:600;color:#a58b74;background:#fbf1e7;border-radius:999px;padding:1px 7px;vertical-align:2px}
+
+.rref{font-size:11px;color:#a58b74;margin:-1px 0 5px 20px;line-height:1.35}
+details.reftab{margin:6px 0 10px}details.reftab>summary{cursor:pointer;font-size:13px;color:var(--acc2);font-weight:600}

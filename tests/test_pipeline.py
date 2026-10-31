@@ -773,6 +773,22 @@ for _tk in ("DEMOBANK", "DEMOCO"):
     check(f"fundamentálna: {_tk} so všetkými modelmi a konkurentmi (200)",
           _appmod.app.test_client().get(f"/company/{_tk}/fundamental?peers=DEMOCO,DEMOBANK").status_code == 200)
 
+# --- referenčné hodnoty pri kvalite podniku (podľa typu biznisu)
+import quality as _q2  # noqa: E402
+check("kvalita: referencia sa líši podľa typu (prevádzková marža: tech ≥ 25 %, všeobecné ≥ 15 %)",
+      "≥ 25 %" in _q2._ref("op_margin", "tech") and "≥ 15 %" in _q2._ref("op_margin", "general") and "≥ 30 %" in _q2._ref("op_margin", "reit"),
+      (_q2._ref("op_margin", "tech"), _q2._ref("op_margin", "general")))
+check("kvalita: zadlženosť má nižšie je lepšie (REIT toleruje viac dlhu)", "≤ 1,5×" in _q2._ref("nd_ebitda", "general") and "≤ 5×" in _q2._ref("nd_ebitda", "reit"))
+check("kvalita: skórovanie podľa typu (marža 20 %: pri tech priemerná, pri všeobecných silná)",
+      _q2._sc("op_margin", "tech", 0.20) == 1 and _q2._sc("op_margin", "general", 0.20) == 2)
+_rt = _q2.reference_table()
+check("kvalita: tabuľka referencií pre všetky typy", len(_rt["types"]) == 5 and any(r["name"] == "ROE" for r in _rt["rows"]))
+_hb = _appmod.app.test_client().get("/company/DEMOBANK/fundamental").get_data(as_text=True)
+_hc = _appmod.app.test_client().get("/company/DEMOCO/fundamental").get_data(as_text=True)
+check("kvalita: banka má vlastné ukazovatele (ROE, efficiency) s referenciou, bez Piotroski",
+      "Referencia: silné ≥" in _hb and "ROE" in _hb and "Efficiency ratio" in _hb and "Piotroski F-score <span" not in _hb, "")
+check("kvalita: firma má referencie pod každým ukazovateľom a tabuľku všetkých typov", _hc.count("Referencia: ") >= 8 and "Referenčné hodnoty pre všetky typy" in _hc)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]

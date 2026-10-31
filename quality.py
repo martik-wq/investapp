@@ -123,8 +123,69 @@ def _score(v, strong, ok, higher_better=True):
     return 2 if v <= strong else (1 if v <= ok else 0)
 
 
-def ratings(built, facts, pio, alt, ro):
-    """Štyri hodnotenia s vypísanými ukazovateľmi: [{'name','label','level','parts':[(názov,hodnota text,skóre)]}]."""
+# Referenčné hranice podľa typu biznisu: kľúč -> {typ: (silné, priemerné)}, vyšší/nižší je lepší, jednotka.
+# Hodnota je „silná“, ak dosiahne prvé číslo, „priemerná“, ak dosiahne druhé, inak „slabá“.
+TH = {
+    "rev_cagr": ("Rast tržieb (CAGR)", True, "pct", {"general": (0.06, 0.02), "tech": (0.15, 0.06), "reit": (0.05, 0.02),
+                                                   "bank": (0.08, 0.03), "insurance": (0.06, 0.02)}),
+    "eps_cagr": ("Rast zisku na akciu (CAGR)", True, "pct", {"general": (0.08, 0.02), "tech": (0.15, 0.05), "reit": (0.05, 0.0),
+                                                           "bank": (0.10, 0.03), "insurance": (0.08, 0.02)}),
+    "op_margin": ("Prevádzková marža", True, "pct", {"general": (0.15, 0.07), "tech": (0.25, 0.12), "reit": (0.30, 0.15)}),
+    "roic": ("ROIC", True, "pct", {"general": (0.12, 0.07), "tech": (0.20, 0.10), "reit": (0.06, 0.03)}),
+    "fcf_margin": ("FCF marža (priemer 3 roky)", True, "pct", {"general": (0.10, 0.04), "tech": (0.20, 0.08), "reit": (0.25, 0.10)}),
+    "nd_ebitda": ("Čistý dlh / EBITDA", False, "x", {"general": (1.5, 3.0), "tech": (0.5, 2.0), "reit": (5.0, 7.0)}),
+    "coverage": ("Krytie úrokov (EBIT / úroky)", True, "x", {"general": (8, 3), "tech": (15, 5), "reit": (3, 1.5)}),
+    "cfo_ni": ("Cash flow / čistý zisk", True, "x", {"general": (1.0, 0.7), "tech": (1.0, 0.7), "reit": (1.2, 0.9)}),
+    "sbc": ("Akciové odmeny / tržby", False, "pct", {"general": (0.01, 0.03), "tech": (0.06, 0.12), "reit": (0.01, 0.03)}),
+    "roe": ("ROE", True, "pct", {"bank": (0.12, 0.08), "insurance": (0.12, 0.08)}),
+    "roa": ("ROA (zisk / aktíva)", True, "pct", {"bank": (0.010, 0.005), "insurance": (0.020, 0.008)}),
+    "efficiency": ("Efficiency ratio (náklady / výnosy)", False, "pct", {"bank": (0.55, 0.65)}),
+    "eq_assets": ("Vlastné imanie / aktíva", True, "pct", {"bank": (0.10, 0.06), "insurance": (0.15, 0.08)}),
+    "ltd": ("Úvery / vklady", False, "pct", {"bank": (0.85, 1.00)}),
+    "net_margin": ("Čistá marža", True, "pct", {"bank": (0.25, 0.12), "insurance": (0.10, 0.04)}),
+}
+TYPE_NAMES = {"general": "Všeobecné firmy", "tech": "Technológie", "reit": "REIT", "bank": "Banky", "insurance": "Poisťovne"}
+
+
+def _fmt_th(v, kind):
+    if kind == "pct":
+        return f"{v * 100:.1f} %".replace(".", ",").replace(",0 %", " %")
+    return f"{v:g}×".replace(".", ",")
+
+
+def _ref(key, btype):
+    """Text referencie pre ukazovateľ a typ biznisu: „silné ≥ 15 %, priemerné ≥ 7 %, slabé pod 7 %“."""
+    name, hi, kind, per = TH[key]
+    th = per.get(btype) or per.get("general")
+    if not th:
+        return None
+    s_, o_ = th
+    if hi:
+        return f"silné ≥ {_fmt_th(s_, kind)}, priemerné ≥ {_fmt_th(o_, kind)}, slabé pod {_fmt_th(o_, kind)}"
+    return f"silné ≤ {_fmt_th(s_, kind)}, priemerné ≤ {_fmt_th(o_, kind)}, slabé nad {_fmt_th(o_, kind)}"
+
+
+def _sc(key, btype, v):
+    name, hi, kind, per = TH[key]
+    th = per.get(btype) or per.get("general")
+    return None if not th else _score(v, th[0], th[1], hi)
+
+
+def reference_table():
+    """Všetky referenčné hranice pre všetky typy biznisu (riadky: ukazovateľ, stĺpce: typ)."""
+    rows = []
+    for key, (name, hi, kind, per) in TH.items():
+        cells = []
+        for t in ("general", "tech", "reit", "bank", "insurance"):
+            th = per.get(t)
+            cells.append(None if not th else (f"≥ {_fmt_th(th[0], kind)} / ≥ {_fmt_th(th[1], kind)}" if hi
+                                              else f"≤ {_fmt_th(th[0], kind)} / ≤ {_fmt_th(th[1], kind)}"))
+        rows.append({"name": name, "cells": cells})
+    return {"types": [TYPE_NAMES[t] for t in ("general", "tech", "reit", "bank", "insurance")], "rows": rows}
+
+
+def ratings(built, facts, pio, alt, ro, btype="general"):
+    """Hodnotenia s ukazovateľmi: [{'name','label','level','parts':[(názov, hodnota, skóre, referencia)]}]."""
     t = _years(built)[-1]
     g = lambda k: _g(built, k, t)  # noqa: E731
     pct = lambda v: "–" if v is None else f"{v * 100:.1f} %".replace(".", ",")  # noqa: E731
@@ -140,34 +201,89 @@ def ratings(built, facts, pio, alt, ro):
     groups = []
 
     def grp(name, parts):
-        sc = [s for _, _, s in parts if s is not None]
+        sc = [s for _, _, s, _ in parts if s is not None]
         lvl = round(sum(sc) / len(sc)) if sc else None
         groups.append({"name": name, "level": lvl, "label": LABELS.get(lvl, "bez údajov"), "parts": parts})
 
-    grp("Rast", [("Rast tržieb 3 roky (CAGR)", pct(facts.get("rev_cagr3")), _score(facts.get("rev_cagr3"), 0.10, 0.03)),
-                 ("Rast tržieb 5 rokov (CAGR)", pct(facts.get("rev_cagr5")), _score(facts.get("rev_cagr5"), 0.10, 0.03)),
-                 ("Rast zisku na akciu 3 roky", pct(facts.get("eps_cagr3")), _score(facts.get("eps_cagr3"), 0.10, 0.03))])
-    grp("Ziskovosť", [("Prevádzková marža", pct(om), _score(om, 0.20, 0.08)),
-                      ("ROIC", pct(ro["roic"] if ro else None), _score(ro["roic"] if ro else None, 0.15, 0.08)),
-                      ("FCF marža (priemer 3 roky)", pct(facts.get("fcf_margin_avg3")), _score(facts.get("fcf_margin_avg3"), 0.15, 0.05))])
-    grp("Finančné zdravie", [("Čistý dlh / EBITDA", x(nd_e) if nd_e is not None else ("bez čistého dlhu" if (facts.get("net_debt") or 0) <= 0 else "–"),
-                              2 if (facts.get("net_debt") or 0) <= 0 else _score(nd_e, 1.0, 3.0, False)),
-                             ("Krytie úrokov (EBIT / úroky)", x(cov), _score(cov, 8, 3)),
-                             ("Altman Z'' zóna", alt["zone"] if alt else "–", None if not alt else (2 if alt["zone"] == "bezpečná" else (1 if alt["zone"] == "šedá" else 0)))])
-    grp("Kvalita ziskov", [("Cash flow / čistý zisk", x(cfo_ni), _score(cfo_ni, 1.0, 0.7)),
-                           ("Akciové odmeny / tržby", pct(sbc), _score(sbc, 0.03, 0.08, False)),
+    def part(label, key, value, text):
+        return (label, text, _sc(key, btype, value), _ref(key, btype))
+
+    no_nd = (facts.get("net_debt") or 0) <= 0
+    grp("Rast", [part("Rast tržieb 3 roky (CAGR)", "rev_cagr", facts.get("rev_cagr3"), pct(facts.get("rev_cagr3"))),
+                 part("Rast tržieb 5 rokov (CAGR)", "rev_cagr", facts.get("rev_cagr5"), pct(facts.get("rev_cagr5"))),
+                 part("Rast zisku na akciu 3 roky", "eps_cagr", facts.get("eps_cagr3"), pct(facts.get("eps_cagr3")))])
+    grp("Ziskovosť", [part("Prevádzková marža", "op_margin", om, pct(om)),
+                      part("ROIC", "roic", ro["roic"] if ro else None, pct(ro["roic"] if ro else None)),
+                      part("FCF marža (priemer 3 roky)", "fcf_margin", facts.get("fcf_margin_avg3"), pct(facts.get("fcf_margin_avg3")))])
+    nd_part = ("Čistý dlh / EBITDA", x(nd_e) if nd_e is not None else ("bez čistého dlhu" if no_nd else "–"),
+               2 if no_nd else _sc("nd_ebitda", btype, nd_e), _ref("nd_ebitda", btype))
+    grp("Finančné zdravie", [nd_part, part("Krytie úrokov (EBIT / úroky)", "coverage", cov, x(cov)),
+                             ("Altman Z'' zóna", alt["zone"] if alt else "–",
+                              None if not alt else (2 if alt["zone"] == "bezpečná" else (1 if alt["zone"] == "šedá" else 0)),
+                              "silné: bezpečná zóna (Z'' > 2,6), priemerné: šedá (1,1 až 2,6), slabé: riziková (< 1,1)")])
+    grp("Kvalita ziskov", [part("Cash flow / čistý zisk", "cfo_ni", cfo_ni, x(cfo_ni)),
+                           part("Akciové odmeny / tržby", "sbc", sbc, pct(sbc)),
                            ("Piotroski F-score", f"{pio['score']} z {pio['n']}" if pio else "–",
-                            None if not pio else (2 if pio["score"] >= 7 else (1 if pio["score"] >= 4 else 0)))])
+                            None if not pio else (2 if pio["score"] >= 7 else (1 if pio["score"] >= 4 else 0)),
+                            "silné: 7 až 9, priemerné: 4 až 6, slabé: 0 až 3")])
+    return groups
+
+
+def financial_ratings(built, facts, btype):
+    """Hodnotenia pre banky a poisťovne z ich vlastných ukazovateľov."""
+    ys = _years(built)
+    t = ys[-1]
+    g = lambda k: _g(built, k, t)  # noqa: E731
+    pct = lambda v: "–" if v is None else f"{v * 100:.1f} %".replace(".", ",")  # noqa: E731
+    ni, eq, ta = g("net_income"), g("equity"), g("total_assets")
+    eq_prev = _g(built, "equity", ys[-2]) if len(ys) >= 2 else None
+    eq_avg = (eq + eq_prev) / 2 if eq is not None and eq_prev else eq
+    net_rev = (g("nii") or 0) + (g("nonint_income") or 0) if g("nii") is not None else g("revenue")
+    roe = _div(ni, eq_avg) if eq_avg and eq_avg > 0 else None
+    roa = _div(ni, ta)
+    eff = _div(g("nonint_expense"), net_rev) if g("nonint_expense") is not None and net_rev else None
+    eqa = _div(eq, ta)
+    ltd = _div(g("loans"), g("deposits"))
+    nm = _div(ni, net_rev)
+    groups = []
+
+    def part(label, key, value):
+        return (label, pct(value), _sc(key, btype, value), _ref(key, btype))
+
+    def grp(name, parts):
+        sc = [s for _, _, s, _ in parts if s is not None]
+        lvl = round(sum(sc) / len(sc)) if sc else None
+        groups.append({"name": name, "level": lvl, "label": LABELS.get(lvl, "bez údajov"), "parts": parts})
+
+    grp("Rast", [part("Rast tržieb 3 roky (CAGR)", "rev_cagr", facts.get("rev_cagr3")),
+                 part("Rast tržieb 5 rokov (CAGR)", "rev_cagr", facts.get("rev_cagr5")),
+                 part("Rast zisku na akciu 3 roky", "eps_cagr", facts.get("eps_cagr3"))])
+    prof = [part("ROE", "roe", roe), part("ROA (zisk / aktíva)", "roa", roa)]
+    if btype == "bank":
+        prof.append(part("Efficiency ratio (náklady / výnosy)", "efficiency", eff))
+    else:
+        prof.append(part("Čistá marža", "net_margin", nm))
+    grp("Ziskovosť", prof)
+    health = [part("Vlastné imanie / aktíva", "eq_assets", eqa)]
+    if btype == "bank":
+        health.append(part("Úvery / vklady", "ltd", ltd))
+    grp("Finančné zdravie", health)
     return groups
 
 
 def build(built, facts, btype):
-    """Celá karta kvality. Pri bankách a poisťovniach sa tieto modely nepoužívajú (vráti {'skip': True})."""
+    """Karta kvality. Pri bankách a poisťovniach sa Piotroski, Altman a ROIC nepoužívajú; majú vlastné ukazovatele."""
+    ref = reference_table()
     if btype in ("bank", "insurance"):
-        return {"skip": True}
+        try:
+            return {"skip": False, "financial": True, "pio": None, "alt": None, "roic": None, "dupont": dupont(built),
+                    "ratings": financial_ratings(built, facts, btype), "reference": ref, "btype": btype}
+        except (TypeError, ZeroDivisionError):
+            return {"skip": True}
     try:
         pio, alt, ro = piotroski(built), altman(built), roic(built)
+        rat = ratings(built, facts, pio, alt, ro, btype)
     except (TypeError, ZeroDivisionError):
         return {"skip": True}
-    return {"skip": False, "pio": pio, "alt": alt, "roic": ro, "dupont": dupont(built),
-            "ratings": ratings(built, facts, pio, alt, ro)}
+    return {"skip": False, "financial": False, "pio": pio, "alt": alt, "roic": ro, "dupont": dupont(built),
+            "ratings": rat, "reference": ref, "btype": btype}

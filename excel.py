@@ -214,7 +214,7 @@ def build_fundamental_workbook(ctx):
     if not q or q.get("skip"):
         wq["A3"] = "Pri bankách a poisťovniach sa tieto modely nepoužívajú."
     else:
-        head(wq, 3, ["Hodnotenie / ukazovateľ", "Hodnota", "Skóre"], [46, 22, 14])
+        head(wq, 3, ["Hodnotenie / ukazovateľ", "Hodnota", "Skóre", "Referencia pre tento typ biznisu"], [46, 22, 14, 70])
         r = 4
         sk = {2: "silné", 1: "priemerné", 0: "slabé"}
         for g in q["ratings"]:
@@ -223,10 +223,12 @@ def build_fundamental_workbook(ctx):
             for i in range(1, 4):
                 wq.cell(r, i).fill = SF
             r += 1
-            for name, val, sc in g["parts"]:
+            for name, val, sc, ref in g["parts"]:
                 wq.cell(r, 1, name).alignment = Alignment(indent=1)
                 wq.cell(r, 2, val).alignment = Alignment(horizontal="right")
                 wq.cell(r, 3, sk.get(sc, "–")).alignment = Alignment(horizontal="right")
+                if ref:
+                    wq.cell(r, 4, ref).font = NOTE
                 r += 1
         r += 1
         if q.get("pio"):

@@ -56,18 +56,25 @@
 <div class="card" id="quality">
   <h2>Kvalita podniku</h2>
   {% if not q or q.skip %}
-    <p class="note">Piotroski F-score, Altman Z'' a ROIC sa pri bankách a poisťovniach nepoužívajú (majú inú štruktúru súvahy). Pre ne pozri záložku Výkazy, Metriky (ROE, efficiency ratio, úverové straty) a model P/B nižšie.</p>
+    <p class="note">Kvalitu podniku sa pre túto firmu nepodarilo spočítať (chýbajú údaje vo výkazoch).</p>
   {% else %}
+  {% if q.financial %}<p class="note">Pre banky a poisťovne sa Piotroski, Altman a ROIC nepoužívajú (iná štruktúra súvahy). Hodnotenie stojí na ich vlastných ukazovateľoch: ROE, ROA, efficiency ratio a kapitalizácia.</p>{% endif %}
   <div class="rtiles">
     {% for g in q.ratings %}
     <div class="rtile">
       <div class="rhead"><span>{{ g.name }}</span><span class="rbadge r{{ g.level if g.level is not none else 'n' }}">{{ g.label }}</span></div>
-      {% for name, val, sc in g.parts %}<div class="rpart"><span class="rdot r{{ sc if sc is not none else 'n' }}"></span><span class="rname">{{ name }}</span><strong>{{ val }}</strong></div>{% endfor %}
+      {% for name, val, sc, ref in g.parts %}<div class="rpart"><span class="rdot r{{ sc if sc is not none else 'n' }}"></span><span class="rname">{{ name }}</span><strong>{{ val }}</strong></div>{% if ref %}<div class="rref">Referencia: {{ ref }}</div>{% endif %}{% endfor %}
     </div>
     {% endfor %}
   </div>
-  <p class="note">Hodnotenie je priemer bodov za ukazovatele v dlaždici (zelená bodka = silné, oranžová = priemerné, červená = slabé; šedá = chýbajú údaje). Hranice: rast tržieb ≥ 10 % silný, &lt; 3 % slabý; prevádzková marža ≥ 20 %; ROIC ≥ 15 %; čistý dlh / EBITDA ≤ 1; krytie úrokov ≥ 8; cash flow / zisk ≥ 1; akciové odmeny ≤ 3 % tržieb.</p>
-  <div class="grid2">
+  <p class="note">Hodnotenie je priemer bodov za ukazovatele v dlaždici (zelená bodka = silné, oranžová = priemerné, červená = slabé; šedá = chýbajú údaje). Pod každým ukazovateľom je referencia pre tvoj typ biznisu (<strong>{{ result.type_label }}</strong>).</p>
+  <details class="reftab"><summary>Referenčné hodnoty pre všetky typy biznisu</summary>
+    <div class="tablewrap"><table class="pf"><thead><tr><th>Ukazovateľ (silné / priemerné)</th>{% for tn in q.reference.types %}<th>{{ tn }}</th>{% endfor %}</tr></thead><tbody>
+      {% for r in q.reference.rows %}<tr><td style="text-align:left">{{ r.name }}</td>{% for c in r.cells %}<td>{{ c if c else '–' }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table></div>
+    <p class="note">Hranice sú orientačné pravidlá (nie zákon): odvetvia sa líšia a pri firmách s inou povahou podnikania (napr. cyklické, kapitálovo náročné) ich ber s rezervou. „–“ = ukazovateľ sa pri danom type nepoužíva.</p>
+  </details>
+  {% if not q.financial %}<div class="grid2">
     <div>
       <h3>Piotroski F-score {% if q.pio %}<span class="rbadge r{{ 2 if q.pio.score >= 7 else (1 if q.pio.score >= 4 else 0) }}">{{ q.pio.score }} z {{ q.pio.n }}</span>{% endif %}</h3>
       {% if q.pio %}
@@ -83,7 +90,7 @@
       {% else %}<p class="note">Na výpočet nie je dosť údajov (chýba súvaha).</p>{% endif %}
       {% if q.roic %}<h3>ROIC</h3><div class="bigprice" style="font-size:28px">{{ pc(q.roic.roic) }}</div><p class="note">Zisk z prevádzky po dani ({{ pc(q.roic.tax, 0) }}) lomený investovaným kapitálom (dlh + vlastné imanie − hotovosť). Nad 10 % firma zvyčajne vytvára hodnotu.</p>{% endif %}
     </div>
-  </div>
+  </div>{% endif %}
   {% if q.dupont %}
   <h3>Rozklad ROE (DuPont)</h3>
   <div class="tablewrap"><table class="pf"><thead><tr><th></th>{% for r in q.dupont %}<th>{{ r.end.year }}</th>{% endfor %}</tr></thead><tbody>
