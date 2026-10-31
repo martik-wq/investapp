@@ -469,7 +469,7 @@ def peer_metrics(name, ticker, built, facts, btype, quote, shares_out):
     """Jeden stĺpec porovnania: dict kľúč -> hodnota (None = chýba)."""
     t = built["display"][-1]
     g = lambda k: built["data"].get(k, {}).get(t)  # noqa: E731
-    rev = g("revenue")
+    rev = V.net_revenue(built, t)
     ebitda = (g("op_income") + g("da")) if g("op_income") is not None and g("da") is not None else None
     ni = g("net_income")
     ro = None

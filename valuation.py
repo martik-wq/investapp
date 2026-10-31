@@ -11,6 +11,28 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+def net_revenue(built, end):
+    """Tržby firmy. U bánk a fintech firiem je „revenue“ často len čiastkový riadok, preto sa berie
+    čistý výnos (čistý úrokový výnos + neúrokové výnosy), ak je zjavne väčší."""
+    d = built["data"]
+    r = d.get("revenue", {}).get(end)
+    nii, ni = d.get("nii", {}).get(end), d.get("nonint_income", {}).get(end)
+    if nii is not None and ni is not None:
+        nr = nii + ni
+        if r is None or nr > r * 1.05:
+            return nr
+    return r
+
+
+def revenue_series(built):
+    out = []
+    for e in built["display"]:
+        v = net_revenue(built, e)
+        if v is not None:
+            out.append((e, v))
+    return out
+
+
 def _series(built, key):
     """[(koniec obdobia, hodnota)] vzostupne pre zobrazené ročné obdobia."""
     d = built["data"].get(key, {})
@@ -38,7 +60,7 @@ def _avg(vals):
 def history_facts(built, ttm=None):
     """Údaje z výkazov, z ktorých sa odvodzujú odporúčania. built = ročné výkazy; ttm = {'revenue','fcf',
     'net_income','eps'} z posledných 4 kvartálov (voliteľné)."""
-    rev = _series(built, "revenue")
+    rev = revenue_series(built)
     fcf = _series(built, "fcf")
     ni = _series(built, "net_income")
     eq = _series(built, "equity")
@@ -46,7 +68,7 @@ def history_facts(built, ttm=None):
     eps = _series(built, "eps_diluted")
     margins = []
     for (e, f) in fcf:
-        r = built["data"].get("revenue", {}).get(e)
+        r = net_revenue(built, e)
         if r:
             margins.append((e, f / r))
     roe = []

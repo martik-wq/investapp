@@ -86,7 +86,7 @@ def dupont(built, n=5):
     rows = []
     for e in _years(built)[-n:]:
         g = lambda k: _g(built, k, e)  # noqa: E731
-        ni, rev, ta, eq = g("net_income"), g("revenue"), g("total_assets"), g("equity")
+        ni, rev, ta, eq = g("net_income"), V.net_revenue(built, e), g("total_assets"), g("equity")
         if None in (ni, rev, ta, eq) or not rev or not ta or not eq or eq <= 0:
             continue
         rows.append({"end": e, "margin": ni / rev, "turnover": rev / ta, "leverage": ta / eq, "roe": ni / eq})
@@ -107,7 +107,7 @@ def roic(built, tax_default=0.21):
     ic = debt + eq - cash
     if ic <= 0:
         return None
-    pretax, tax = g("pretax"), g("income_tax")
+    pretax, tax = g("pretax"), g("tax")
     rate = tax_default
     if pretax and tax is not None and pretax > 0:
         rate = max(0.0, min(0.35, tax / pretax))
