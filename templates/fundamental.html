@@ -11,6 +11,8 @@
 {% if not fund %}
   <div class="warn">Pre túto firmu sa nepodarilo načítať ročné výkazy, preto sa modely nedajú spočítať.</div>
 {% else %}
+<div class="controls" style="margin-bottom:12px"><a href="{{ url_for('fundamental_xlsx', ticker=ticker, **request.args.to_dict()) }}"><button type="button">⬇ Stiahnuť analýzu do Excelu</button></a>
+  <span class="note">Excel obsahuje súhrn, kvalitu, modely so živými vzorcami (vstupy si môžeš meniť aj v Exceli) a porovnanie s konkurenciou.</span></div>
 <div class="warn">Oceňovacie modely stoja na predpokladoch. Pri každom vstupe nájdeš odporúčanie z histórie firmy a odhadov analytikov a vstup môžeš zmeniť. Výsledok je rozpätie hodnôt (pesimistický, základný a optimistický variant), nie jedna „správna“ cena a nie je to investičné odporúčanie.</div>
 {% for n in fund.notes %}<div class="warn">{{ n }}</div>{% endfor %}
 

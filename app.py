@@ -888,6 +888,22 @@ def export_xlsx(ticker):
                              f"attachment; filename={ctx['comp']['ticker']}_vykazy_{ctx['mode']}.xlsx"})
 
 
+@app.route("/company/<ticker>/fundamental.xlsx")
+def fundamental_xlsx(ticker):
+    try:
+        ctx = build_context(ticker.upper(), "fundamental")
+    except edgar.EdgarError as e:
+        return Response(str(e), status=400)
+    if not ctx.get("fund"):
+        return Response("Pre túto firmu sa nepodarilo načítať ročné výkazy.", status=400)
+    try:
+        data = excel.build_fundamental_workbook(ctx)
+    except ImportError:
+        return Response("Chýba knižnica openpyxl. Zatvor okno s aplikáciou a spusti ju znova cez spustit.bat.", status=500)
+    return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename={ctx['comp']['ticker']}_fundamentalna_analyza.xlsx"})
+
+
 @app.route("/company/<ticker>/officer")
 def officer_info(ticker):
     """Údaje o členovi vedenia pre okno po kliknutí na meno (JSON)."""

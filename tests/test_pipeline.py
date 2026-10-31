@@ -736,6 +736,14 @@ check("fundamentálna: karta Kvalita podniku a porovnanie s konkurenciou (ukáž
 check("fundamentálna: neexistujúci konkurent dá hlášku, nie pád",
       "nenašiel" in _appmod.app.test_client().get("/company/DEMOCO/fundamental?peers=NEEXISTUJE123").get_data(as_text=True))
 
+# --- Excel s fundamentálnou analýzou (živé vzorce v modeloch)
+_fx2 = _appmod.app.test_client().get("/company/DEMOCO/fundamental.xlsx?peers=DEMOBANK&d_g1=14")
+_fwb = _ox.load_workbook(_io.BytesIO(_fx2.data))
+check("excel fundamentálna: hárky a živé vzorce v DCF, P/B a P/E",
+      _fx2.status_code == 200 and _fwb.sheetnames == ["Súhrn", "Kvalita", "DCF", "Férové P-B", "Cieľové P-E", "Konkurencia"]
+      and str(_fwb["DCF"]["B35"].value).startswith("=B33/B34") and str(_fwb["Férové P-B"]["B9"].value).startswith("=(B4-B6)")
+      and abs(_fwb["DCF"]["B4"].value - 0.14) < 1e-9, (_fx2.status_code, _fwb.sheetnames))
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]
