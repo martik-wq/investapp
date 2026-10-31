@@ -1001,6 +1001,32 @@ check("Yahoo: výkazy a fundamentálna analýza sa zobrazia s upozornením na ne
 check("Yahoo: neznámy symbol zostane chybou", cl.get("/company/QQNEEXISTUJE").status_code == 400)
 edgar._get_json = _orig_gj
 
+# ---- SK hynix: firma v SEC bez výkazov (len F-1) -> Yahoo alebo jasná hláška
+_orig_fetch, _orig_gj2 = _yf.fetch, edgar._get_json
+_F1 = {"cik": "0002120882", "entityName": "SK hynix Inc.", "facts": {"ffd": {"NetFeeAmt": {"units": {"USD": []}}}}}
+edgar._get_json = lambda url, name: _F1 if name.startswith("facts_") else {"filings": {"recent": {}}, "sic": "3674"}
+_yf.fetch = lambda sym: None
+try:
+    edgar.load_company("SKHY", 2120882, "SK hynix Inc.")
+    _msg = ""
+except edgar.EdgarError as _ex:
+    _msg = str(_ex)
+check("SK hynix: firma bez výkazov v SEC dá jasnú hlášku s tipom na 000660.KS", "000660.KS" in _msg and "nepodarilo" not in _msg, _msg)
+_yf.fetch = lambda sym: _FAKE_YF
+_ck = edgar.load_company("SKHY", 2120882, "SK hynix Inc.")
+check("SK hynix: ak Yahoo výkazy má, použijú sa", _ck.get("source") == "yahoo" and _ck["currency"] == "EUR")
+_yf.fetch, edgar._get_json = _orig_fetch, _orig_gj2
+class _R:  # falošná odpoveď Yahoo search
+    def raise_for_status(self): pass
+    def json(self): return {"quotes": [{"symbol": "000660.KS", "quoteType": "EQUITY", "longname": "SK hynix Inc.", "exchDisp": "KSE"},
+                                         {"symbol": "SKHY", "quoteType": "EQUITY", "shortname": "SK hynix Inc.", "exchDisp": "NASDAQ"},
+                                         {"symbol": "XYZ=F", "quoteType": "FUTURE"}]}
+_orig_get = _yf.requests.get
+_yf.requests.get = lambda *a, **k: _R()
+_sr = _yf.search("SK hynix")
+_yf.requests.get = _orig_get
+check("Yahoo hľadanie podľa názvu: akcie áno, futures nie", [x[0] for x in _sr] == ["000660.KS", "SKHY"] and "KSE" in _sr[0][2], _sr)
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

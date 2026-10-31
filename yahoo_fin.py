@@ -150,3 +150,27 @@ def load(sym, title):
     if not raw:
         return None
     return to_facts(raw, title), _currency(raw)
+
+
+SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search?q={q}&quotesCount=8&newsCount=0"
+
+
+def search(query):
+    """Hľadanie podľa názvu na Yahoo: [(symbol, 'YF', 'názov · burza')]. Pri chybe prázdny zoznam."""
+    q = (query or "").strip()
+    if not q:
+        return []
+    try:
+        r = requests.get(SEARCH_URL.format(q=requests.utils.quote(q)), headers=HEADERS, timeout=10)
+        r.raise_for_status()
+        quotes = r.json().get("quotes") or []
+    except (requests.RequestException, ValueError, AttributeError):
+        return []
+    out = []
+    for x in quotes:
+        sym = str(x.get("symbol", "")).upper()
+        if x.get("quoteType") != "EQUITY" or not SYMBOL.match(sym):
+            continue
+        nm = x.get("longname") or x.get("shortname") or sym
+        out.append((sym, "YF", f"{nm} · {x.get('exchDisp') or x.get('exchange') or ''}".rstrip(" ·")))
+    return out

@@ -25,6 +25,7 @@ import quality
 import valuation
 import trends
 import updater
+import yahoo_fin
 import watchlist
 import statements
 from taxonomy import BUSINESS_TYPES
@@ -874,6 +875,8 @@ def search():
         return render_template("error.html", message=str(e), section=None), 400
     if match:
         return redirect(url_for("section_view", ticker=match[0], section="overview"))
+    seen = {c[0] for c in cands}
+    cands = list(cands) + [c for c in yahoo_fin.search(q) if c[0] not in seen]
     return render_template("search.html", q=q, cands=cands, section=None)
 
 

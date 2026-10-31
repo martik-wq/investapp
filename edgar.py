@@ -125,6 +125,20 @@ def load_company(ticker, cik, title):
             subs = _get_json(SUBS_URL.format(cik=cik), f"subs_{cik}.json")
         except EdgarError:
             subs = {}
+    if not any(k in (facts.get("facts") or {}) for k in ("us-gaap", "ifrs-full")):
+        # firma je v SEC, ale zatiaľ nemá výkazy (napr. nový ADR, ktorý podal len F-1): skús Yahoo, inak vysvetli
+        import yahoo_fin
+        got = yahoo_fin.load(ticker, facts.get("entityName") or title)
+        if not got:
+            raise EdgarError(f"SEC pre „{ticker}“ zatiaľ neeviduje finančné výkazy (firma podala len registráciu). "
+                             "Skús hlavnú domácu kótáciu so symbolom z Yahoo Finance, napr. 000660.KS pre SK hynix, "
+                             "alebo vyhľadaj podľa názvu.")
+        yf, cur = got
+        return {"filings": {}, "sec": {"exchanges": [], "website": None, "description": None, "place": "",
+                                       "fiscal_year_end": "", "category": None, "former": []},
+                "ticker": ticker, "cik": cik, "name": yf.get("entityName") or title, "facts": yf, "sic": None,
+                "sic_desc": "", "currency": cur, "shares_out": latest_shares_outstanding(yf), "is_demo": False,
+                "source": "yahoo"}
     sic = subs.get("sic")
     addr = (subs.get("addresses") or {}).get("business") or {}
     place = ", ".join(x for x in (addr.get("city"), addr.get("stateOrCountryDescription")

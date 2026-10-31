@@ -5,7 +5,7 @@
   {% if cands %}
   <ul>
     {% for t, cik, title in cands %}
-      <li><a href="{{ url_for('section_view', ticker=t, section='overview') }}"><strong>{{ t }}</strong></a> – {{ title }}</li>
+      <li><a href="{{ url_for('section_view', ticker=t, section='overview') }}"><strong>{{ t }}</strong></a> – {{ title }}{% if cik == 'YF' %} <span class="note">(Yahoo, neoficiálne výkazy)</span>{% endif %}</li>
     {% endfor %}
   </ul>
   {% else %}
