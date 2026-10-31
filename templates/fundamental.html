@@ -1,3 +1,167 @@
 {% extends "base.html" %}
 {% block title %}{{ ticker }} – Fundamentálna analýza · mkej{% endblock %}
-{% block content %}{% set title = 'Fundamentálna analýza' %}{% include "placeholder.html" %}{% endblock %}
+{% block content %}
+{% macro money(v) %}{{ ('{:,.2f}'.format(v)).replace(',', ' ').replace('.', ',') if v is not none else '–' }}{% endmacro %}
+{% macro upside(u) %}{% if u is none %}–{% else %}<span class="{{ 'up' if u >= 0 else 'down' }}">{{ '+' if u >= 0 else '−' }}{{ ('%.0f'|format(u|abs * 100)) }} %</span>{% endif %}{% endmacro %}
+{% macro pc(v, d=1) %}{{ (('%.' ~ d ~ 'f')|format(v * 100)).replace('.', ',') ~ ' %' if v is not none else '–' }}{% endmacro %}
+<div class="pagehead">
+  <h1>Fundamentálna analýza <span class="badge">{{ comp.ticker }}</span></h1>
+  <div class="sub">{{ comp.name }} · mena: {{ built.currency }} · typ biznisu: <strong>{{ result.type_label }}</strong>{% if comp.is_demo %} · <strong>fiktívne ukážkové dáta</strong>{% endif %}</div>
+</div>
+{% if not fund %}
+  <div class="warn">Pre túto firmu sa nepodarilo načítať ročné výkazy, preto sa modely nedajú spočítať.</div>
+{% else %}
+<div class="warn">Oceňovacie modely stoja na predpokladoch. Pri každom vstupe nájdeš odporúčanie z histórie firmy a odhadov analytikov a vstup môžeš zmeniť. Výsledok je rozpätie hodnôt (pesimistický, základný a optimistický variant), nie jedna „správna“ cena a nie je to investičné odporúčanie.</div>
+{% for n in fund.notes %}<div class="warn">{{ n }}</div>{% endfor %}
+
+<div class="card">
+  <div class="flowhead"><h2>Súhrn: rozpätie hodnoty na akciu</h2>
+    <div class="note">{% if fund.price %}Cena na trhu: <strong>{{ money(fund.price) }} {{ fund.currency }}</strong>{% else %}Cena akcie nie je k dispozícii{% endif %}</div></div>
+  {% if fund.summary %}
+  <div class="ff">
+    {% for s in fund.summary %}
+    <div class="ffrow"><div class="ffname">{{ s.name }}</div>
+      <div class="fftrack">
+        <div class="ffbar" style="left:{{ s.pl }}%;width:{{ s.pw }}%"></div>
+        <div class="ffmid" style="left:{{ s.pm }}%"></div>
+        {% if fund.price_pos is not none %}<div class="ffprice" style="left:{{ fund.price_pos }}%" title="Cena na trhu"></div>{% endif %}
+      </div>
+      <div class="ffval">{{ money(s.low) }} – {{ money(s.high) }} <span class="note">(základ {{ money(s.mid) }})</span></div></div>
+    {% endfor %}
+  </div>
+  <p class="note">Oranžový pruh = od pesimistického po optimistický variant, bodka = základný variant, zvislá čiara = cena na trhu.</p>
+  {% else %}<p class="note">Rozpätie sa zobrazí, keď sa aspoň jeden model dá spočítať.</p>{% endif %}
+</div>
+
+<form method="get" id="fundform">
+  <input type="hidden" name="m" id="fund-m" value="{{ fund.model }}">
+  {% for k, v in qs.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  {% if price %}<input type="hidden" name="price" value="{{ price }}">{% endif %}
+  <div class="gbar" style="margin-top:0">
+    <div class="gtabs" id="fund-tabs" role="tablist">
+      <button type="button" class="gtab" data-m="dcf">DCF (voľný cash flow)</button>
+      <button type="button" class="gtab" data-m="pb">Férové P/B {% if fund.is_fin %}(banky){% endif %}</button>
+      <button type="button" class="gtab" data-m="pe">Cieľové P/E</button>
+    </div>
+  </div>
+
+  {% macro fields(model, title, intro) %}
+  <div class="fmodel" data-m="{{ model }}">
+    <div class="card">
+      <h2>{{ title }}</h2>
+      <p class="note">{{ intro }}</p>
+      {% if model == 'dcf' and fund.is_fin %}<div class="warn">Pri bankách a poisťovniach DCF z voľného cash flow nedáva dobrý zmysel (cash flow banky je zmiešaný s klientskymi vkladmi). V súhrne sa nepoužíva, spoľahlivejší je model P/B.</div>{% endif %}
+      {% if model == 'pb' and not fund.is_fin %}<div class="warn">P/B model je určený hlavne pre banky a poisťovne. Pri bežných firmách (kde hodnotu tvoria skôr budúce zisky než účtovný majetok) vychádza zvyčajne ďaleko od trhu a v súhrne sa nepoužíva.</div>{% endif %}
+      <div class="finputs">
+      {% for f in fund[model].fields %}
+        <div class="finput">
+          <label for="{{ f.name }}">{{ f.label }}{% if f.help %}<span class="info" tabindex="0" data-tip="{{ f.help }}">ⓘ</span>{% endif %}</label>
+          <div class="fctl"><input id="{{ f.name }}" name="{{ f.name }}" inputmode="decimal" value="{{ (f.fmt.format(f.value)).replace('.', ',') if f.value is not none else '' }}"><span class="unit">{{ f.unit }}</span></div>
+          {% if f.rec is not none %}
+          <div class="frec">Odporúčame <strong>{{ (f.fmt.format(f.rec)).replace('.', ',') }}</strong>
+            <button type="button" class="linkbtn useit" data-target="{{ f.name }}" data-val="{{ f.fmt.format(f.rec) }}">použiť</button>
+            {% if f.changed %}<span class="note">(tvoja hodnota sa líši)</span>{% endif %}</div>
+          {% endif %}
+          {% if f.why %}<div class="note">{{ f.why }}</div>{% endif %}
+          {% for h in f.hints %}<div class="fhint">{{ h }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      </div>
+      <div class="controls"><button>Prepočítať</button>
+        <a href="{{ url_for('section_view', ticker=ticker, section='fundamental', m=model, **qs) }}"><button type="button" class="ghost">Vrátiť odporúčané hodnoty</button></a></div>
+    </div>
+  {% endmacro %}
+
+  {{ fields('dcf', 'DCF: diskontovaný voľný cash flow', 'Odhadne sa 10 rokov voľného cash flow (FCF), spolu s hodnotou po roku 10, a všetko sa prepočíta na dnešok diskontnou sadzbou. Od hodnoty firmy sa odpočíta čistý dlh a delí sa počtom akcií.') }}
+    {% set m = fund.dcf %}
+    <div class="card">
+      <h2>Výsledok DCF</h2>
+      {% if m.error %}<div class="warn">{{ m.error }}</div>{% else %}
+      <div class="fres"><div><span class="note">Hodnota na akciu (základný variant)</span><div class="bigprice">{{ money(m.base.per_share) }} <span class="cur">{{ fund.currency }}</span></div></div>
+        <div><span class="note">Oproti cene</span><div class="bigprice" style="font-size:30px">{{ upside((m.base.per_share / fund.price - 1) if fund.price else none) }}</div></div>
+        <div><span class="note">Hodnota po roku 10 tvorí</span><div class="bigprice" style="font-size:30px">{{ pc(m.base.tv_share, 0) }}</div><div class="note">z hodnoty firmy</div></div></div>
+      <div class="tablewrap"><table class="pf"><thead><tr><th>Variant</th><th>Rast tržieb</th><th>FCF marža (rok 5)</th><th>WACC</th><th>Hodnota na akciu</th><th>Oproti cene</th></tr></thead><tbody>
+        {% for s in m.scenarios %}<tr><td style="text-align:left"><strong>{{ s.name }}</strong></td><td>{{ pc(s.g1) }}</td><td>{{ pc(s.margin5) }}</td><td>{{ pc(s.wacc) }}</td><td><strong>{{ money(s.value) }}</strong></td><td>{{ upside(s.upside) }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      <h3>Citlivosť: hodnota na akciu podľa diskontnej sadzby a terminálneho rastu</h3>
+      <div class="tablewrap"><table class="pf sens"><thead><tr><th>WACC \ rast</th>{% for g in m.sens.gts %}<th>{{ pc(g) }}</th>{% endfor %}</tr></thead><tbody>
+        {% for w in m.sens.waccs %}{% set i = loop.index0 %}<tr><td><strong>{{ pc(w) }}</strong></td>{% for v in m.sens.grid[i] %}<td class="{{ 'sbase' if i == 2 and loop.index0 == 2 }}">{{ money(v) }}</td>{% endfor %}</tr>{% endfor %}
+      </tbody></table></div>
+      <details style="margin-top:10px"><summary>Ročné prognózy (v mil. {{ fund.currency }})</summary>
+        <div class="tablewrap"><table class="pf"><thead><tr><th>Rok</th><th>Rast</th><th>Tržby</th><th>FCF marža</th><th>FCF</th><th>Dnešná hodnota FCF</th></tr></thead><tbody>
+        {% for r in m.base.rows %}<tr><td>{{ r.t }}</td><td>{{ pc(r.growth) }}</td><td>{{ '{:,.0f}'.format(r.revenue / 1e6).replace(',', ' ') }}</td><td>{{ pc(r.margin) }}</td><td>{{ '{:,.0f}'.format(r.fcf / 1e6).replace(',', ' ') }}</td><td>{{ '{:,.0f}'.format(r.pv / 1e6).replace(',', ' ') }}</td></tr>{% endfor %}
+        </tbody></table></div></details>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ fields('pb', 'Férové P/B z návratnosti vlastného imania', 'Vhodné hlavne pre banky a poisťovne. Férové P/B = (ROE − rast) / (požadovaná návratnosť − rast). Hodnota = férové P/B × účtovná hodnota na akciu.') }}
+    {% set m = fund.pb %}
+    <div class="card">
+      <h2>Výsledok P/B modelu</h2>
+      {% if m.error %}<div class="warn">{{ m.error }}</div>{% else %}
+      <div class="fres"><div><span class="note">Férové P/B</span><div class="bigprice">{{ ('%.2f'|format(m.base.fair_pb)).replace('.', ',') }}×</div>{% if m.pb_now %}<div class="note">dnes {{ ('%.2f'|format(m.pb_now)).replace('.', ',') }}×</div>{% endif %}</div>
+        <div><span class="note">Hodnota na akciu</span><div class="bigprice">{{ money(m.base.value) }} <span class="cur">{{ fund.currency }}</span></div></div>
+        <div><span class="note">Oproti cene</span><div class="bigprice" style="font-size:30px">{{ upside(m.base.upside) }}</div></div></div>
+      <div class="tablewrap"><table class="pf"><thead><tr><th>Variant</th><th>ROE</th><th>Požadovaná návratnosť</th><th>Férové P/B</th><th>Hodnota na akciu</th><th>Oproti cene</th></tr></thead><tbody>
+        {% for s in m.scenarios %}<tr><td style="text-align:left"><strong>{{ s.name }}</strong></td><td>{{ pc(s.roe) }}</td><td>{{ pc(s.ke) }}</td><td>{{ ('%.2f'|format(s.fair_pb)).replace('.', ',') if s.fair_pb is not none else '–' }}×</td><td><strong>{{ money(s.value) }}</strong></td><td>{{ upside(s.upside) }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      <h3>Citlivosť: hodnota na akciu podľa ROE a požadovanej návratnosti</h3>
+      <div class="tablewrap"><table class="pf sens"><thead><tr><th>ROE \ návratnosť</th>{% for k in m.sens.kes %}<th>{{ pc(k) }}</th>{% endfor %}</tr></thead><tbody>
+        {% for r in m.sens.roes %}{% set i = loop.index0 %}<tr><td><strong>{{ pc(r) }}</strong></td>{% for v in m.sens.grid[i] %}<td class="{{ 'sbase' if i == 2 and loop.index0 == 2 }}">{{ money(v) }}</td>{% endfor %}</tr>{% endfor %}
+      </tbody></table></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ fields('pe', 'Cieľové P/E', 'Najjednoduchší model: zisk na akciu o rok × férové P/E, diskontovaný na dnešok. Dáva zmysel len pri firmách so ziskom.') }}
+    {% set m = fund.pe %}
+    <div class="card">
+      <h2>Výsledok P/E modelu</h2>
+      {% if m.error %}<div class="warn">{{ m.error }}</div>{% else %}
+      <div class="fres"><div><span class="note">EPS o rok</span><div class="bigprice">{{ money(m.base.eps1) }}</div></div>
+        <div><span class="note">Hodnota na akciu dnes</span><div class="bigprice">{{ money(m.base.value) }} <span class="cur">{{ fund.currency }}</span></div></div>
+        <div><span class="note">Oproti cene</span><div class="bigprice" style="font-size:30px">{{ upside(m.base.upside) }}</div></div></div>
+      <div class="tablewrap"><table class="pf"><thead><tr><th>Variant</th><th>Rast EPS</th><th>Cieľové P/E</th><th>Hodnota na akciu</th><th>Oproti cene</th></tr></thead><tbody>
+        {% for s in m.scenarios %}<tr><td style="text-align:left"><strong>{{ s.name }}</strong></td><td>{{ pc(s.g_eps) }}</td><td>{{ ('%.1f'|format(s.pe)).replace('.', ',') }}×</td><td><strong>{{ money(s.value) }}</strong></td><td>{{ upside(s.upside) }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+{% if fund.analyst and (fund.analyst.target_mean or fund.analyst.recommendation) %}
+<div class="card">
+  <h2>Čo hovoria analytici</h2>
+  <div class="kpis kpis-big">
+    {% if fund.analyst.target_mean %}<div class="kpi"><div class="l">Cieľová cena (priemer)</div><div class="v">{{ money(fund.analyst.target_mean) }}</div></div>{% endif %}
+    {% if fund.analyst.target_low and fund.analyst.target_high %}<div class="kpi"><div class="l">Rozpätie cieľových cien</div><div class="v" style="font-size:20px">{{ money(fund.analyst.target_low) }} – {{ money(fund.analyst.target_high) }}</div></div>{% endif %}
+    {% if fund.analyst.recommendation %}<div class="kpi"><div class="l">Odporúčanie</div><div class="v" style="font-size:20px">{{ fund.analyst.recommendation|replace('_', ' ') }}</div></div>{% endif %}
+    {% if fund.analyst.n_analysts %}<div class="kpi"><div class="l">Počet analytikov</div><div class="v">{{ fund.analyst.n_analysts|int }}</div></div>{% endif %}
+  </div>
+  <p class="note">Zdroj: Yahoo Finance (neoficiálne). Odhady analytikov bývajú optimistické a menia sa, ber ich ako jeden z podkladov, nie ako pravdu.</p>
+</div>
+{% endif %}
+<p class="note">Postup: DCF z voľného cash flow (FCF = prevádzkový cash flow − CapEx), diskontná sadzba z CAPM (bezriziková sadzba z 10-ročných amerických dlhopisov, beta z Yahoo, prémia za riziko 5 %), terminálny rast do 6 %. Všetky vstupy sú upraviteľné.</p>
+<script>
+(function () {
+  var form = document.getElementById('fundform'), mIn = document.getElementById('fund-m');
+  var tabs = document.querySelectorAll('#fund-tabs .gtab'), panes = document.querySelectorAll('.fmodel');
+  function show(m) {
+    mIn.value = m;
+    tabs.forEach(function (t) { t.classList.toggle('on', t.dataset.m === m); });
+    panes.forEach(function (p) { p.style.display = p.dataset.m === m ? '' : 'none'; });
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.m); }); });
+  show(mIn.value || 'dcf');
+  document.querySelectorAll('.useit').forEach(function (b) {
+    b.addEventListener('click', function () { document.getElementById(b.dataset.target).value = b.dataset.val.replace('.', ','); form.submit(); });
+  });
+  var timer;
+  form.querySelectorAll('.finput input').forEach(function (i) {
+    i.addEventListener('change', function () { clearTimeout(timer); timer = setTimeout(function () { form.submit(); }, 300); });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -241,7 +241,7 @@ def build_context(ticker, section):
            "typ": p["typ"], "price": p["price_raw"], "years": p["years"], "detail": p["detail"],
            "years_options": YEARS_OPTIONS, "types": BUSINESS_TYPES, "sections": SECTIONS,
            "qs": _qs(p), "today": date.today()}
-    if section in ("fundamental", "technical"):
+    if section == "technical":
         return ctx
 
     comp = edgar.load_company(*match)
@@ -273,6 +273,8 @@ def build_context(ticker, section):
                 ctx["det"] = filings.get_detailed(comp, p["mode"], p["years"])
             except edgar.EdgarError as e:
                 ctx["det_error"] = str(e)
+    elif section == "fundamental":
+        ctx["fund"] = _fundamental(comp, match[0], btype, price, quote, is_demo)
     elif section == "charts":
         ctx["trend"] = trends.build_trends(comp, btype, p["mode"], min(p["years"], 20))
         opts = _flow_options(built, p["mode"])
@@ -292,6 +294,52 @@ def build_context(ticker, section):
                        "quarterly": url_for("section_view", ticker=match[0], section="charts",
                                             **dict(base, mode="quarterly"))})
     return ctx
+
+
+
+DEMO_ANALYST = {"rev_growth": {"0y": 0.12, "+1y": 0.10}, "eps_growth": {"0y": 0.13, "+1y": 0.11}, "n_analysts": 12,
+                "target_mean": 55.0, "target_low": 42.0, "target_high": 68.0, "recommendation": "buy", "beta": 1.1,
+                "growth_5y": 0.12}
+
+
+def _fundamental(comp, ticker, btype, price, quote, is_demo):
+    """Údaje pre záložku Fundamentálna analýza (ročné výkazy, TTM, odhady analytikov, vstupy modelov)."""
+    import fundamental
+    import valuation
+    try:
+        annual = statements.build(comp, "annual", 10)
+    except edgar.EdgarError:
+        annual = None
+    if annual is None:
+        return None
+    ttm = None
+    try:
+        q = statements.build(comp, "quarterly", 7)
+        tt = trends._ttm_data(q, 1)
+        if tt:
+            disp, data = tt
+            e = disp[-1]
+            ttm = {"revenue": data["revenue"].get(e), "fcf": data.get("fcf", {}).get(e),
+                   "net_income": data.get("net_income", {}).get(e), "eps": data.get("eps_diluted", {}).get(e)}
+            if not ttm["revenue"]:
+                ttm = None
+    except edgar.EdgarError:
+        ttm = None
+    facts = valuation.history_facts(annual, ttm)
+    analyst = DEMO_ANALYST if is_demo else prices.get_analyst(ticker)
+    profile = DEMO_PROFILES.get(ticker) if is_demo else prices.get_profile(ticker)
+    beta = (analyst or {}).get("beta") or (profile or {}).get("beta")
+    rf = None if is_demo else prices.get_risk_free()
+    shares = comp.get("shares_out")
+    mcap = (profile or {}).get("market_cap") or ((price * shares) if price and shares else None)
+    note = None
+    if quote and quote.get("mismatch"):
+        note = "Cena akcie je v inej mene ako výkazy, preto sa výsledok neporovnáva s trhom."
+        price = None
+    view = fundamental.build_view(request.args, facts, analyst, price, annual["currency"], btype, beta, rf, mcap,
+                                  shares, note)
+    view["profile"] = profile
+    return view
 
 
 # ------------------------------------------------------------------ portfólio

@@ -296,3 +296,72 @@ def get_officer_bio(name, company, ticker=""):
         return None   # chyba siete sa neukladá, aby sa to skúsilo znova
     _store(f"bio_{key}.json", {"bio": bio})
     return bio
+
+
+# ------------------------------------------------------------ odhady analytikov (Yahoo)
+ANALYST_URL = ("https://query1.finance.yahoo.com/v10/finance/quoteSummary/{sym}"
+               "?modules=earningsTrend,financialData,defaultKeyStatistics&crumb={crumb}")
+
+
+def parse_analyst(res):
+    """Z odpovede quoteSummary vytiahne odhady rastu a cieľové ceny (hodnoty môžu chýbať)."""
+    out = {"rev_growth": {}, "eps_growth": {}, "n_analysts": None, "target_mean": None, "target_low": None,
+           "target_high": None, "recommendation": None, "beta": None, "growth_5y": None}
+    for t in ((res.get("earningsTrend") or {}).get("trend") or []):
+        per = t.get("period")
+        if not per:
+            continue
+        rev = t.get("revenueEstimate") or {}
+        eps = t.get("earningsEstimate") or {}
+        g = _raw(rev, "growth")
+        if g is not None:
+            out["rev_growth"][per] = g
+            n = _raw(rev, "numberOfAnalysts")
+            if n and (out["n_analysts"] is None or n > out["n_analysts"]):
+                out["n_analysts"] = n
+        e = _raw(eps, "growth")
+        if e is not None:
+            out["eps_growth"][per] = e
+        if per == "+5y":
+            out["growth_5y"] = _raw(t, "growth")
+    fd = res.get("financialData") or {}
+    out["target_mean"] = _raw(fd, "targetMeanPrice")
+    out["target_low"] = _raw(fd, "targetLowPrice")
+    out["target_high"] = _raw(fd, "targetHighPrice")
+    out["recommendation"] = fd.get("recommendationKey")
+    n = _raw(fd, "numberOfAnalystOpinions")
+    if n:
+        out["n_analysts"] = out["n_analysts"] or n
+    out["beta"] = _raw(res.get("defaultKeyStatistics") or {}, "beta")
+    return out
+
+
+def get_analyst(ticker):
+    """Odhady analytikov z Yahoo Finance alebo None (neoficiálny zdroj, môže chýbať)."""
+    sym = _sym(ticker)
+    hit = _cached(f"analyst_{sym}.json", PROFILE_TTL)
+    if hit:
+        return hit
+    try:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        s.get("https://fc.yahoo.com", timeout=10)
+        crumb = s.get(CRUMB_URL, timeout=10)
+        crumb.raise_for_status()
+        r = s.get(ANALYST_URL.format(sym=sym, crumb=crumb.text.strip()), timeout=10)
+        r.raise_for_status()
+        res = r.json()["quoteSummary"]["result"][0]
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None
+    out = parse_analyst(res)
+    _store(f"analyst_{sym}.json", out)
+    return out
+
+
+def get_risk_free():
+    """Výnos 10-ročných amerických dlhopisov (^TNX) v desatinách (0.042 = 4,2 %) alebo None."""
+    q = get_price("^TNX")
+    if q and q.get("price"):
+        v = q["price"] / 100.0
+        return v if 0 < v < 0.2 else None
+    return None

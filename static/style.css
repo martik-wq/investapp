@@ -371,3 +371,25 @@ button.person strong{display:block}
 .cagrl{font-size:12px;color:var(--mute)}
 .cagrv{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
 .cagrv.up{color:var(--pos)}.cagrv.down{color:var(--neg)}
+
+/* ---- fundamentálna analýza ---- */
+.finputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px 20px;margin:10px 0 14px}
+.finput label{font-weight:650;font-size:14px;display:block;margin-bottom:5px}
+.fctl{display:flex;align-items:center;gap:8px}
+.fctl input{width:130px;font-weight:600;font-variant-numeric:tabular-nums}
+.unit{font-size:13px;color:var(--mute)}
+.frec{font-size:13px;margin-top:5px;color:var(--acc2)}
+.fhint{font-size:12.5px;color:#7a6a5a;margin-top:3px;padding-left:10px;border-left:2px solid #f0d9c4}
+.fres{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin:6px 0 14px}
+table.sens td{text-align:right;font-variant-numeric:tabular-nums}
+table.sens td.sbase{background:var(--tint);font-weight:700}
+.ff{display:flex;flex-direction:column;gap:12px;margin:10px 0}
+.ffrow{display:grid;grid-template-columns:120px 1fr 270px;gap:14px;align-items:center;font-size:14px}
+.fftrack{position:relative;height:18px;background:#fbf1e7;border-radius:9px}
+.ffbar{position:absolute;top:0;height:18px;border-radius:9px;background:linear-gradient(90deg,#e0a96f,var(--acc))}
+.ffmid{position:absolute;top:3px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--acc2);margin-left:-6px}
+.ffprice{position:absolute;top:-5px;width:3px;height:28px;background:var(--ink);border-radius:2px;margin-left:-1px}
+.ffval{font-variant-numeric:tabular-nums}
+@media(max-width:800px){.ffrow{grid-template-columns:1fr}}
+
+#fund-tabs .gtab.on{background:var(--acc);color:#fff}

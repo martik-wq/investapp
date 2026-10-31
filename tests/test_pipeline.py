@@ -694,6 +694,23 @@ check("portfólio: záložka Import a súbory (nahrávanie, zoznam súborov, zma
 _fc.post("/portfolio/clear")
 check("portfólio: bez údajov presmeruje záložku súborov na úvodné nahrávanie", _fc.get("/portfolio/files").status_code == 302)
 
+# --- oceňovacie modely: overenie voči uzavretému tvaru
+import valuation as _va  # noqa: E402
+_w, _g, _mg, _r0 = 0.09, 0.03, 0.2, 1000.0
+_d = _va.dcf(_r0, _g, _mg, _mg, _w, _g, 0.0, 100.0, 0.0)   # rast = terminálny rast, marža konštantná
+_ratio = (1 + _g) / (1 + _w)
+_pv = _r0 * _mg * sum(_ratio ** t for t in range(1, 11))
+_tv = _r0 * _mg * (1 + _g) ** 10 * (1 + _g) / (_w - _g) / (1 + _w) ** 10
+check("DCF: zhoda s uzavretým tvarom (rast = terminálny rast)", abs(_d["ev"] - (_pv + _tv)) < 1e-6 * _d["ev"], (_d["ev"], _pv + _tv))
+check("DCF: čistý dlh a riedenie znižujú hodnotu na akciu",
+      _va.dcf(_r0, 0.1, 0.1, 0.15, 0.09, 0.025, 200, 100, 0.02)["per_share"] < _va.dcf(_r0, 0.1, 0.1, 0.15, 0.09, 0.025, 0, 100, 0)["per_share"])
+check("DCF: pesimistický < základný < optimistický",
+      (lambda s: s[0]["value"] < s[1]["value"] < s[2]["value"])(_va.dcf_scenarios(dict(rev0=1000, g1=0.1, margin0=0.15, margin5=0.2, wacc=0.09, g_term=0.025, net_debt=0, shares=100, dilution=0))))
+check("férové P/B: (ROE − g)/(ke − g) = (0,12 − 0,03)/(0,10 − 0,03)", abs(_va.fair_pb(0.12, 0.10, 0.03) - 9 / 7) < 1e-12)
+check("P/E model: EPS 2 × 1,10 × P/E 18 / 1,09", abs(_va.multiple_model(2.0, 0.10, 18, 0.09)["value"] - 2.2 * 18 / 1.09) < 1e-9)
+check("odporúčaný rast: priemer analytikov a 5-ročného CAGR",
+      abs(_va.recommend_growth({"rev_cagr5": 0.30}, {"rev_growth": {"+1y": 0.20}})[0] - 0.25) < 1e-12)
+
 # --- regresia (reálne dáta): predaj všetkého s drobným rozdielom suma vs. cena × kusy + malý nákup v ten istý deň
 _d0 = date(2024, 3, 4)
 _days = [_d0 + timedelta(days=i) for i in range(8)]
@@ -811,7 +828,16 @@ check("výkonnosť: záložky Prehľad a Výkonnosť", "Výkonnosť a porovnanie
 r = cl.post("/portfolio/clear", follow_redirects=True)
 check("portfólio: zmazanie cez stránku", "Nahraj export" in r.get_data(as_text=True))
 check("bočný panel: odkaz na Portfólio", "Portfólio" in cl.get("/").get_data(as_text=True))
-check("fundamentálna je prázdna", "zatiaľ prázdna" in cl.get("/company/DEMOCO/fundamental").get_data(as_text=True))
+_fu = cl.get("/company/DEMOCO/fundamental")
+_fh2 = _fu.get_data(as_text=True)
+check("fundamentálna: modely DCF, P/B a P/E s odporúčanými vstupmi a súhrnom",
+      _fu.status_code == 200 and "DCF" in _fh2 and "Odporúčame" in _fh2 and "Férové P/B" in _fh2
+      and "Cieľové P/E" in _fh2 and "Súhrn: rozpätie hodnoty" in _fh2, _fu.status_code)
+_fu2 = cl.get("/company/DEMOCO/fundamental?m=dcf&d_g1=20&d_wacc=9&d_gt=3").get_data(as_text=True)
+check("fundamentálna: vlastné vstupy sa prenesú do formulára a poznačí sa odchýlka od odporúčania",
+      'name="d_g1"' in _fu2 and 'value="20,0"' in _fu2 and "tvoja hodnota sa líši" in _fu2)
+check("fundamentálna: nezmyselné vstupy (WACC ≤ terminálny rast) dajú hlášku, nie pád",
+      "Diskontná sadzba musí byť" in cl.get("/company/DEMOCO/fundamental?d_wacc=3&d_gt=3").get_data(as_text=True))
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
