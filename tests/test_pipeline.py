@@ -968,6 +968,39 @@ check("moat: syntetická firma s ROIC ~30 % a 60 % maržou dostane silné hodnot
 _syn["data"]["revenue"]["Y3"] = 60
 check("moat: prepad tržieb o viac než 5 % zníži hodnotenie stability", {i["name"]: i for i in _moat.indicators(_syn, 0.09)}["Stabilita tržieb"]["score"] == 0)
 
+# ---- firmy mimo SEC (Yahoo)
+import yahoo_fin as _yf  # noqa: E402
+_yf.CACHE_DIR = tempfile.mkdtemp()
+def _yrows(vals, cur="EUR"):
+    return [{"asOfDate": f"{2021 + i}-12-31", "currencyCode": cur, "raw": v} for i, v in enumerate(vals)]
+_FAKE_YF = {"TotalRevenue": _yrows([100e9, 110e9, 120e9, 126e9, 140e9]), "CostOfRevenue": _yrows([80e9, 87e9, 94e9, 99e9, 108e9]),
+            "GrossProfit": _yrows([20e9, 23e9, 26e9, 27e9, 32e9]), "OperatingIncome": _yrows([10e9, 12e9, 14e9, 13e9, 18e9]),
+            "NetIncomeCommonStockholders": _yrows([7e9, 8e9, 10e9, 9e9, 13e9]), "DilutedEPS": _yrows([7.0, 8.0, 10.0, 9.0, 13.0]),
+            "OperatingCashFlow": _yrows([12e9, 13e9, 15e9, 14e9, 19e9]), "CapitalExpenditure": _yrows([-5e9, -5e9, -6e9, -6e9, -7e9]),
+            "CashDividendsPaid": _yrows([-2e9, -2e9, -3e9, -3e9, -4e9]), "TotalAssets": _yrows([150e9, 155e9, 160e9, 170e9, 175e9]),
+            "StockholdersEquity": _yrows([60e9, 64e9, 70e9, 74e9, 80e9]), "OrdinarySharesNumber": _yrows([1e9] * 5, "EUR")}
+_yf.fetch = lambda sym: _FAKE_YF if sym.upper() == "ZZEU" else None
+_orig_gj = edgar._get_json
+edgar._get_json = lambda url, name: {"0": {"ticker": "AAPL", "cik_str": 320193, "title": "Apple Inc."}}   # bez internetu
+_m, _c = edgar.find_company("ZZEU")
+check("Yahoo: firma mimo SEC sa nájde cez záložný zdroj", _m and _m[0] == "ZZEU" and _m[1] == "YF", _m)
+_co = edgar.load_company(*_m)
+_bb = statements.build(_co, "annual", 8)
+_e = _bb["display"][-1]
+check("Yahoo: výkazy majú správne hodnoty, mena a počet akcií",
+      _co["currency"] == "EUR" and _bb["data"]["revenue"][_e] == 140e9 and _bb["data"]["net_income"][_e] == 13e9
+      and _bb["data"]["capex"][_e] == 7e9 and _bb["data"]["div_paid"][_e] == 4e9 and _co["shares_out"] == 1e9, (_co["currency"], _co["shares_out"]))
+check("Yahoo: odvodené riadky (FCF = CFO − CapEx)", _bb["data"]["fcf"][_e] == 12e9 and len(_bb["display"]) == 5, _bb["data"].get("fcf"))
+_orig_q2 = _appmod.prices.get_price
+_appmod.prices.get_price = lambda t: {"price": 90.0, "currency": "EUR", "name": "Zed AG", "change_pct": 0.0, "high52": 100, "low52": 70}
+_ch = cl.get("/company/ZZEU/statements"); _fh = cl.get("/company/ZZEU/fundamental")
+_appmod.prices.get_price = _orig_q2
+check("Yahoo: výkazy a fundamentálna analýza sa zobrazia s upozornením na neoficiálne údaje",
+      _ch.status_code == 200 and _fh.status_code == 200 and "Neoficiálne údaje" in _ch.get_data(as_text=True)
+      and "Neoficiálne údaje" in _fh.get_data(as_text=True), (_ch.status_code, _fh.status_code))
+check("Yahoo: neznámy symbol zostane chybou", cl.get("/company/QQNEEXISTUJE").status_code == 400)
+edgar._get_json = _orig_gj
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

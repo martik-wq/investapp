@@ -95,11 +95,27 @@ def find_company(query):
             return (t, cik, title), []
     ql = query.strip().lower()
     cands = [r for r in rows if ql in r[2].lower()][:12]
+    if not cands:
+        import yahoo_fin   # firma mimo SEC: neoficiálne výkazy z Yahoo
+        hit = yahoo_fin.lookup(q)
+        if hit:
+            return hit, []
     return None, cands
 
 
 # ------------------------------------------------------------------ načítanie firmy
 def load_company(ticker, cik, title):
+    if cik == "YF":
+        import yahoo_fin
+        got = yahoo_fin.load(ticker, title)
+        if not got:
+            raise EdgarError(f"Pre „{ticker}“ sa nepodarilo načítať výkazy z Yahoo Finance.")
+        facts, cur = got
+        return {"filings": {}, "sec": {"exchanges": [], "website": None, "description": None, "place": "",
+                                       "fiscal_year_end": "", "category": None, "former": []},
+                "ticker": ticker, "cik": cik, "name": facts.get("entityName") or title, "facts": facts,
+                "sic": None, "sic_desc": "", "currency": cur, "shares_out": latest_shares_outstanding(facts),
+                "is_demo": False, "source": "yahoo"}
     if ticker in DEMO_TICKERS:
         facts = _load_demo(ticker, "facts")
         subs = _load_demo(ticker, "subs")

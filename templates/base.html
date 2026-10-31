@@ -37,7 +37,7 @@
     <div class="note" id="updMsg"></div>
   </div>
 </aside>
-<main class="content">{% block content %}{% endblock %}</main>
+<main class="content">{% if comp and comp.source == 'yahoo' %}<div class="warn"><strong>Neoficiálne údaje.</strong> Táto firma nie je v SEC, výkazy sú z Yahoo Finance (zvyčajne 4 až 5 rokov, bez kvartálov a podúčtov). Hodnoty skontroluj s ročnou správou firmy. Rast za 5 rokov a niektoré modely môžu chýbať.</div>{% endif %}{% block content %}{% endblock %}</main>
 </div>
 <script>
 (function(){
