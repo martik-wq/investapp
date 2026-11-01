@@ -913,6 +913,16 @@ def _earnings(comp, ticker):
         out["transcript"], out["transcript_src"] = saved, "vložený ručne"
     if out["transcript"]:
         out["tpoints"] = earnings.key_points(out["transcript"], per_cat=5)
+    if request.args.get("ir"):
+        site = comp["sec"].get("website")
+        if not site:
+            try:
+                site = (prices.get_profile(ticker) or {}).get("website")
+            except Exception:  # noqa: BLE001
+                site = None
+        out["ir"] = {"site": site, "links": [], "used": []}
+        if site:
+            out["ir"]["links"], out["ir"]["used"] = earnings.find_ir_transcripts(site)
     q = quote(f"{comp['name']} earnings call transcript")
     out["links"] = [("Hľadať prepis (Google)", f"https://www.google.com/search?q={q}"),
                     ("Stránka pre investorov", f"https://www.google.com/search?q={quote(comp['name'] + ' investor relations earnings')}")]
@@ -925,6 +935,13 @@ def earnings_transcript(ticker):
     t = ticker.upper()
     key = re.sub(r"[^A-Za-z0-9_.-]", "", request.form.get("key", ""))[:30] or "latest"
     text = request.form.get("text", "")
+    url = request.form.get("url", "").strip()
+    if url:
+        text, err = earnings.fetch_transcript_url(url)
+        if err:
+            flash(err, "warn")
+            return redirect(url_for("section_view", ticker=t, section="earnings",
+                                    **({"acc": request.form["acc"]} if request.form.get("acc") else {"key": key})))
     f = request.files.get("file")
     if f and f.filename:
         text = f.read(earnings.MAX_PASTE * 4).decode("utf-8", errors="ignore")

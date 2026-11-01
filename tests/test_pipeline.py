@@ -1089,6 +1089,25 @@ _er.list_releases, _er.get_release = _orig_lr, _orig_gr
 _fl.fetch_text = _orig_ft
 check("earnings: menu obsahuje sekciu", "Výsledky a call" in cl.get("/company/DEMOCO/statements").get_data(as_text=True))
 
+# ---- hľadanie prepisu na stránke pre investorov
+check("IR: adresy stránky pre investorov z webu firmy", "https://investor.apple.com" in _er.ir_start_urls("https://www.apple.com")
+      and "https://www.apple.com/investors" in _er.ir_start_urls("https://www.apple.com"))
+check("IR: vnútorné a lokálne adresy sa odmietnu (ochrana pred SSRF)", not _er.safe_url("http://127.0.0.1:8000/x") and not _er.safe_url("http://localhost/") and not _er.safe_url("file:///etc/passwd") and not _er.safe_url("http://192.168.1.1/"))
+_ir_html = {"https://investor.fake.com": '<a href="/events">Events and Earnings</a>',
+            "https://investor.fake.com/events": '<a href="/t/q3.pdf">Q3 2026 Earnings Call Transcript</a><a href="/slides.pdf">Slides</a><a href="/t/q2">Q2 earnings transcript</a>'}
+class _Rsp:
+    def __init__(self, u, t): self.url, self.text, self.status_code, self.headers, self.content = u, t, 200, {"content-type": "text/html"}, b""
+_orig_g = _er._get
+_er._get = lambda url, timeout=8: _Rsp(url, _ir_html[url]) if url in _ir_html else None
+_lk, _us = _er.find_ir_transcripts("https://www.fake.com")
+_er._get = _orig_g
+check("IR: nájde odkazy s „transcript“ aj cez podstránku Events a vynechá prezentáciu",
+      [l["url"] for l in _lk] == ["https://investor.fake.com/t/q3.pdf", "https://investor.fake.com/t/q2"] and len(_us) == 2, (_lk, _us))
+_er._get = lambda url, timeout=8: _Rsp(url, "<p>krátky text</p>")
+_tx, _err = _er.fetch_transcript_url("https://investor.fake.com/t/q2")
+_er._get = _orig_g
+check("IR: príliš krátka stránka sa nevezme ako prepis", _tx is None and "dostatočne dlhý" in _err)
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

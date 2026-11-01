@@ -55,6 +55,20 @@
     {% endif %}
   {% else %}
     <p>Prepis callu sa automaticky nenašiel. Väčšina firiem ho do SEC nepodáva a úplné prepisy sú na platených stránkach, ktoré appka nesťahuje. Vlož ho sem (nezdieľa sa, ostáva len u teba), appka z neho vyberie kľúčové body.</p>
+    <p><a class="btnlink" href="{{ url_for('section_view', ticker=ticker, section='earnings', acc=(e.cur.acc if e.cur else None), key=e.key, ir=1) }}#call">🔍 Hľadať prepis na stránke firmy pre investorov</a></p>
+    {% if e.ir %}
+      {% if not e.ir.site %}<p class="note">Webovú stránku firmy sa nepodarilo zistiť.</p>
+      {% elif e.ir.links %}
+        <p class="note">Nájdené odkazy so slovom „transcript“ na stránkach firmy ({{ e.ir.used|length }} prehľadaných). Vyber ten, ktorý patrí k tomuto obdobiu:</p>
+        <ul>{% for l in e.ir.links %}<li>
+          <a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.title }}</a>
+          <form action="{{ url_for('earnings_transcript', ticker=ticker) }}" method="post" style="display:inline">
+            <input type="hidden" name="key" value="{{ e.key }}"><input type="hidden" name="acc" value="{{ e.cur.acc if e.cur else '' }}"><input type="hidden" name="url" value="{{ l.url }}">
+            <button type="submit">Načítať ako prepis</button></form></li>{% endfor %}</ul>
+      {% else %}
+        <p class="note">Na stránke pre investorov ({{ e.ir.site }}) som nenašiel odkaz na prepis. Mnohé firmy zverejňujú len audio alebo prezentáciu, prípadne sa stránka načítava cez JavaScript, ktorý appka nevidí.</p>
+      {% endif %}
+    {% endif %}
     <p>{% for lbl, url in e.links %}<a href="{{ url }}" target="_blank" rel="noopener">{{ lbl }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
   {% endif %}
   {% if not e.transcript or e.transcript_src == 'vložený ručne' %}

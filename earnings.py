@@ -214,3 +214,142 @@ def delete_transcript(ticker, key):
         return True
     except OSError:
         return False
+
+
+# ------------------------------------------------------------------ hľadanie na stránke pre investorov (IR)
+import ipaddress  # noqa: E402
+import socket  # noqa: E402
+from urllib.parse import urljoin, urlparse  # noqa: E402
+
+import requests  # noqa: E402
+
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
+IR_PATHS = ("", "/investors", "/investor-relations", "/investor", "/ir", "/investors/earnings", "/earnings")
+_NEXT = re.compile(r"(earnings|quarterly[- ]results|financial[- ]results|results|events|webcast|presentations)", re.I)
+
+
+class _Links(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links, self._href, self._txt = [], None, []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            self._href = dict(attrs).get("href")
+            self._txt = []
+
+    def handle_data(self, data):
+        if self._href is not None:
+            self._txt.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._href is not None:
+            self.links.append((re.sub(r"\s+", " ", "".join(self._txt)).strip(), self._href))
+            self._href = None
+
+
+def safe_url(url):
+    """Len http(s) adresy na verejný internet (ochrana pred zneužitím formulára na prístup do vnútornej siete)."""
+    try:
+        u = urlparse(url)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            return False
+        for info in socket.getaddrinfo(u.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _get(url, timeout=8):
+    if not safe_url(url):
+        return None
+    try:
+        r = requests.get(url, headers=_UA, timeout=timeout, allow_redirects=True)
+        if r.status_code != 200 or not safe_url(r.url):
+            return None
+        return r
+    except requests.RequestException:
+        return None
+
+
+def ir_start_urls(website):
+    """Možné adresy stránky pre investorov z webu firmy (napr. https://www.apple.com -> investor.apple.com...)."""
+    if not website:
+        return []
+    if not re.match(r"https?://", website):
+        website = "https://" + website
+    host = urlparse(website).hostname or ""
+    base = re.sub(r"^(www|www2|corporate|about)\.", "", host)
+    roots = [f"https://investor.{base}", f"https://investors.{base}", f"https://ir.{base}", f"https://{host}"]
+    out = []
+    for r in roots:
+        for p in IR_PATHS:
+            if (r.startswith(f"https://{host}") or p == "") and r + p not in out:
+                out.append(r + p)
+    return out[:10]
+
+
+def _scan(url, html):
+    p = _Links()
+    try:
+        p.feed(html)
+    except Exception:  # noqa: BLE001
+        pass
+    found, nxt = [], []
+    for txt, href in p.links:
+        if not href or href.startswith(("#", "javascript:", "mailto:")):
+            continue
+        full = urljoin(url, href)
+        if re.search(r"transcript", txt + " " + href, re.I):
+            found.append({"title": (txt or full)[:140], "url": full})
+        elif _NEXT.search(txt) and urlparse(full).hostname == urlparse(url).hostname:
+            nxt.append(full)
+    return found, nxt
+
+
+def find_ir_transcripts(website, max_fetch=8):
+    """Preskúma stránku pre investorov a nájde odkazy so slovom „transcript“. Vráti (odkazy, použité stránky)."""
+    seen, found, used, queue, fetched = set(), [], [], ir_start_urls(website), 0
+    while queue and fetched < max_fetch:
+        url = queue.pop(0)
+        if url in seen:
+            continue
+        seen.add(url)
+        r = _get(url)
+        fetched += 1
+        if not r or "html" not in r.headers.get("content-type", ""):
+            continue
+        used.append(r.url)
+        f, nxt = _scan(r.url, r.text)
+        found += [x for x in f if x["url"] not in {y["url"] for y in found}]
+        if not found:
+            queue = [u for u in nxt[:3] if u not in seen] + queue
+        elif len(found) >= 6:
+            break
+    return found[:15], used
+
+
+def fetch_transcript_url(url):
+    """Stiahne prepis z odkazu (HTML alebo PDF). Vráti (text, chyba)."""
+    r = _get(url, timeout=20)
+    if not r:
+        return None, "Odkaz sa nepodarilo otvoriť (stránka nie je dostupná alebo adresa nie je verejná)."
+    ctype = r.headers.get("content-type", "")
+    if "pdf" in ctype or url.lower().split("?")[0].endswith(".pdf"):
+        try:
+            import io
+
+            from pypdf import PdfReader
+            text = "\n".join((pg.extract_text() or "") for pg in PdfReader(io.BytesIO(r.content)).pages)
+        except ImportError:
+            return None, "Na čítanie PDF chýba knižnica pypdf (spusti: pip install pypdf), alebo vlož text ručne."
+        except Exception as e:  # noqa: BLE001
+            return None, f"PDF sa nepodarilo prečítať ({e.__class__.__name__})."
+    else:
+        text = html_to_text(r.text)
+    if len(text) < 3000:
+        return None, "Stránka neobsahuje dostatočne dlhý text (možno sa načítava cez JavaScript). Skús vložiť prepis ručne."
+    return text, None
