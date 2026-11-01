@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Výsledky a call · {{ ticker }} · mkej{% endblock %}
+{% block content %}
+{% set e = earn %}
+<div class="pagehead"><h1>🎙 Výsledky a earnings call</h1>
+  <div class="sub">{{ name }} · tlačová správa k výsledkom zo SEC, prepis callu a kľúčové body</div></div>
+{% for cat, msg in get_flashed_messages(with_categories=true) %}
+  <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
+{% endfor %}
+
+{% if e.releases %}
+<div class="card">
+  <h2>Obdobie</h2>
+  <div class="echips">
+    {% for r in e.releases %}<a class="echip {{ 'on' if e.cur and r.acc == e.cur.acc }}" href="{{ url_for('section_view', ticker=ticker, section='earnings', acc=r.acc) }}">{{ r.date }}</a>{% endfor %}
+  </div>
+  <p class="note">Dátum je deň zverejnenia výsledkov (podanie 8-K s položkou 2.02).{% if e.release_url %} <a href="{{ e.release_url }}" target="_blank" rel="noopener">Podanie na SEC</a>{% endif %}</p>
+</div>
+{% else %}
+<div class="warn">Pre túto firmu nie sú v SEC podania s výsledkami (nie je v SEC alebo nemá podania 8-K). Prepis callu môžeš vložiť ručne nižšie.</div>
+{% endif %}
+
+{% if e.error %}<div class="warn">{{ e.error }}</div>{% endif %}
+
+{% if e.points %}
+<div class="card">
+  <h2>Kľúčové body z tlačovej správy <span class="info" tabindex="0" data-tip="Automatický výber viet s číslami a kľúčovými slovami (výhľad, rast, riziká, kapitál). Nie je to AI zhrnutie, preto si dôležité veci over v plnom texte.">ⓘ</span></h2>
+  {% for key, items in e.points.items() %}
+    <h3 style="margin:12px 0 4px">{{ e.labels[key] }}</h3>
+    <ul>{% for s in items %}<li>{{ s }}</li>{% endfor %}</ul>
+  {% endfor %}
+  {% if e.tables %}
+  <h3 style="margin:12px 0 4px">Čísla z tabuliek</h3>
+  <div class="tablewrap"><table class="plain"><tbody>{% for row in e.tables %}<tr><td>{{ row }}</td></tr>{% endfor %}</tbody></table></div>
+  {% endif %}
+  <p class="note">Texty sú z verejnej tlačovej správy firmy (angličtina), vybrané automaticky.</p>
+</div>
+{% endif %}
+
+<div class="card" id="call">
+  <h2>Prepis earnings callu</h2>
+  {% if e.transcript %}
+    <p class="note">Zdroj prepisu: {{ e.transcript_src }}.</p>
+    {% if e.tpoints %}
+      {% for key, items in e.tpoints.items() %}
+        <h3 style="margin:12px 0 4px">{{ e.labels[key] }}</h3>
+        <ul>{% for s in items %}<li>{{ s }}</li>{% endfor %}</ul>
+      {% endfor %}
+    {% else %}<p class="note">Z prepisu sa nepodarilo vybrať žiadne body.</p>{% endif %}
+    <details><summary>Zobraziť celý prepis</summary><pre class="transcript">{{ e.transcript }}</pre></details>
+    {% if e.transcript_src == 'vložený ručne' %}
+    <form action="{{ url_for('earnings_transcript', ticker=ticker) }}" method="post" style="margin-top:8px">
+      <input type="hidden" name="key" value="{{ e.key }}"><input type="hidden" name="acc" value="{{ e.cur.acc if e.cur else '' }}"><input type="hidden" name="delete" value="1">
+      <button class="danger" type="submit">Odstrániť vložený prepis</button></form>
+    {% endif %}
+  {% else %}
+    <p>Prepis callu sa automaticky nenašiel. Väčšina firiem ho do SEC nepodáva a úplné prepisy sú na platených stránkach, ktoré appka nesťahuje. Vlož ho sem (nezdieľa sa, ostáva len u teba), appka z neho vyberie kľúčové body.</p>
+    <p>{% for lbl, url in e.links %}<a href="{{ url }}" target="_blank" rel="noopener">{{ lbl }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+  {% if not e.transcript or e.transcript_src == 'vložený ručne' %}
+  <form action="{{ url_for('earnings_transcript', ticker=ticker) }}" method="post" enctype="multipart/form-data" style="margin-top:10px">
+    <input type="hidden" name="key" value="{{ e.key }}"><input type="hidden" name="acc" value="{{ e.cur.acc if e.cur else '' }}">
+    <textarea name="text" rows="6" placeholder="Sem vlož text prepisu…" style="width:100%"></textarea>
+    <div style="margin-top:6px">alebo súbor .txt: <input type="file" name="file" accept=".txt,text/plain"> <button>{{ 'Nahradiť prepis' if e.transcript else 'Uložiť prepis' }}</button></div>
+  </form>
+  {% endif %}
+</div>
+
+{% if e.release %}
+<div class="card"><details><summary><strong>Plný text tlačovej správy</strong></summary><pre class="transcript">{{ e.release }}</pre></details></div>
+{% endif %}
+{% endblock %}

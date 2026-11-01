@@ -12,6 +12,7 @@ from urllib.parse import quote
 from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
                    url_for)
 
+import earnings
 import edgar
 import excel
 import filings
@@ -111,6 +112,7 @@ def parse_price(s):
 SECTIONS = [
     ("overview", "Úvod", "🏠"),
     ("statements", "Výkazy", "📑"),
+    ("earnings", "Výsledky a call", "🎙"),
     ("charts", "Grafy", "📈"),
     ("fundamental", "Fundamentálna analýza", "🔎"),
     ("technical", "Technická analýza", "📉"),
@@ -278,6 +280,8 @@ def build_context(ticker, section):
                 ctx["det"] = filings.get_detailed(comp, p["mode"], p["years"])
             except edgar.EdgarError as e:
                 ctx["det_error"] = str(e)
+    elif section == "earnings":
+        ctx["earn"] = _earnings(comp, match[0])
     elif section == "fundamental":
         try:
             ctx["fund"] = _fundamental(comp, match[0], btype, price, quote, is_demo)
@@ -879,6 +883,59 @@ def search():
     seen = {c[0] for c in cands}
     cands = list(cands) + [c for c in yahoo_fin.search(q) if c[0] not in seen]
     return render_template("search.html", q=q, cands=cands, section=None)
+
+
+def _earnings(comp, ticker):
+    """Sekcia Výsledky a call: tlačová správa zo SEC, prepis (zo SEC prílohy alebo vložený) a kľúčové body."""
+    rels = [] if comp.get("source") == "yahoo" else earnings.list_releases(comp)
+    acc = request.args.get("acc", "")
+    cur = next((r for r in rels if r["acc"] == acc), rels[0] if rels else None)
+    key = cur["acc"] if cur else (re.sub(r"[^A-Za-z0-9_.-]", "", request.args.get("key", ""))[:30] or "latest")
+    out = {"releases": rels, "cur": cur, "key": key, "error": None, "release": None, "points": {}, "tables": [],
+           "transcript": None, "transcript_src": None, "tpoints": {}, "release_url": None}
+    if cur:
+        out["release_url"] = f"https://www.sec.gov/Archives/edgar/data/{comp['cik']}/{cur['acc'].replace('-', '')}/"
+        try:
+            rel = earnings.get_release(comp, cur["acc"])
+        except edgar.EdgarError as e:
+            rel, out["error"] = None, str(e)
+        if rel:
+            out["release"] = rel.get("release")
+            out["tables"] = rel.get("tables") or []
+            if rel.get("release"):
+                out["points"] = earnings.key_points(rel["release"])
+            if rel.get("transcript"):
+                out["transcript"], out["transcript_src"] = rel["transcript"], "SEC (príloha podania)"
+        elif not out["error"]:
+            out["error"] = "K tomuto podaniu sa nenašla príloha s tlačovou správou."
+    saved = earnings.load_transcript(ticker, key)
+    if saved:
+        out["transcript"], out["transcript_src"] = saved, "vložený ručne"
+    if out["transcript"]:
+        out["tpoints"] = earnings.key_points(out["transcript"], per_cat=5)
+    q = quote(f"{comp['name']} earnings call transcript")
+    out["links"] = [("Hľadať prepis (Google)", f"https://www.google.com/search?q={q}"),
+                    ("Stránka pre investorov", f"https://www.google.com/search?q={quote(comp['name'] + ' investor relations earnings')}")]
+    out["labels"] = {k: lbl for k, lbl, _r in earnings.CATEGORIES}
+    return out
+
+
+@app.route("/company/<ticker>/earnings/transcript", methods=["POST"])
+def earnings_transcript(ticker):
+    t = ticker.upper()
+    key = re.sub(r"[^A-Za-z0-9_.-]", "", request.form.get("key", ""))[:30] or "latest"
+    text = request.form.get("text", "")
+    f = request.files.get("file")
+    if f and f.filename:
+        text = f.read(earnings.MAX_PASTE * 4).decode("utf-8", errors="ignore")
+    if request.form.get("delete"):
+        earnings.delete_transcript(t, key)
+        flash("Prepis odstránený.", "ok")
+    else:
+        ok, msg = earnings.save_transcript(t, key, text)
+        flash(msg, "ok" if ok else "warn")
+    args = {"acc": request.form.get("acc", "")} if request.form.get("acc") else {"key": key}
+    return redirect(url_for("section_view", ticker=t, section="earnings", **args))
 
 
 @app.route("/company/<ticker>", defaults={"section": "overview"})

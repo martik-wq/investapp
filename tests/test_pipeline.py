@@ -1042,6 +1042,53 @@ check("zoznam: úvodná stránka ukazuje firmy", "KakaoBank" in cl.get("/").get_
 _yf.fetch = _orig_fetch
 edgar._get_json = _orig_gj2
 
+# ---- výsledky a earnings call
+import json  # noqa: E402
+import earnings as _er  # noqa: E402
+import filings as _fl  # noqa: E402
+_er.TRANSCRIPT_DIR = tempfile.mkdtemp()
+_REL = ("<html><body><p>Apple Inc. announced financial results for its fiscal 2026 third quarter. "
+        "Revenue was a record $94.0 billion, up 10 percent year over year, and diluted earnings per share was $1.57.</p>"
+        "<p>The Company expects revenue growth of 8 to 10 percent in the September quarter, with gross margin between 46 and 47 percent.</p>"
+        "<p>Tariffs created headwinds of approximately $1.1 billion in the quarter, and pressure on services margin continues.</p>"
+        "<p>The Company repurchased $20 billion of its common stock and paid dividends of $3.8 billion during the quarter.</p>"
+        "<p>This press release contains forward-looking statements, including undue reliance should not be placed on them.</p>"
+        "<table><tr><td>Total net sales</td><td>94,036</td><td>85,777</td></tr><tr><td>Net income</td><td>23,434</td><td>21,448</td></tr></table></body></html>")
+_IDX = json.dumps({"directory": {"item": [{"name": "aapl-20260730.htm"}, {"name": "a8-kex991_2026q3.htm"}, {"name": "R1.htm"}]}})
+_orig_ft = _fl.fetch_text
+_fl.fetch_text = lambda comp, acc, name: _IDX if name == "index.json" else (_REL if name == "a8-kex991_2026q3.htm" else None)
+_fake_co = {"filings": {"form": ["10-K", "8-K", "8-K"], "items": ["", "2.02,9.01", "5.02"], "accessionNumber": ["a", "0000320193-26-000018", "c"],
+                        "filingDate": ["2025-11-01", "2026-07-30", "2026-07-01"], "primaryDocument": ["x", "aapl.htm", "y"]},
+            "cik": 320193, "is_demo": False, "name": "Apple Inc."}
+_rl = _er.list_releases(_fake_co)
+check("earnings: zo zoznamu podaní sa vyberú len 8-K s položkou 2.02", len(_rl) == 1 and _rl[0]["date"] == "2026-07-30", _rl)
+_gr = _er.get_release(_fake_co, "0000320193-26-000018")
+check("earnings: príloha EX-99.1 sa nájde (nie R1.htm ani hlavný dokument) a prevedie na text",
+      _gr and _gr["release_file"] == "a8-kex991_2026q3.htm" and "record $94.0 billion" in _gr["release"], _gr and _gr["files"])
+_kp = _er.key_points(_gr["release"])
+_flat = " ".join(" ".join(v) for v in _kp.values())
+check("earnings: kľúčové body obsahujú výhľad, riziká aj návrat kapitálu a vynechajú právne vety",
+      "guidance" in _kp or "expects revenue growth" in " ".join(_kp.get("guidance", []))
+      and any("Tariffs" in s for s in _kp.get("risks", [])) and any("repurchased" in s for s in _kp.get("capital", []))
+      and "undue reliance" not in _flat, _kp)
+check("earnings: čísla z tabuliek (tržby, čistý zisk)", any(r.startswith("Total net sales") for r in _gr["tables"]) and any(r.startswith("Net income") for r in _gr["tables"]), _gr["tables"])
+_okp, _ = _er.save_transcript("AAPL", "k1", "x" * 100)
+check("earnings: príliš krátky prepis sa neuloží", not _okp)
+_ok2, _ = _er.save_transcript("AAPL", "k1", ("Operator: Welcome to the call. We expect revenue growth of 9 percent next quarter. " * 20))
+check("earnings: vložený prepis sa uloží a načíta", _ok2 and _er.load_transcript("AAPL", "k1").startswith("Operator"))
+_orig_lr, _orig_gr = _er.list_releases, _er.get_release
+_er.list_releases = lambda comp, n=12: _rl
+_er.get_release = lambda comp, acc: _gr
+_eh = cl.get("/company/DEMOCO/earnings").get_data(as_text=True)
+check("earnings: stránka ukáže kľúčové body, obdobie a pole na prepis",
+      "Kľúčové body z tlačovej správy" in _eh and "2026-07-30" in _eh and "Prepis earnings callu" in _eh and "Total net sales" in _eh)
+cl.post("/company/DEMOCO/earnings/transcript", data={"key": _rl[0]["acc"], "acc": _rl[0]["acc"], "text": "Operator: Hello. We expect revenue growth of 12 percent. " * 20})
+_eh2 = cl.get("/company/DEMOCO/earnings?acc=" + _rl[0]["acc"]).get_data(as_text=True)
+check("earnings: po uložení sa prepis zobrazí so zdrojom „vložený ručne“", "Zdroj prepisu: vložený ručne" in _eh2 and "Odstrániť vložený prepis" in _eh2)
+_er.list_releases, _er.get_release = _orig_lr, _orig_gr
+_fl.fetch_text = _orig_ft
+check("earnings: menu obsahuje sekciu", "Výsledky a call" in cl.get("/company/DEMOCO/statements").get_data(as_text=True))
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
