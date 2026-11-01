@@ -1027,6 +1027,21 @@ _sr = _yf.search("SK hynix")
 _yf.requests.get = _orig_get
 check("Yahoo hľadanie podľa názvu: akcie áno, futures nie", [x[0] for x in _sr] == ["000660.KS", "SKHY"] and "KSE" in _sr[0][2], _sr)
 
+# ---- zoznam firiem (Disco, KakaoBank...)
+import directory as _dir  # noqa: E402
+edgar._get_json = lambda url, name: {"0": {"ticker": "AAPL", "cik_str": 320193, "title": "Apple Inc."}}
+check("zoznam: Disco, KakaoBank a SK hynix sa nájdu podľa názvu aj tickeru",
+      edgar.find_company("Disco")[0][0] == "6146.T" and edgar.find_company("kakaobank")[0][0] == "323410.KS"
+      and edgar.find_company("323410.KS")[0][0] == "323410.KS" and edgar.find_company("SK hynix")[0][0] == "000660.KS")
+check("zoznam: čiastočná zhoda ponúkne kandidáta", any(c[0] == "035720.KS" for c in edgar.find_company("kakao co")[1]) or edgar.find_company("kakao")[0] is not None)
+_yf.fetch = lambda sym: _FAKE_YF
+_kb = edgar.load_company(*edgar.find_company("KakaoBank")[0])
+_kbb = statements.build(_kb, "annual", 8)
+check("zoznam: KakaoBank sa vyhodnotí ako banka aj bez SIC kódu", metrics.detect_type(_kb, _kbb) == "bank")
+check("zoznam: úvodná stránka ukazuje firmy", "KakaoBank" in cl.get("/").get_data(as_text=True) and "Disco Corporation" in cl.get("/").get_data(as_text=True))
+_yf.fetch = _orig_fetch
+edgar._get_json = _orig_gj2
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

@@ -88,13 +88,17 @@ def find_company(query):
     if q in DEMO_TICKERS:
         title, cik = DEMO_TICKERS[q]
         return (q, cik, title), []
+    import directory   # moje firmy mimo SEC (Disco, KakaoBank...): nájdu sa podľa názvu aj tickeru
+    d_exact, d_part = directory.find(query)
+    if d_exact:
+        return directory.as_candidate(d_exact), []
     raw = _get_json(TICKERS_URL, "company_tickers.json")
     rows = [(v["ticker"].upper(), int(v["cik_str"]), v["title"]) for v in raw.values()]
     for t, cik, title in rows:
         if t == q or t == q.replace(".", "-"):
             return (t, cik, title), []
     ql = query.strip().lower()
-    cands = [r for r in rows if ql in r[2].lower()][:12]
+    cands = [directory.as_candidate(x) for x in d_part] + [r for r in rows if ql in r[2].lower()][:12]
     if not cands:
         import yahoo_fin   # firma mimo SEC: neoficiálne výkazy z Yahoo
         hit = yahoo_fin.lookup(q)
@@ -104,6 +108,12 @@ def find_company(query):
 
 
 # ------------------------------------------------------------------ načítanie firmy
+def _type_hint(ticker):
+    import directory
+    d = directory.by_symbol(ticker)
+    return d["type"] if d else None
+
+
 def load_company(ticker, cik, title):
     if cik == "YF":
         import yahoo_fin
@@ -115,7 +125,7 @@ def load_company(ticker, cik, title):
                                        "fiscal_year_end": "", "category": None, "former": []},
                 "ticker": ticker, "cik": cik, "name": facts.get("entityName") or title, "facts": facts,
                 "sic": None, "sic_desc": "", "currency": cur, "shares_out": latest_shares_outstanding(facts),
-                "is_demo": False, "source": "yahoo"}
+                "is_demo": False, "source": "yahoo", "type_hint": _type_hint(ticker)}
     if ticker in DEMO_TICKERS:
         facts = _load_demo(ticker, "facts")
         subs = _load_demo(ticker, "subs")

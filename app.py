@@ -863,7 +863,8 @@ def watchlist_target():
 
 @app.route("/")
 def index():
-    return render_template("index.html", types=BUSINESS_TYPES, section=None)
+    import directory
+    return render_template("index.html", types=BUSINESS_TYPES, section=None, firms=directory.entries())
 
 
 @app.route("/search")

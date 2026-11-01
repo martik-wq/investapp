@@ -399,6 +399,8 @@ def groups_reit(c):
 
 # ------------------------------------------------------------- detekcia typu biznisu
 def detect_type(company, built):
+    if company.get("type_hint"):
+        return company["type_hint"]
     sic = company.get("sic")
     d = built["data"]
     if sic in REIT_SIC:

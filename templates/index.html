@@ -16,6 +16,13 @@
     (DEMOCO a DEMOBANK sú fiktívne ukážkové firmy, ktoré fungujú aj bez internetu)</p>
 </div>
 <div class="card">
+  <h2>Moje firmy</h2>
+  <p class="note">Rýchly výber. Firmy so značkou „Yahoo“ nie sú v SEC, výkazy sú neoficiálne (cca 4 roky).</p>
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Firma</th><th>Symbol</th><th>Krajina</th><th>Zdroj</th></tr></thead><tbody>
+  {% for f in firms %}<tr><td><a href="{{ url_for('section_view', ticker=f.symbol, section='overview') }}">{{ f.name }}</a></td><td>{{ f.symbol }}</td><td>{{ f.country }}</td><td>{{ 'SEC' if f.src == 'sec' else 'Yahoo' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+<div class="card">
   <h2>Podporované typy biznisu</h2>
   <ul>{% for k,v in types.items() %}<li>{{ v }}</li>{% endfor %}</ul>
   <p class="note">Typ sa určí automaticky podľa SIC kódu firmy a dostupných dát, môžeš ho ručne prepnúť na stránke firmy.</p>

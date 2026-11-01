@@ -24,7 +24,7 @@ SYMBOL = re.compile(r"^[A-Z0-9]{1,8}([.\-][A-Z0-9]{1,4})?$")
 MAP = {
     "revenue": ("TotalRevenue", 1), "cost_of_revenue": ("CostOfRevenue", 1), "gross_profit": ("GrossProfit", 1),
     "rnd": ("ResearchAndDevelopment", 1), "sga": ("SellingGeneralAndAdministration", 1),
-    "op_income": ("OperatingIncome", 1), "interest_expense": ("InterestExpense", 1),
+    "op_income": ("OperatingIncome", 1), "nii": ("NetInterestIncome", 1), "nonint_income": ("NonInterestIncome", 1), "interest_expense": ("InterestExpense", 1),
     "pretax": ("PretaxIncome", 1), "tax": ("TaxProvision", 1), "net_income": ("NetIncomeCommonStockholders", 1),
     "eps_diluted": ("DilutedEPS", 1), "shares_diluted": ("DilutedAverageShares", 1),
     "cash": ("CashAndCashEquivalents", 1), "total_assets": ("TotalAssets", 1),
