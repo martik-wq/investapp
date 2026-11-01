@@ -1071,7 +1071,6 @@ check("earnings: kľúčové body obsahujú výhľad, riziká aj návrat kapitá
       "guidance" in _kp or "expects revenue growth" in " ".join(_kp.get("guidance", []))
       and any("Tariffs" in s for s in _kp.get("risks", [])) and any("repurchased" in s for s in _kp.get("capital", []))
       and "undue reliance" not in _flat, _kp)
-check("earnings: čísla z tabuliek (tržby, čistý zisk)", any(r.startswith("Total net sales") for r in _gr["tables"]) and any(r.startswith("Net income") for r in _gr["tables"]), _gr["tables"])
 _okp, _ = _er.save_transcript("AAPL", "k1", "x" * 100)
 check("earnings: príliš krátky prepis sa neuloží", not _okp)
 _ok2, _ = _er.save_transcript("AAPL", "k1", ("Operator: Welcome to the call. We expect revenue growth of 9 percent next quarter. " * 20))
@@ -1081,7 +1080,7 @@ _er.list_releases = lambda comp, n=12: _rl
 _er.get_release = lambda comp, acc: _gr
 _eh = cl.get("/company/DEMOCO/earnings").get_data(as_text=True)
 check("earnings: stránka ukáže kľúčové body, obdobie a pole na prepis",
-      "Kľúčové body z tlačovej správy" in _eh and "2026-07-30" in _eh and "Prepis earnings callu" in _eh and "Total net sales" in _eh)
+      "Kľúčové body z tlačovej správy" in _eh and "2026-07-30" in _eh and "Prepis earnings callu" in _eh)
 cl.post("/company/DEMOCO/earnings/transcript", data={"key": _rl[0]["acc"], "acc": _rl[0]["acc"], "text": "Operator: Hello. We expect revenue growth of 12 percent. " * 20})
 _eh2 = cl.get("/company/DEMOCO/earnings?acc=" + _rl[0]["acc"]).get_data(as_text=True)
 check("earnings: po uložení sa prepis zobrazí so zdrojom „vložený ručne“", "Zdroj prepisu: vložený ručne" in _eh2 and "Odstrániť vložený prepis" in _eh2)

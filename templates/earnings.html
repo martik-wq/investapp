@@ -29,10 +29,6 @@
     <h3 style="margin:12px 0 4px">{{ e.labels[key] }}</h3>
     <ul>{% for s in items %}<li>{{ s }}</li>{% endfor %}</ul>
   {% endfor %}
-  {% if e.tables %}
-  <h3 style="margin:12px 0 4px">Čísla z tabuliek</h3>
-  <div class="tablewrap"><table class="plain"><tbody>{% for row in e.tables %}<tr><td>{{ row }}</td></tr>{% endfor %}</tbody></table></div>
-  {% endif %}
   <p class="note">Texty sú z verejnej tlačovej správy firmy (angličtina), vybrané automaticky.</p>
 </div>
 {% endif %}
