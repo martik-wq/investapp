@@ -480,3 +480,14 @@ details.reftab{margin:6px 0 10px}details.reftab>summary{cursor:pointer;font-size
 pre.transcript{white-space:pre-wrap;word-wrap:break-word;max-height:520px;overflow:auto;font:13px/1.55 inherit;background:#faf7f4;padding:12px;border-radius:10px;margin-top:8px}
 .btnlink{display:inline-block;padding:7px 14px;border:1px solid #c2410c;border-radius:10px;color:#c2410c;text-decoration:none;font-weight:600}
 .btnlink:hover{background:#c2410c;color:#fff}
+
+/* technická analýza */
+.techbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.tgrp{display:flex;gap:4px;align-items:center}
+.tgrp button{padding:5px 11px;border:1px solid var(--line,#e5e7eb);background:#fff;color:#334155;opacity:1;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.tgrp button:hover{border-color:#c2410c;color:#c2410c}
+.tgrp button.on,.tgrp button.on:hover{background:#c2410c;border-color:#c2410c;color:#fff}
+.tchk{gap:12px;flex-wrap:wrap;font-size:13px}.tchk label{display:inline-flex;gap:4px;align-items:center;cursor:pointer}
+.techinfo{font-size:13px;margin:4px 0 6px;min-height:20px;font-variant-numeric:tabular-nums}
+.sig{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.sig.bull{background:#dcfce7;color:#166534}.sig.bear{background:#fee2e2;color:#991b1b}.sig.neu{background:#f1f5f9;color:#475569}

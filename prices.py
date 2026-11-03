@@ -216,6 +216,50 @@ def get_history(symbol, start):
     return out
 
 
+def parse_ohlcv(res):
+    """Z odpovede chart API vyberie riadky, kde sú všetky ceny. {'dates','open','high','low','close','volume','currency'} alebo None."""
+    from datetime import datetime, timezone
+    q = res["indicators"]["quote"][0]
+    ts = res["timestamp"]
+    out = {"dates": [], "open": [], "high": [], "low": [], "close": [], "volume": [],
+           "currency": (res.get("meta") or {}).get("currency")}
+    for i, t in enumerate(ts):
+        vals = [q[k][i] for k in ("open", "high", "low", "close")]
+        if any(v is None for v in vals):
+            continue
+        out["dates"].append(datetime.fromtimestamp(t, timezone.utc).date().isoformat())
+        for k, v in zip(("open", "high", "low", "close"), vals):
+            out[k].append(float(v))
+        vol = q["volume"][i] if q.get("volume") else None
+        out["volume"].append(float(vol or 0))
+    return out if out["dates"] else None
+
+
+def get_ohlcv(symbol, years=5):
+    """Denné OHLCV (ceny upravené o splity) za posledných `years` rokov alebo None. Cache 6 hodín."""
+    from datetime import datetime, timedelta, timezone
+    sym = _sym(symbol)
+    name = f"ohlc_{re.sub(r'[^A-Za-z0-9]', '_', sym)}_{years}.json"
+    hit = _cached(name, 6 * 3600)
+    if hit:
+        return hit
+    now = datetime.now(timezone.utc)
+    p1, p2 = int((now - timedelta(days=365 * years + 10)).timestamp()), int((now + timedelta(days=2)).timestamp())
+    try:
+        url = HIST_URL.format(sym=requests.utils.quote(sym), p1=p1, p2=p2)
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        if r.status_code == 429:
+            time.sleep(1.5)
+            r = requests.get(url, headers=HEADERS, timeout=20)
+        r.raise_for_status()
+        out = parse_ohlcv(r.json()["chart"]["result"][0])
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None
+    if out:
+        _store(name, out)
+    return out
+
+
 # ------------------------------------------------------------ biografia člena vedenia
 _TITLE_RE = re.compile(r"^(mr|ms|mrs|miss|dr|prof|sir|dame|hon)\.?\s+", re.I)
 _SUFFIX_RE = re.compile(r",?\s+(j\.?d\.?|ph\.?d\.?|cpa|mba|esq\.?|m\.?d\.?|jr\.?|sr\.?|ii|iii|iv)\.?$", re.I)

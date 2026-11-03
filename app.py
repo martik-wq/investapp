@@ -29,6 +29,7 @@ import updater
 import yahoo_fin
 import watchlist
 import statements
+import technical
 from taxonomy import BUSINESS_TYPES
 
 app = Flask(__name__)
@@ -249,6 +250,7 @@ def build_context(ticker, section):
            "years_options": YEARS_OPTIONS, "types": BUSINESS_TYPES, "sections": SECTIONS,
            "qs": _qs(p), "today": date.today()}
     if section == "technical":
+        ctx["tech"] = _technical(match[0])
         return ctx
 
     comp = edgar.load_company(*match)
@@ -883,6 +885,27 @@ def search():
     seen = {c[0] for c in cands}
     cands = list(cands) + [c for c in yahoo_fin.search(q) if c[0] not in seen]
     return render_template("search.html", q=q, cands=cands, section=None)
+
+
+def _technical(ticker):
+    """Dáta pre technickú analýzu: OHLCV + indikátory + signály. {'error'} ak ceny nie sú dostupné."""
+    if ticker in ("DEMOCO", "DEMOBANK"):
+        o = technical.synthetic(seed=7 if ticker == "DEMOCO" else 11)
+        demo = True
+    else:
+        o, demo = prices.get_ohlcv(ticker), False
+    if not o:
+        return {"error": "Historické ceny sa nepodarilo stiahnuť (Yahoo Finance nie je dostupný alebo ticker nemá cenové dáta)."}
+    d = technical.analyze(o)
+    if not d:
+        return {"error": "Firma má príliš krátku cenovú históriu (menej než 60 obchodných dní)."}
+    keep = ("dates", "open", "high", "low", "close", "volume", "sma20", "sma50", "sma200", "rsi", "macd", "macd_sig",
+            "macd_hist", "bb_up", "bb_lo", "stoch_k", "stoch_d", "obv")
+    r2 = lambda xs: [None if x is None else round(x, 4) for x in xs]  # noqa: E731
+    series = {k: (d[k] if k == "dates" else r2(d[k])) for k in keep}
+    return {"error": None, "demo": demo, "currency": o.get("currency") or "", "series": series, "stats": d["stats"],
+            "signals": d["signals"], "verdict": d["verdict"], "support": d["support"], "resistance": d["resistance"],
+            "last": d["close"][-1], "last_date": d["dates"][-1]}
 
 
 def _earnings(comp, ticker):

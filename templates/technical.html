@@ -1,3 +1,81 @@
 {% extends "base.html" %}
 {% block title %}{{ ticker }} – Technická analýza · mkej{% endblock %}
-{% block content %}{% set title = 'Technická analýza' %}{% include "placeholder.html" %}{% endblock %}
+{% block content %}
+{% set t = tech %}
+<div class="pagehead"><h1>📉 Technická analýza</h1>
+  <div class="sub">{{ name }} · denné ceny, indikátory a signály{% if t and t.last_date %} · posledná cena {{ '%.2f'|format(t.last) }} {{ t.currency }} ({{ t.last_date }}){% endif %}</div></div>
+{% if not t or t.error %}
+  <div class="warn">{{ t.error if t else 'Údaje nie sú dostupné.' }}</div>
+{% else %}
+{% if t.demo %}<div class="warn">Ukážková firma: ceny sú vymyslené (náhodná prechádzka) a slúžia len na vyskúšanie.</div>{% endif %}
+{% set v = t.verdict %}
+<div class="card">
+  <div class="revrow">
+    <div><div class="bigprice" style="font-size:28px">{{ v.label }}</div><div class="note">{{ v.bull }} býčích · {{ v.neutral }} neutrálnych · {{ v.bear }} medvedích signálov</div></div>
+    <div class="revtxt">Súhrn spočíta signály z trendu, momenta, volatility a objemu (tabuľka nižšie). Je to len mechanický súčet pravidiel nad minulými cenami, nie predpoveď ani odporúčanie.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="techbar">
+    <div class="tgrp" role="group" aria-label="Obdobie">
+      {% for lbl, n in [('3M', 63), ('6M', 126), ('1R', 252), ('2R', 504), ('Všetko', 0)] %}<button type="button" data-range="{{ n }}" class="{{ 'on' if n == 252 }}">{{ lbl }}</button>{% endfor %}
+    </div>
+    <div class="tgrp" role="group" aria-label="Typ grafu">
+      <button type="button" data-type="candle" class="on">Sviečky</button><button type="button" data-type="line">Čiara</button>
+    </div>
+    <div class="tgrp tchk">
+      <label><input type="checkbox" data-toggle="sma20"> SMA 20</label>
+      <label><input type="checkbox" data-toggle="sma50" checked> SMA 50</label>
+      <label><input type="checkbox" data-toggle="sma200" checked> SMA 200</label>
+      <label><input type="checkbox" data-toggle="bb"> Bollinger</label>
+      <label><input type="checkbox" data-toggle="vol" checked> Objem</label>
+      <label><input type="checkbox" data-toggle="rsi" checked> RSI</label>
+      <label><input type="checkbox" data-toggle="macd" checked> MACD</label>
+    </div>
+  </div>
+  <div id="techinfo" class="techinfo"></div>
+  <div id="techchart"></div>
+  <p class="note">Prerušované čiary v grafe sú najbližšie úrovne podpory (zelená) a odporu (červená). Ceny sú upravené o splity. Prejdi myšou po grafe pre hodnoty v danom dni.</p>
+</div>
+<script id="techdata" type="application/json">{{ t|tojson }}</script>
+<script src="{{ url_for('static', filename='technical.js') }}"></script>
+
+<div class="card">
+  <h2>Signály</h2>
+  <div class="tablewrap"><table class="plain">
+    <thead><tr><th>Skupina</th><th>Ukazovateľ</th><th>Hodnota</th><th>Čítanie</th><th>Signál</th></tr></thead>
+    <tbody>{% for s in t.signals %}
+      <tr><td>{{ s.group }}</td><td>{{ s.name }} <span class="info" tabindex="0" data-tip="{{ s.why }}">ⓘ</span></td><td>{{ s.value }}</td><td>{{ s.reading }}</td>
+        <td><span class="sig {{ 'bull' if s.signal == 1 else 'bear' if s.signal == -1 else 'neu' }}">{{ 'býčí' if s.signal == 1 else 'medvedí' if s.signal == -1 else 'neutrálny' }}</span></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="note">Prekúpené a prepredané stavy sú označené ako neutrálne upozornenie, nie ako signál na predaj alebo nákup.</p>
+</div>
+
+{% set s = t.stats %}
+<div class="grid2">
+  <div class="card">
+    <h2>Výnosy a riziko</h2>
+    <table class="plain"><tbody>
+      {% for lbl, k in [('1 mesiac','ret_1m'),('3 mesiace','ret_3m'),('6 mesiacov','ret_6m'),('12 mesiacov','ret_1y'),('Od začiatku roka','ret_ytd')] %}
+      <tr><td>{{ lbl }}</td><td class="{{ 'neg' if s[k] is not none and s[k] < 0 }}">{{ s[k]|fmt('pct') if s[k] is not none else '–' }}</td></tr>{% endfor %}
+      <tr><td>Volatilita za rok (ročná)</td><td>{{ s.vol_1y|fmt('pct') if s.vol_1y is not none else '–' }}</td></tr>
+      <tr><td>Najväčší pokles za rok</td><td class="neg">{{ s.mdd_1y|fmt('pct') }}</td></tr>
+      <tr><td>ATR (14) v % ceny</td><td>{{ s.atr_pct|fmt('pct') if s.atr_pct is not none else '–' }}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <h2>Úrovne</h2>
+    <table class="plain"><tbody>
+      <tr><td>52-týždňové maximum</td><td>{{ '%.2f'|format(s.hi52) }} ({{ s.from_hi|fmt('pct') }})</td></tr>
+      <tr><td>52-týždňové minimum</td><td>{{ '%.2f'|format(s.lo52) }} ({{ s.from_lo|fmt('pct') }})</td></tr>
+      {% for r in t.resistance|reverse %}<tr><td>Odpor</td><td>{{ '%.2f'|format(r) }}</td></tr>{% endfor %}
+      <tr><td><strong>Posledná cena</strong></td><td><strong>{{ '%.2f'|format(t.last) }}</strong></td></tr>
+      {% for r in t.support %}<tr><td>Podpora</td><td>{{ '%.2f'|format(r) }}</td></tr>{% endfor %}
+    </tbody></table>
+    <p class="note">Úrovne sú zhluky lokálnych maxím a miním za posledný rok (hladiny, kde cena v minulosti obracala).</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

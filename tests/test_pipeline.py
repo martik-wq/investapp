@@ -1107,6 +1107,46 @@ _tx, _err = _er.fetch_transcript_url("https://investor.fake.com/t/q2")
 _er._get = _orig_g
 check("IR: príliš krátka stránka sa nevezme ako prepis", _tx is None and "dostatočne dlhý" in _err)
 
+# ---- technická analýza
+import datetime as _dtm  # noqa: E402
+import technical as _tc  # noqa: E402
+_w = [44.3389, 44.0902, 44.1497, 43.6124, 44.3278, 44.8264, 45.0955, 45.4245, 45.8433, 46.0826, 45.8931, 46.0328, 45.6140, 46.2820, 46.2820, 46.0028, 46.0328, 46.4116, 46.2222, 45.6439]
+check("technická: RSI (Wilder) sedí s učebnicovým príkladom", [round(x, 2) for x in _tc.rsi(_w) if x is not None] == [70.53, 66.32, 66.55, 69.41, 66.36, 57.97])
+check("technická: SMA a EMA (seed = jednoduchý priemer)", _tc.sma([1, 2, 3, 4, 5], 3) == [None, None, 2.0, 3.0, 4.0] and _tc.ema([1, 2, 3, 4, 5], 3) == [None, None, 2.0, 3.0, 4.0]
+      and abs(_tc.ema([2, 4, 6, 8, 10, 12], 3)[5] - 10.0) < 1e-9)
+_ml, _ms, _mh = _tc.macd([float(i) for i in range(1, 80)])
+_e12, _e26 = _tc.ema([float(i) for i in range(1, 80)], 12), _tc.ema([float(i) for i in range(1, 80)], 26)
+check("technická: MACD = EMA12 − EMA26 a histogram = MACD − signál", abs(_ml[60] - (_e12[60] - _e26[60])) < 1e-9 and abs(_mh[60] - (_ml[60] - _ms[60])) < 1e-9 and _ml[24] is None and _ml[25] is not None)
+_bm, _bu, _bl = _tc.bollinger([10.0] * 25)
+check("technická: Bollinger pri konštantnej cene má nulovú šírku; pri známych dátach sedí populačná odchýlka",
+      _bu[24] == _bl[24] == 10.0 and abs(_tc.bollinger([2, 4, 4, 4, 5, 5, 7, 9], 8)[1][7] - (5 + 2 * 2)) < 1e-9)
+check("technická: ATR pri konštantnom rozpätí 2 a bez medzier je 2", abs(_tc.atr([11.0] * 20, [9.0] * 20, [10.0] * 20)[19] - 2.0) < 1e-9)
+check("technická: OBV sčítava objem pri raste a odčítava pri poklese", _tc.obv([1, 2, 1, 1, 3], [10, 20, 30, 40, 50]) == [0.0, 20.0, -10.0, -10.0, 40.0])
+_k, _dd = _tc.stochastic([5, 6, 7, 8], [1, 2, 3, 4], [5, 6, 7, 8], 3, 2)
+check("technická: Stochastic pri zatvorení na maxime rozpätia je 100", _k[2] == 100.0 and _k[3] == 100.0 and _dd[3] == 100.0)
+_up = {"dates": [(_dtm.date(2024, 1, 1) + _dtm.timedelta(days=i)).isoformat() for i in range(300)], "open": [100 + i for i in range(300)],
+       "high": [101.5 + i for i in range(300)], "low": [99.5 + i for i in range(300)], "close": [100.8 + i for i in range(300)], "volume": [1000 + i for i in range(300)]}
+_au = _tc.analyze(_up)
+check("technická: stabilný rast dá prevažne býčie signály a nulový pokles", _au["verdict"]["label"] == "prevažujú býčie signály" and _au["verdict"]["bear"] <= 1 and _au["stats"]["mdd_1y"] == 0.0, _au["verdict"])
+_dn = dict(_up, close=[400 - i + 0.2 for i in range(300)], open=[400 - i + 1 for i in range(300)], high=[401.5 - i for i in range(300)], low=[398.5 - i for i in range(300)])
+check("technická: stabilný pokles dá prevažne medvedie signály", _tc.analyze(_dn)["verdict"]["label"] == "prevažujú medvedie signály")
+check("technická: príliš krátka história sa odmietne", _tc.analyze({k: v[:30] for k, v in _up.items()}) is None)
+_syn = _tc.synthetic(n=400)
+check("technická: syntetické ceny majú High ≥ Close,Open ≥ Low a sú reprodukovateľné",
+      all(h >= max(o, c) and l <= min(o, c) for h, l, o, c in zip(_syn["high"], _syn["low"], _syn["open"], _syn["close"])) and _tc.synthetic(n=50)["close"] == _tc.synthetic(n=50)["close"])
+_pr_ok = {"timestamp": [1700000000, 1700086400, 1700172800], "meta": {"currency": "USD"},
+          "indicators": {"quote": [{"open": [1, None, 3], "high": [2, 3, 4], "low": [0.5, 1, 2], "close": [1.5, 2, 3.5], "volume": [100, 200, None]}]}}
+_po = _pr.parse_ohlcv(_pr_ok)
+check("technická: parse_ohlcv vynechá dni s chýbajúcou cenou a chýbajúci objem dá 0", len(_po["dates"]) == 2 and _po["volume"] == [100.0, 0.0] and _po["currency"] == "USD", _po)
+_th = cl.get("/company/DEMOCO/technical")
+_tht = _th.get_data(as_text=True)
+check("technická: stránka ukáže graf, signály, úrovne a vložené dáta", _th.status_code == 200 and 'id="techchart"' in _tht and 'id="techdata"' in _tht
+      and "Signály" in _tht and "Výnosy a riziko" in _tht and "RSI (14)" in _tht and "Ukážková firma" in _tht)
+_orig_oh = _appmod.prices.get_ohlcv
+_appmod.prices.get_ohlcv = lambda t: None
+check("technická: nedostupné ceny dajú hlášku, nie pád", "nepodarilo stiahnuť" in cl.get("/company/ZZEU/technical").get_data(as_text=True) or cl.get("/company/ZZEU/technical").status_code in (200, 400))
+_appmod.prices.get_ohlcv = _orig_oh
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
