@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Porovnanie firiem · mkej{% endblock %}
+{% block content %}
+{% macro pc(v, d=1) %}{{ (('%.' ~ d ~ 'f')|format(v * 100)).replace('.', ',') }} %{% endmacro %}
+<div class="pagehead"><h1>⚖ Porovnanie firiem</h1>
+  <div class="sub">2 až 6 firiem vedľa seba v rovnakých ukazovateľoch · posledný ročný výkaz a aktuálna cena</div></div>
+<div class="card">
+  <form method="get" class="controls">
+    <label style="min-width:420px">Tickery (oddelené čiarkou)
+      <input name="t" value="{{ cmp.input }}" placeholder="napr. SOFI, NU, 323410.KS" autocomplete="off"></label>
+    <button>Porovnať</button>
+  </form>
+  {% if suggest %}<div class="note">Z watchlistu: {% for t in suggest %}<a href="#" onclick="var i=document.querySelector('[name=t]');i.value=(i.value?i.value+', ':'')+'{{ t }}';return false">{{ t }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+</div>
+{% for e in cmp.errors %}<div class="warn">{{ e }}</div>{% endfor %}
+{% if cmp.table %}
+<div class="card">
+  <div class="tablewrap"><table class="pf peers"><thead><tr><th></th>{% for c in cmp.cols %}<th><a href="{{ url_for('section_view', ticker=c.ticker, section='fundamental') }}">{{ c.ticker }}</a><div class="note" style="font-weight:400">{{ c.name }}</div></th>{% endfor %}</tr></thead><tbody>
+    {% for r in cmp.table %}<tr><td style="text-align:left">{{ r.label }}</td>
+      {% for v in r.vals %}<td class="{{ 'best' if r.best == loop.index0 }}">{% if v is none %}–{% elif r.fmt == 'pct' %}{{ pc(v) }}{% elif r.fmt == 'x' %}{{ ('%.1f'|format(v)).replace('.', ',') }}×{% elif r.fmt == 'int' %}{{ v }}{% elif r.fmt == 'num2' %}{{ ('%.2f'|format(v)).replace('.', ',') }}{% else %}{{ v|fmt('big') }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div>
+  <p class="note">Oranžovo je najlepšia hodnota v riadku. Tržby a trhová kapitalizácia sú v mene výkazov každej firmy, preto ich nepreváraj medzi menami. „–“ = údaj chýba alebo sa nedá spočítať. Banky nemajú FCF ukazovatele. Firmy mimo SEC (Yahoo) majú neoficiálne a kratšie údaje.</p>
+</div>
+{% elif not cmp.input %}
+<p class="note">Zadaj aspoň dva tickery. Funguje pre firmy zo SEC aj pre zahraničné firmy z Yahoo (napr. 000660.KS, 6146.T).</p>
+{% endif %}
+{% endblock %}

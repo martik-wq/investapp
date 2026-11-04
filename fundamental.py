@@ -134,6 +134,7 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
     out["dcf"] = {"fields": dcf_fields, "p": p, "bars": bars, "error": base.get("error"), "base": None if "error" in base else base,
                   "scenarios": V.dcf_scenarios(p, price) if "error" not in base else [],
                   "sens": V.dcf_sensitivity(p) if "error" not in base else None,
+                  "sens2": V.dcf_sensitivity2(p) if "error" not in base else None, "price": price,
                   "price_value": None if "error" in base else base["per_share"]}
 
     # ------------------------------------------------------------------ P/B (banky, poisťovne)

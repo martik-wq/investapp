@@ -1197,6 +1197,132 @@ _rg = cl.get("/company/GRAB")
 check("GRAB: SEC bez výkazov -> stránka sa načíta cez Yahoo, nie chyba", _rg.status_code == 200 and _calls[:2] == ["sec", "yahoo"], (_rg.status_code, _calls))
 _appmod.edgar.load_company, _appmod.edgar.yahoo_company, _appmod.edgar.find_company, _appmod.statements.build = _og3, _oy3, _ofc3, _olc3
 
+
+# ---------------------------------------------------------------- téza, insideri, kalendár, makro, porovnanie
+from datetime import timedelta as _tdelta
+import tempfile as _tmpf
+import thesis as _th2, insider as _ins, events as _ev, macro as _mc, valuation as _V2
+from datetime import date as _date
+_th2.PATH = os.path.join(_tmpf.mkdtemp(), "thesis.json")
+_ok, _m = _th2.save("abc", "dôvod", "predaj ak X", "sleduj Y", "poznámka 1", 12.5, today=_date(2026, 10, 1))
+_t = _th2.get("ABC")
+check("téza: uloží sa, ticker sa zjednotí na veľké písmená, denník má záznam", _ok and _t["why"] == "dôvod" and _t["log"][0]["t"] == "poznámka 1" and _t["price"] == 12.5)
+_th2.save("ABC", "dôvod", "predaj ak X", "sleduj Y", "", None, today=_date(2026, 11, 1))
+check("téza: bez zmeny textu sa dátum úpravy nemení, pôvodná cena zostane", _th2.get("ABC")["updated"] == "2026-10-01" and _th2.get("ABC")["price"] == 12.5)
+_th2.save("ABC", "nový dôvod", "predaj ak X", "sleduj Y", "", None, today=_date(2026, 11, 2))
+check("téza: zmena textu posunie dátum úpravy", _th2.get("ABC")["updated"] == "2026-11-02")
+check("téza: výsledky po úprave označia tézu ako zastaranú, staršie nie", _th2.stale(_th2.get("ABC"), "2026-11-10") and not _th2.stale(_th2.get("ABC"), "2026-10-30"))
+check("téza: neplatný ticker sa odmietne", _th2.save("<x>", "a")[0] is False)
+_th2.save("ABC", "", "", "", "", None)
+check("téza: prázdne polia s existujúcim denníkom ju nezmažú, kým denník zostane", _th2.get("ABC") is not None)
+_th2.save("QQQ", "x")
+_th2.save("QQQ", "", "", "", "")
+check("téza: úplne prázdna téza bez denníka sa zmaže", _th2.get("QQQ") is None)
+
+_x4 = """<ownershipDocument><reportingOwner><reportingOwnerId><rptOwnerName>DOE JOHN</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isOfficer>1</isOfficer><officerTitle>CEO</officerTitle></reportingOwnerRelationship></reportingOwner>
+<nonDerivativeTable>
+<nonDerivativeTransaction><transactionDate><value>2026-10-02</value></transactionDate><transactionCoding><transactionCode>P</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>1000</value></transactionShares><transactionPricePerShare><value>50</value></transactionPricePerShare><transactionAcquiredDisposedCode><value>A</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>9000</value></sharesOwnedFollowingTransaction></postTransactionAmounts></nonDerivativeTransaction>
+<nonDerivativeTransaction><transactionDate><value>2026-10-03</value></transactionDate><transactionCoding><transactionCode>S</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>200</value></transactionShares><transactionPricePerShare><value>52</value></transactionPricePerShare><transactionAcquiredDisposedCode><value>D</value></transactionAcquiredDisposedCode></transactionAmounts></nonDerivativeTransaction>
+<nonDerivativeTransaction><transactionDate><value>2026-10-04</value></transactionDate><transactionCoding><transactionCode>A</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>5000</value></transactionShares></transactionAmounts></nonDerivativeTransaction>
+</nonDerivativeTable></ownershipDocument>"""
+_tx = _ins.parse_form4(_x4, "0001-26-000001", "2026-10-05")
+_sm = _ins.summarize(_tx, today=_date(2026, 11, 1))
+check("insider: parser prečíta nákup, predaj aj grant; súhrn rátá len P a S", len(_tx) == 3 and _sm["n_buy"] == 1 and _sm["n_sell"] == 1
+      and _sm["buy_value"] == 50000 and _sm["sell_value"] == 10400 and _sm["net"] == 39600 and _tx[0]["title"] == "CEO")
+check("insider: pokazené XML nezhodí parser", _ins.parse_form4("<x", "a") == [] and _ins.parse_form4("", "a") == [])
+check("insider: surový dokument bez XSL prefixu", _ins._raw_doc("xslF345X05/wk-form4_1.xml") == "wk-form4_1.xml" and _ins._raw_doc("f4.xml") == "f4.xml")
+_of = _ins.filings.fetch_text
+_ins.filings.fetch_text = lambda comp, acc, name: _x4
+_comp4 = {"cik": "123", "source": "sec", "filings": {"form": ["8-K", "4", "4"], "accessionNumber": ["a1", "a2", "a3"],
+          "filingDate": ["2026-10-01", "2026-10-05", "2026-10-06"], "primaryDocument": ["x.htm", "xslF345X05/f.xml", "xslF345X05/g.xml"]}}
+_gi = _ins.get_insider(_comp4, today=_date(2026, 11, 1))
+check("insider: get_insider zloží transakcie z viacerých podaní", _gi["error"] is None and len(_gi["txs"]) == 6 and _gi["n_filings"] == 2)
+check("insider: firma mimo SEC alebo bez formulárov 4 dá vysvetlenie",
+      "len pri firmách" in _ins.get_insider({"cik": "YF", "source": "yahoo", "filings": {}})["error"]
+      and "žiadne formuláre 4" in _ins.get_insider({"cik": "1", "source": "sec", "filings": {"form": ["8-K"], "accessionNumber": ["a"]}})["error"])
+_ins.filings.fetch_text = _of
+
+_tt = _date(2026, 11, 4)
+_en = _ev.estimate_next_earnings(["2026-10-30", "2026-07-31", "2026-05-01", "2026-02-05", "2025-10-31"], _tt)
+check("kalendár: výsledky podľa rovnakého kvartálu vlani", _en["date"] == "2027-02-04" and _en["last"] == "2026-10-30")
+check("kalendár: málo dát dá aspoň približný odhad, žiadne dáta None",
+      _ev.estimate_next_earnings(["2026-10-30"], _tt)["date"] == "2027-01-29" and _ev.estimate_next_earnings([], _tt) is None)
+check("kalendár: uplynulý odhad sa posunie do budúcnosti", _ev.estimate_next_earnings(["2025-01-10", "2024-10-10", "2024-07-10", "2024-04-10"], _tt)["date"] >= "2026-11-04")
+_dv = _ev.dividend_info([("2026-02-10", 0.25), ("2026-05-10", 0.25), ("2026-08-10", 0.26)], _tt)
+check("kalendár: štvrťročná dividenda a odhad ďalšej ex-dividendy", _dv["freq"] == "štvrťročne" and _dv["next_date"] >= "2026-11-04" and abs(_dv["year_sum"] - 0.76) < 1e-9)
+check("kalendár: stará alebo žiadna dividenda = nevypláca", _ev.dividend_info([("2023-01-01", 1.0)], _tt) is None and _ev.dividend_info([], _tt) is None)
+_up = _ev.upcoming([{"ticker": "AAA", "name": "A", "earnings": {"date": "2026-11-20", "basis": "x"}, "dividend": {"next_date": "2026-11-10", "last_amount": 0.5}, "div_ccy": "USD", "shares": 10},
+                    {"ticker": "BBB", "earnings": {"date": "2027-06-01", "basis": "x"}}], _tt)
+check("kalendár: časová os zoradená, ďaleké udalosti vynechané, dividenda × počet kusov", [e["ticker"] for e in _up] == ["AAA", "AAA"] and _up[0]["kind"].startswith("Ex-div") and "5.00" in _up[0]["note"])
+
+_csv = "observation_date,CPIAUCSL\n" + "\n".join(f"{y}-{m:02d}-01,{100 + (y - 2024) * 3 + m * 0.1}" for y in (2024, 2025, 2026) for m in range(1, 13))
+_pts = _mc.parse_fred_csv(_csv)
+_yy = _mc.yoy(_pts)
+check("makro: CSV sa načíta a medziročná zmena sa spočíta", len(_pts) == 36 and len(_yy) == 24 and 2.5 < _yy[0][1] < 3.1)
+check("makro: priemer za rok a zredčenie", abs(_mc.annual_avg([("2025-01-01", 4.0), ("2025-06-01", 6.0), ("2026-01-01", 9.0)], 2025) - 5.0) < 1e-9
+      and len(_mc._thin([("2020-01-01", 1.0)] * 5000)) <= 901 and _mc._thin([("2020-01-01", 1.0)] * 5000)[-1] == ("2020-01-01", 1.0))
+_ogp = _mc.get_points
+_mc.get_points = lambda sid: None if sid == "DGS2" else _mc.parse_fred_csv("DATE,X\n" + "\n".join(f"{y}-{m:02d}-01,{2 + y % 5 + m * 0.01}" for y in range(2018, 2027) for m in range(1, 13)))
+_cards = _mc.page_data(10, today=_date(2026, 11, 4))
+check("makro: chýbajúca rada nezhodí ostatné, karta má poslednú hodnotu a body",
+      len(_cards) == len(_mc.SERIES) and [c for c in _cards if c["id"] == "DGS2"][0]["points"] is None
+      and [c for c in _cards if c["id"] == "FEDFUNDS"][0]["last"] is not None and [c for c in _cards if c["id"] == "FEDFUNDS"][0]["points"])
+_rm = cl.get("/macro")
+check("makro: stránka sa vykreslí s grafmi a upozornením pri chýbajúcich dátach", _rm.status_code == 200 and b"macrodata" in _rm.data and "nepodarilo načítať" in _rm.get_data(as_text=True))
+_mc.get_points = _ogp
+
+_pp = dict(rev0=1e9, g1=0.10, margin0=0.15, margin5=0.20, wacc=0.09, g_term=0.03, net_debt=0.0, shares=1e8, dilution=0.0)
+_s2 = _V2.dcf_sensitivity2(_pp)
+check("DCF: druhá tabuľka 5×5, vyšší rast aj marža = vyššia hodnota", len(_s2["grid"]) == 5 and len(_s2["grid"][0]) == 5
+      and _s2["grid"][4][4] > _s2["grid"][2][2] > _s2["grid"][0][0])
+_rf = cl.get("/company/DEMOCO/fundamental").get_data(as_text=True)
+check("DCF: stránka ukáže druhú tabuľku citlivosti a farbenie voči cene", "Rast \\ FCF marža" in _rf and ("sgood" in _rf or "sbad" in _rf))
+
+import app as _a3
+_a3.thesis.PATH = _th2.PATH
+_rp = cl.post("/company/DEMOCO/thesis", data={"why": "demo dôvod", "sell_if": "", "watch": "", "note": "n1", "back": "overview"}, follow_redirects=True)
+_ro = _rp.get_data(as_text=True)
+check("téza: uloženie cez formulár a zobrazenie na úvodnej stránke", _rp.status_code == 200 and "Moja téza" in _ro and "demo dôvod" in _ro and "n1" in _ro)
+check("téza: karta je aj na stránke výsledkov", "Moja téza" in cl.get("/company/DEMOCO/earnings").get_data(as_text=True))
+_ri = cl.get("/company/DEMOCO/insiders")
+check("insideri: ukážková firma dá vysvetlenie, nie pád", _ri.status_code == 200 and "Insider transakcie" in _ri.get_data(as_text=True))
+
+_ol = _a3._load_peer
+_a3._load_peer = lambda t: (t, {"ticker": t, "name": t + " Inc", "currency": "USD", "fy": None, "revenue": 1e9, "rev_cagr3": 0.1, "op_margin": 0.2, "net_margin": 0.1,
+                                 "fcf_margin": None, "roe": 0.15, "roic": None, "nd_ebitda": None, "piotroski": None, "altman": None, "mcap": 1e10,
+                                 "pe": 20.0 if t == "AAA" else 12.0, "ps": None, "ev_ebitda": None, "fcf_yield": None}, None) if t != "ZZZ" else (t, None, "ZZZ: chyba")
+_rc = cl.get("/compare?t=AAA,BBB,ZZZ")
+_rct = _rc.get_data(as_text=True)
+check("porovnanie: tabuľka pre dve firmy, chyba tretej sa ukáže a nezhodí stránku", _rc.status_code == 200 and "AAA Inc" in _rct and "BBB Inc" in _rct and "ZZZ: chyba" in _rct and "P/E" in _rct)
+check("porovnanie: jedna firma = výzva na ďalšiu; prázdne = návod", "aspoň dve firmy" in cl.get("/compare?t=AAA").get_data(as_text=True) and cl.get("/compare").status_code == 200)
+check("porovnanie: neplatný ticker sa odmietne bez pádu", cl.get("/compare?t=%3Cscript%3E").status_code == 200)
+_a3._load_peer = _ol
+
+_owl, _ocr = _a3.watchlist.load, _a3._calendar_row
+_a3.watchlist.load = lambda: [{"ticker": "AAA", "name": "A Inc"}]
+_a3._calendar_row = lambda it: {"ticker": it[0], "name": it[1], "shares": it[2], "earnings": {"date": (_date.today() + _tdelta(days=20)).isoformat(), "basis": "rovnaký kvartál vlani"},
+                                "dividend": None, "div_ccy": None, "last_release": "2026-10-30", "note": None}
+_rk = cl.get("/calendar")
+check("kalendár: stránka ukáže časovú os s odhadom a upozornenie, že ide o odhady", _rk.status_code == 200 and "Výsledky (odhad)" in _rk.get_data(as_text=True) and "odhady" in _rk.get_data(as_text=True))
+_a3.watchlist.load = lambda: []
+check("kalendár: bez firiem návod, nie pád", "Zatiaľ tu nič nie je" in cl.get("/calendar").get_data(as_text=True) or cl.get("/calendar").status_code == 200)
+_a3.watchlist.load, _a3._calendar_row = _owl, _ocr
+
+_mb, _ = _appmod.edgar.find_company("DEMOBANK")
+_bb = _appmod.statements.build(_appmod.edgar.load_company(*_mb), "annual", 8)
+_ogp2 = _appmod.macro.get_points
+_appmod.macro.get_points = lambda sid: [(f"{y}-{mo:02d}-01", 2.0 + (y - 2018) * 0.5) for y in range(2015, 2027) for mo in range(1, 13)]
+_rr = _appmod._rates_card(_bb, "bank")
+check("banky: karta sadzieb spáruje maržu s priemerom sadzieb za rok", _rr and len(_rr["rows"]) >= 2 and _rr["rows"][0]["fed"] is not None and 0 < _rr["rows"][0]["margin"] < 0.1)
+_appmod.macro.get_points = lambda sid: None
+check("banky: bez dát z FRED karta nevznikne, appka nespadne", _appmod._rates_card(_bb, "bank") is None)
+_appmod.macro.get_points = _ogp2
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Insideri · {{ ticker }} · mkej{% endblock %}
+{% block content %}
+{% set i = ins %}
+<div class="pagehead"><h1>🕴 Insider transakcie</h1>
+  <div class="sub">{{ name }} · formuláre 4 zo SEC: nákupy a predaje vedenia, predstavenstva a veľkých akcionárov</div></div>
+{% if i.error %}<div class="warn">{{ i.error }}</div>
+{% else %}
+{% set s = i.summary %}
+<div class="card">
+  <h2>Posledných {{ s.days }} dní (len nákupy a predaje na trhu)</h2>
+  <div class="kpis kpis-big">
+    <div class="kpi"><div class="l">Nákupy</div><div class="v">{{ s.n_buy }}</div><div class="note">{{ s.buy_value|fmt('big') }}</div></div>
+    <div class="kpi"><div class="l">Predaje</div><div class="v">{{ s.n_sell }}</div><div class="note">{{ s.sell_value|fmt('big') }}</div></div>
+    <div class="kpi"><div class="l">Čisto (nákup − predaj)</div><div class="v {{ 'neg' if s.net < 0 }}">{{ s.net|fmt('big') }}</div></div>
+  </div>
+  <p class="note">Nákup na voľnom trhu za vlastné peniaze je zvyčajne silnejší signál ako predaj: predávať sa dá aj kvôli daniam, diverzifikácii alebo pre plánované predaje (označené 10b5-1). Udelené akcie, uplatnenie opcií a zrážky dane sa do súčtu nerátajú. Ceny sú v USD. Načítaných {{ i.n_filings }} najnovších podaní.</p>
+</div>
+<div class="card">
+  <h2>Transakcie</h2>
+  {% if i.txs %}
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Dátum</th><th>Kto</th><th>Druh</th><th>Akcie</th><th>Cena</th><th>Hodnota</th><th>Drží po</th></tr></thead><tbody>
+    {% for t in i.txs %}<tr class="{{ 'ins-buy' if t.code == 'P' else 'ins-sell' if t.code == 'S' }}">
+      <td style="white-space:nowrap">{{ t.date }}</td><td>{{ t.who }}<div class="note">{{ t.title }}</div></td>
+      <td>{{ t.kind }}{% if t.plan %} <span class="note">(plán 10b5-1)</span>{% endif %}</td>
+      <td>{{ '{:,.0f}'.format(t.shares).replace(',', ' ') }}</td><td>{{ '%.2f'|format(t.price) if t.price else '–' }}</td>
+      <td>{{ (t.shares * t.price)|fmt('big') if t.price else '–' }}</td><td>{{ '{:,.0f}'.format(t.after).replace(',', ' ') if t.after is not none else '–' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<p class="note">Vo formulároch 4 nie sú žiadne transakcie s akciami.</p>{% endif %}
+  <p class="note">Inštitucionálne držby (formulár 13F) tu nie sú: podávajú sa za fond, nie za firmu, takže zo SEC sa nedajú jednoducho zobraziť pre jednu akciu.</p>
+</div>
+{% endif %}
+{% endblock %}

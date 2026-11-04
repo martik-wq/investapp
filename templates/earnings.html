@@ -8,6 +8,7 @@
   <div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>
 {% endfor %}
 
+{% with back = "earnings", stale_since = (e.releases[0].date if e.releases else none) %}{% include "_thesis.html" %}{% endwith %}
 {% if e.releases %}
 <div class="card">
   <h2>Obdobie</h2>

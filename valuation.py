@@ -235,6 +235,20 @@ def dcf_sensitivity(p, waccs=None, gts=None):
     return {"waccs": waccs, "gts": gts, "grid": grid}
 
 
+def dcf_sensitivity2(p, g1s=None, m5s=None):
+    """Druhá tabuľka citlivosti: rast v rokoch 1 až 5 × cieľová FCF marža (WACC a terminálny rast ostávajú)."""
+    g1s = g1s or [p["g1"] + d for d in (-0.04, -0.02, 0, 0.02, 0.04)]
+    m5s = m5s or [p["margin5"] + d for d in (-0.06, -0.03, 0, 0.03, 0.06)]
+    grid = []
+    for g in g1s:
+        row = []
+        for m in m5s:
+            r = dcf(p["rev0"], g, p["margin0"], m, p["wacc"], p["g_term"], p["net_debt"], p["shares"], p["dilution"])
+            row.append(None if "error" in r else r["per_share"])
+        grid.append(row)
+    return {"g1s": g1s, "m5s": m5s, "grid": grid}
+
+
 def fair_pb(roe, ke, g):
     """Férové P/B = (ROE − g) / (ke − g) (model trvalo udržateľného rastu)."""
     if ke <= g + 0.005:

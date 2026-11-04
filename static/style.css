@@ -493,3 +493,11 @@ pre.transcript{white-space:pre-wrap;word-wrap:break-word;max-height:520px;overfl
 .sig.bull{background:#dcfce7;color:#166534}.sig.bear{background:#fee2e2;color:#991b1b}.sig.neu{background:#f1f5f9;color:#475569}
 #tvbox{min-height:0;margin-top:6px}
 #tvbox .tradingview-widget-container{width:100%}
+.thesisform{display:grid;gap:10px}
+.thesisform label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:#334155}
+.thesisform textarea,.thesisform input{font:inherit;font-weight:400;padding:8px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;width:100%;box-sizing:border-box}
+tr.ins-buy td:first-child{box-shadow:inset 3px 0 #15803d}
+tr.ins-sell td:first-child{box-shadow:inset 3px 0 #b91c1c}
+.macrochart{margin:4px 0}
+table.sens td.sgood{background:#ecfdf3}
+table.sens td.sbad{background:#fef2f2}

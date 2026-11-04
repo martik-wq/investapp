@@ -13,6 +13,10 @@ from flask import (Flask, Response, abort, flash, jsonify, redirect, render_temp
                    url_for)
 
 import earnings
+import events
+import insider
+import macro
+import thesis
 import edgar
 import excel
 import filings
@@ -118,6 +122,7 @@ SECTIONS = [
     ("charts", "Grafy", "📈"),
     ("fundamental", "Fundamentálna analýza", "🔎"),
     ("technical", "Technická analýza", "📉"),
+    ("insiders", "Insideri", "🕴"),
 ]
 SECTION_KEYS = {k for k, _, _ in SECTIONS}
 YEARS_OPTIONS = (5, 8, 10, 15, 20, 30)  # 30 = všetko dostupné
@@ -249,7 +254,7 @@ def build_context(ticker, section):
     ctx = {"ticker": match[0], "name": match[2], "section": section, "mode": p["mode"],
            "typ": p["typ"], "price": p["price_raw"], "years": p["years"], "detail": p["detail"],
            "years_options": YEARS_OPTIONS, "types": BUSINESS_TYPES, "sections": SECTIONS,
-           "qs": _qs(p), "today": date.today()}
+           "qs": _qs(p), "today": date.today(), "thesis": thesis.get(match[0])}
     if section == "technical":
         ctx["tech"] = _technical(match[0])
         return ctx
@@ -293,6 +298,12 @@ def build_context(ticker, section):
                 ctx["det_error"] = str(e)
     elif section == "earnings":
         ctx["earn"] = _earnings(comp, match[0])
+    elif section == "insiders":
+        try:
+            ctx["ins"] = insider.get_insider(comp)
+        except Exception as e:  # noqa: BLE001 - doplnková sekcia nesmie zhodiť stránku
+            app.logger.exception("Insider transakcie zlyhali")
+            ctx["ins"] = {"error": f"Insider transakcie sa nepodarilo načítať ({type(e).__name__})."}
     elif section == "fundamental":
         try:
             ctx["fund"] = _fundamental(comp, match[0], btype, price, quote, is_demo)
@@ -367,7 +378,58 @@ def _fundamental(comp, ticker, btype, price, quote, is_demo):
     view["quality"] = quality.build(annual, facts, btype)
     view["moat"] = moat.build(annual, facts, btype, view.get("wacc_used"), price, mcap, view.get("reverse"))
     view["peers"] = _peers(comp, ticker, btype, annual, facts, quote, is_demo)
+    view["rates"] = _rates_card(annual, btype) if btype == "bank" and not is_demo else None
     return view
+
+
+def _rates_card(built, btype):
+    """Banky: čistý úrokový výnos / priemerné aktíva (približná marža) vedľa priemerných sadzieb Fedu a 10-ročného výnosu."""
+    try:
+        ff, t10 = macro.get_points("FEDFUNDS"), macro.get_points("DGS10")
+        if not ff:
+            return None
+        ends = built["display"]
+        nii, ta = built["data"].get("nii", {}), built["data"].get("total_assets", {})
+        rows = []
+        for i, e in enumerate(ends):
+            prev = ends[i - 1] if i else None
+            if nii.get(e) is None or ta.get(e) is None:
+                continue
+            avg = (ta[e] + ta[prev]) / 2 if prev and ta.get(prev) is not None else ta[e]
+            y = e.year
+            rows.append({"year": e.year, "margin": nii[e] / avg if avg else None,
+                         "fed": macro.annual_avg(ff, y), "t10": macro.annual_avg(t10, y) if t10 else None})
+        return {"rows": rows} if len(rows) >= 2 else None
+    except Exception:  # noqa: BLE001 - doplnok
+        app.logger.exception("Karta sadzieb zlyhala")
+        return None
+
+
+def _load_peer(t):
+    """Stĺpec porovnania pre ticker t: (ticker, peer_metrics | None, chyba | None). Chyba jednej firmy nezhodí stránku."""
+    import fundamental
+    try:
+        m, _ = edgar.find_company(t)
+        if not m:
+            return t, None, f"Ticker „{t}“ sa nenašiel."
+        c = edgar.load_company(*m)
+        try:
+            b = statements.build(c, "annual", 8)
+        except edgar.EdgarError:
+            alt = None if c.get("source") == "yahoo" or c["is_demo"] else edgar.yahoo_company(*m)
+            if not alt:
+                raise
+            c = alt
+            b = statements.build(c, "annual", 8)
+        f = valuation.history_facts(b, None)
+        bt = metrics.detect_type(c, b)
+        q = DEMO_QUOTE if c["is_demo"] else prices.get_price(m[0])
+        q = dict(q) if q else None
+        if q and q["currency"] != b["currency"]:
+            q["mismatch"] = True
+        return t, fundamental.peer_metrics(c["name"], m[0], b, f, bt, q, c.get("shares_out")), None
+    except Exception as e:  # noqa: BLE001 - jedna zlá firma nesmie zhodiť stránku
+        return t, None, f"{t}: {e}"
 
 
 def _peers(comp, ticker, btype, built, facts, quote, is_demo):
@@ -388,22 +450,7 @@ def _peers(comp, ticker, btype, built, facts, quote, is_demo):
         return out
     me = fundamental.peer_metrics(comp["name"], ticker, built, facts, btype, quote, comp.get("shares_out"))
 
-    def load(t):
-        try:
-            m, _ = edgar.find_company(t)
-            if not m:
-                return t, None, f"Ticker „{t}“ sa nenašiel."
-            c = edgar.load_company(*m)
-            b = statements.build(c, "annual", 8)
-            f = valuation.history_facts(b, None)
-            bt = metrics.detect_type(c, b)
-            q = DEMO_QUOTE if c["is_demo"] else prices.get_price(m[0])
-            q = dict(q) if q else None
-            if q and q["currency"] != b["currency"]:
-                q["mismatch"] = True
-            return t, fundamental.peer_metrics(c["name"], m[0], b, f, bt, q, c.get("shares_out")), None
-        except Exception as e:  # noqa: BLE001 - jedna zlá firma nesmie zhodiť stránku
-            return t, None, f"{t}: {e}"
+    load = _load_peer
 
     with ThreadPoolExecutor(max_workers=4) as ex:
         res = list(ex.map(load, wanted))
@@ -874,6 +921,122 @@ def watchlist_remove():
 def watchlist_target():
     watchlist.set_target(request.form.get("ticker", ""), request.form.get("target", ""))
     return redirect(url_for("watchlist_view"))
+
+
+# ------------------------------------------------------------------ téza
+@app.route("/company/<ticker>/thesis", methods=["POST"])
+def thesis_save(ticker):
+    t = ticker.upper()
+    price = None
+    try:
+        q = prices.get_price(t)
+        price = q["price"] if q else None
+    except Exception:  # noqa: BLE001
+        price = None
+    f = request.form
+    ok, msg = thesis.save(t, f.get("why", ""), f.get("sell_if", ""), f.get("watch", ""), f.get("note", ""), price)
+    flash(msg, "ok" if ok else "warn")
+    back = request.form.get("back", "overview")
+    return redirect(url_for("section_view", ticker=t, section=back if back in SECTION_KEYS else "overview") + "#thesis")
+
+
+# ------------------------------------------------------------------ porovnanie firiem
+@app.route("/compare")
+def compare_view():
+    import fundamental
+    from concurrent.futures import ThreadPoolExecutor
+    raw = request.args.get("t", "")
+    wanted, bad = [], []
+    for t in re.split(r"[,\s;]+", raw.upper()):
+        t = t.strip()
+        if not t or t in wanted:
+            continue
+        (wanted if re.fullmatch(r"[A-Z0-9.\-]{1,12}", t) else bad).append(t)
+    wanted = wanted[:6]
+    out = {"input": ", ".join(wanted), "errors": [f"Ticker „{t[:20]}“ sa nenašiel." for t in bad], "cols": [], "table": None}
+    if wanted:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            res = list(ex.map(_load_peer, wanted))
+        out["cols"] = [c for _t, c, _e in res if c]
+        out["errors"] += [e for _t, c, e in res if e]
+        if len(out["cols"]) >= 2:
+            out["table"] = fundamental.peer_table(out["cols"])
+        elif out["cols"]:
+            out["errors"].append("Na porovnanie treba aspoň dve firmy s dostupnými výkazmi.")
+    suggest = []
+    for t in [w["ticker"] for w in watchlist.load()][:12]:
+        if t not in suggest:
+            suggest.append(t)
+    return render_template("compare.html", page="compare", ticker=None, section=None, cmp=out, suggest=suggest)
+
+
+# ------------------------------------------------------------------ kalendár
+def _calendar_tickers():
+    """Tickery z watchlistu a otvorených pozícií portfólia: [(ticker, názov, počet kusov | None)]."""
+    seen, out = set(), []
+    for w in watchlist.load():
+        if w["ticker"] not in seen:
+            seen.add(w["ticker"])
+            out.append((w["ticker"], w.get("name") or w["ticker"], None))
+    try:
+        store = portfolio.load_store()
+        txns = list(store["txns"].values())
+        if txns:
+            fn = _pf_symbol_fn(store)
+            for p in portfolio.build_positions(txns)["open"]:
+                sym = fn(p["isin"], p["ticker"])
+                if sym and sym not in seen:
+                    seen.add(sym)
+                    out.append((sym, p.get("name") or sym, p.get("shares")))
+                elif sym:
+                    out = [(a, b, p.get("shares") if a == sym else c) for a, b, c in out]
+    except Exception:  # noqa: BLE001 - portfólio je len doplnok
+        app.logger.exception("Kalendár: portfólio sa nepodarilo načítať")
+    return out[:40]
+
+
+def _calendar_row(item):
+    t, name, shares = item
+    row = {"ticker": t, "name": name, "shares": shares, "earnings": None, "dividend": None, "div_ccy": None,
+           "last_release": None, "note": None}
+    try:
+        m, _ = edgar.find_company(t)
+        if m and str(m[1]).isdigit():
+            subs = edgar._get_json(edgar.SUBS_URL.format(cik=m[1]), f"subs_{m[1]}.json")
+            rel = earnings.list_releases({"filings": (subs.get("filings") or {}).get("recent") or {}}, n=12)
+            if rel:
+                row["last_release"] = rel[0]["date"]
+                row["earnings"] = events.estimate_next_earnings([r["date"] for r in rel])
+        elif m:
+            row["note"] = "Výsledky: pre firmy mimo SEC dátum neodhadujem."
+    except Exception:  # noqa: BLE001
+        row["note"] = "Dátum výsledkov sa nepodarilo zistiť."
+    try:
+        dv = prices.get_dividends(t)
+        if dv and dv["items"]:
+            row["dividend"] = events.dividend_info(dv["items"])
+            row["div_ccy"] = dv.get("currency")
+    except Exception:  # noqa: BLE001
+        pass
+    return row
+
+
+@app.route("/calendar")
+def calendar_view():
+    from concurrent.futures import ThreadPoolExecutor
+    items = _calendar_tickers()
+    rows = []
+    if items:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            rows = list(ex.map(_calendar_row, items))
+    return render_template("calendar.html", page="calendar", ticker=None, section=None, rows=rows,
+                           timeline=events.upcoming(rows), today=date.today())
+
+
+# ------------------------------------------------------------------ makro
+@app.route("/macro")
+def macro_view():
+    return render_template("macro.html", page="macro", ticker=None, section=None, cards=macro.page_data())
 
 
 @app.route("/")

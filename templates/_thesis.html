@@ -1,0 +1,25 @@
+{# Karta Moja téza: parameter back = sekcia, na ktorú sa vrátiť po uložení; thesis = zo kontextu; stale_since = dátum posledných výsledkov #}
+<div class="card" id="thesis">
+  <h2>📝 Moja téza</h2>
+  {% if thesis and stale_since and stale_since > (thesis.updated or '') %}
+  <div class="warn">Od poslednej úpravy tézy ({{ thesis.updated }}) vyšli nové výsledky ({{ stale_since }}). Prečítaj si ich a skontroluj, či téza stále platí.</div>
+  {% endif %}
+  <form method="post" action="{{ url_for('thesis_save', ticker=ticker) }}" class="thesisform">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label>Prečo firmu držím alebo chcem kúpiť
+      <textarea name="why" rows="3" maxlength="3000" placeholder="napr. rastúca platforma, silná marža, lacná voči rastu">{{ thesis.why if thesis }}</textarea></label>
+    <label>Kedy by som predal (čo by pokazilo tézu)
+      <textarea name="sell_if" rows="2" maxlength="3000" placeholder="napr. rast tržieb pod 10 % dva kvartály po sebe, strata marže">{{ thesis.sell_if if thesis }}</textarea></label>
+    <label>Čo sledovať v ďalších výsledkoch
+      <textarea name="watch" rows="2" maxlength="3000" placeholder="napr. NIM, náklady na úvery, počet zákazníkov">{{ thesis.watch if thesis }}</textarea></label>
+    <label>Nová poznámka do denníka (voliteľné)
+      <input name="note" maxlength="600" placeholder="napr. po Q3: marže lepšie, téza platí"></label>
+    <div><button>Uložiť</button>
+      <span class="note">{% if thesis %}Naposledy upravená téza: {{ thesis.updated }}{% if thesis.price is not none %} · cena vtedy {{ '%.2f'|format(thesis.price) }}{% endif %}{% else %}Zatiaľ nič nezapísané{% endif %} · uložené len u teba v počítači.</span></div>
+  </form>
+  {% if thesis and thesis.log %}
+  <details style="margin-top:8px"><summary>Denník poznámok ({{ thesis.log|length }})</summary>
+    <table class="plain"><tbody>{% for l in thesis.log %}<tr><td style="white-space:nowrap">{{ l.d }}</td><td>{{ l.t }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+  {% endif %}
+</div>

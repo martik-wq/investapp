@@ -52,6 +52,7 @@
 </div>
 {% endif %}
 
+{% with back = "overview", stale_since = none %}{% include "_thesis.html" %}{% endwith %}
 <div class="card">
   <h2>Kľúčové metriky <span class="note">(posledné obdobie: {{ last.strftime('%d.%m.%Y') }}{{ ', TTM' if result.ttm }})</span></h2>
   <div class="kpis kpis-big">

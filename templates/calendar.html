@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Kalendár · mkej{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>🗓 Kalendár výsledkov a dividend</h1>
+  <div class="sub">Firmy z tvojho watchlistu a portfólia · dnes {{ today.strftime('%d.%m.%Y') }}</div></div>
+<div class="warn">Všetky dátumy sú <strong>odhady</strong>. Výsledky odhadujem podľa toho, kedy firma zverejnila rovnaký kvartál vlani, ex-dividendy podľa rozstupu posledných výplat. Presný termín firma oznámi väčšinou 2 až 4 týždne vopred, over ho na jej stránke pre investorov.</div>
+{% if not rows %}
+<p class="note">Zatiaľ tu nič nie je. Pridaj firmy do <a href="{{ url_for('watchlist_view') }}">watchlistu</a> alebo nahraj <a href="{{ url_for('portfolio_view') }}">portfólio</a>.</p>
+{% else %}
+<div class="card"><h2>Najbližších 120 dní</h2>
+  {% if timeline %}
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Dátum (odhad)</th><th>Firma</th><th>Udalosť</th><th>Poznámka</th></tr></thead><tbody>
+    {% for e in timeline %}<tr><td style="white-space:nowrap"><strong>{{ e.date[8:10] }}.{{ e.date[5:7] }}.{{ e.date[:4] }}</strong></td>
+      <td><a href="{{ url_for('section_view', ticker=e.ticker, section='earnings' if e.kind.startswith('Výsledky') else 'overview') }}">{{ e.ticker }}</a> <span class="note">{{ e.name }}</span></td><td>{{ e.kind }}</td><td class="note">{{ e.note }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<p class="note">V najbližších 120 dňoch nie je podľa odhadu žiadna udalosť.</p>{% endif %}
+</div>
+<div class="card"><h2>Prehľad po firmách</h2>
+  <div class="tablewrap"><table class="plain"><thead><tr><th>Firma</th><th>Posledné výsledky</th><th>Ďalšie výsledky (odhad)</th><th>Dividenda</th><th>Ďalšia ex-dividenda (odhad)</th></tr></thead><tbody>
+  {% for r in rows %}<tr>
+    <td><a href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}">{{ r.ticker }}</a> <span class="note">{{ r.name }}</span>{% if r.shares %}<div class="note">{{ '%.6g'|format(r.shares) }} ks</div>{% endif %}</td>
+    <td>{{ r.last_release or '–' }}</td>
+    <td>{% if r.earnings %}{{ r.earnings.date }}<div class="note">{{ r.earnings.basis }}</div>{% else %}–{% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}{% endif %}</td>
+    <td>{% if r.dividend %}{{ '%.4g'|format(r.dividend.last_amount) }} {{ r.div_ccy or '' }} {{ r.dividend.freq }}<div class="note">za 12 mesiacov {{ '%.4g'|format(r.dividend.year_sum) }}{% if r.shares %} × {{ '%.6g'|format(r.shares) }} ks ≈ {{ '%.2f'|format(r.dividend.year_sum * r.shares) }} {{ r.div_ccy or '' }}{% endif %}</div>{% else %}nevypláca{% endif %}</td>
+    <td>{{ r.dividend.next_date if r.dividend and r.dividend.next_date else '–' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="note">Dividendový príjem pri pozíciách je hrubý (pred zrážkovou daňou) a v mene dividendy. Ak firma nezmenila výšku dividendy, ide o jednoduchý násobok počtu kusov.</p>
+</div>
+{% endif %}
+{% endblock %}

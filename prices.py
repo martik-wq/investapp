@@ -409,3 +409,29 @@ def get_risk_free():
         v = q["price"] / 100.0
         return v if 0 < v < 0.2 else None
     return None
+
+
+DIV_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=2y&interval=1mo&events=div"
+
+
+def get_dividends(symbol):
+    """História dividend za 2 roky: {'items': [[ISO ex-dátum, suma]], 'currency'} alebo None (chyba siete).
+    Firma bez dividend vráti {'items': []}."""
+    from datetime import datetime, timezone
+    sym = _sym(symbol)
+    name = f"div_{re.sub(r'[^A-Za-z0-9]', '_', sym)}.json"
+    hit = _cached(name, 12 * 3600)
+    if hit:
+        return hit
+    try:
+        r = requests.get(DIV_URL.format(sym=requests.utils.quote(sym)), headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        res = r.json()["chart"]["result"][0]
+        ev = (res.get("events") or {}).get("dividends") or {}
+        items = sorted([datetime.fromtimestamp(e["date"], timezone.utc).date().isoformat(), float(e["amount"])]
+                       for e in ev.values())
+        out = {"items": items, "currency": (res.get("meta") or {}).get("currency")}
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None
+    _store(name, out)
+    return out

@@ -106,6 +106,16 @@
 
 {% set mo = fund.moat %}
 {% if mo %}
+{% if fund.rates %}
+<div class="card" id="rates">
+  <h2>Úrokové sadzby a zisk z úrokov</h2>
+  <div class="tablewrap"><table class="pf"><thead><tr><th>Rok</th><th>Čistý úrok / priem. aktíva</th><th>Sadzba Fed (priemer roka)</th><th>10-ročný výnos USA (priemer roka)</th></tr></thead><tbody>
+    {% for r in fund.rates.rows %}<tr><td>{{ r.year }}</td><td>{{ pc(r.margin, 2) if r.margin is not none else '–' }}</td><td>{{ (('%.2f'|format(r.fed)).replace('.', ',') ~ ' %') if r.fed is not none else '–' }}</td><td>{{ (('%.2f'|format(r.t10)).replace('.', ',') ~ ' %') if r.t10 is not none else '–' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="note">Približná úroková marža banky (čistý úrokový výnos delený priemernými aktívami) vedľa priemerných sadzieb. Banka s lacnými vkladmi zvyčajne zarába viac, keď sadzby rastú; banka s drahým financovaním (veľa termínovaných vkladov) pri rýchlom raste sadzieb naopak stráca maržu. Rok výkazu sa porovnáva s kalendárnym rokom, aj keď firma má iný fiškálny rok. Zdroj sadzieb FRED.</p>
+</div>
+{% endif %}
+
 <div class="card" id="moat">
   <h2>Prečo trh platí prémiu? <span class="info" tabindex="0" data-tip="Značku, sieťové efekty ani patenty z výkazov vyčítať nejde. Karta meria ich dôsledky v číslach: či kapitál dlhodobo zarába viac, než stojí, či sú marže vysoké a stabilné a či sa zisk mení na hotovosť.">ⓘ</span></h2>
   {% if mo.skip %}
@@ -223,8 +233,15 @@
           {% if m.key == 'dcf' and d.sens %}
           <h3>Citlivosť: hodnota na akciu podľa WACC a terminálneho rastu</h3>
           <div class="tablewrap"><table class="pf sens"><thead><tr><th>WACC \ rast</th>{% for g in d.sens.gts %}<th>{{ pc(g) }}</th>{% endfor %}</tr></thead><tbody>
-            {% for w in d.sens.waccs %}{% set i = loop.index0 %}<tr><td><strong>{{ pc(w) }}</strong></td>{% for v in d.sens.grid[i] %}<td class="{{ 'sbase' if i == 2 and loop.index0 == 2 }}">{{ money(v) }}</td>{% endfor %}</tr>{% endfor %}
+            {% for w in d.sens.waccs %}{% set i = loop.index0 %}<tr><td><strong>{{ pc(w) }}</strong></td>{% for v in d.sens.grid[i] %}<td class="{{ 'sbase' if i == 2 and loop.index0 == 2 }} {{ ('sgood' if v > d.price else 'sbad') if v is not none and d.price }}">{{ money(v) }}</td>{% endfor %}</tr>{% endfor %}
           </tbody></table></div>
+          {% if d.sens2 %}
+          <h3>Citlivosť: hodnota na akciu podľa rastu v rokoch 1 až 5 a cieľovej FCF marže</h3>
+          <div class="tablewrap"><table class="pf sens"><thead><tr><th>Rast \ FCF marža</th>{% for m in d.sens2.m5s %}<th>{{ pc(m) }}</th>{% endfor %}</tr></thead><tbody>
+            {% for g in d.sens2.g1s %}{% set i = loop.index0 %}<tr><td><strong>{{ pc(g) }}</strong></td>{% for v in d.sens2.grid[i] %}<td class="{{ 'sbase' if i == 2 and loop.index0 == 2 }} {{ ('sgood' if v > d.price else 'sbad') if v is not none and d.price }}">{{ money(v) }}</td>{% endfor %}</tr>{% endfor %}
+          </tbody></table></div>
+          <p class="note">Zelené políčka sú nad aktuálnou cenou {% if d.price %}({{ money(d.price) }}){% endif %}, červené pod ňou. Tabuľky ukazujú, ktoré predpoklady držia tézu: ak sa firma „oplatí“ len pri optimistickom raste a marži, margin of safety je tenká.</p>
+          {% endif %}
           <details style="margin-top:10px"><summary>Ročné prognózy (v mil. {{ fund.currency }})</summary>
             <div class="tablewrap"><table class="pf"><thead><tr><th>Rok</th><th>Rast</th><th>Tržby</th><th>FCF marža</th><th>FCF</th><th>Dnešná hodnota FCF</th></tr></thead><tbody>
             {% for r in d.base.rows %}<tr><td>{{ r.t }}</td><td>{{ pc(r.growth) }}</td><td>{{ '{:,.0f}'.format(r.revenue / 1e6).replace(',', ' ') }}</td><td>{{ pc(r.margin) }}</td><td>{{ '{:,.0f}'.format(r.fcf / 1e6).replace(',', ' ') }}</td><td>{{ '{:,.0f}'.format(r.pv / 1e6).replace(',', ' ') }}</td></tr>{% endfor %}

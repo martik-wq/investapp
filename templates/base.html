@@ -16,6 +16,9 @@
   </form>
   <a class="gnav {{ 'on' if page == 'portfolio' }}" href="{{ url_for('portfolio_view') }}"><span class="ic">💼</span>Portfólio</a>
   <a class="gnav {{ 'on' if page == 'watchlist' }}" href="{{ url_for('watchlist_view') }}"><span class="ic">👁</span>Watchlist</a>
+  <a class="gnav {{ 'on' if page == 'compare' }}" href="{{ url_for('compare_view') }}"><span class="ic">⚖</span>Porovnanie</a>
+  <a class="gnav {{ 'on' if page == 'calendar' }}" href="{{ url_for('calendar_view') }}"><span class="ic">🗓</span>Kalendár</a>
+  <a class="gnav {{ 'on' if page == 'macro' }}" href="{{ url_for('macro_view') }}"><span class="ic">🌍</span>Makro</a>
   {% if ticker %}
   <div class="coBox">
     <div class="coTick">{{ ticker }}</div>

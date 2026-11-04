@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Makro · mkej{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>🌍 Makro dáta</h1>
+  <div class="sub">Sadzby, výnosová krivka, inflácia a práca · zdroj FRED (Federal Reserve Bank of St. Louis) · posledných 10 rokov · obnova každých 12 hodín</div></div>
+<script id="macrodata" type="application/json">{{ cards|tojson }}</script>
+<div class="grid2" id="macrogrid">
+{% for c in cards %}
+  <div class="card macrocard" data-id="{{ c.id }}">
+    <h2>{{ c.name }}</h2>
+    {% if c.points %}
+    <div class="revrow"><div class="bigprice" style="font-size:26px">{{ ('%.2f'|format(c.last)).replace('.', ',') }} {{ c.unit }}</div>
+      <div class="note">k {{ c.last_date }}{% if c.chg_1y is not none %} · za rok {{ ('%+.2f'|format(c.chg_1y)).replace('.', ',') }} p. b.{% endif %}</div></div>
+    <div class="macrochart" id="mc-{{ c.id }}"></div>
+    {% else %}<div class="warn">Údaje z FRED sa nepodarilo načítať (internet alebo FRED nie je dostupný).</div>{% endif %}
+    <p class="note">{{ c.desc }}</p>
+  </div>
+{% endfor %}
+</div>
+<script src="{{ url_for('static', filename='macro.js') }}"></script>
+{% endblock %}
