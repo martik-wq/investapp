@@ -130,7 +130,20 @@ def load_company(ticker, cik, title):
         facts = _load_demo(ticker, "facts")
         subs = _load_demo(ticker, "subs")
     else:
-        facts = _get_json(FACTS_URL.format(cik=cik), f"facts_{cik}.json")
+        try:
+            facts = _get_json(FACTS_URL.format(cik=cik), f"facts_{cik}.json")
+        except EdgarError as e:
+            # SEC pre túto firmu nevrátilo výkazy (napr. 404 u zahraničného emitenta): skús Yahoo, inak pôvodná chyba
+            import yahoo_fin
+            got = yahoo_fin.load(ticker, title)
+            if not got:
+                raise EdgarError(f"{e} Záložný zdroj (Yahoo Finance) pre „{ticker}“ tiež nevrátil výkazy.") from e
+            yf, cur = got
+            return {"filings": {}, "sec": {"exchanges": [], "website": None, "description": None, "place": "",
+                                           "fiscal_year_end": "", "category": None, "former": []},
+                    "ticker": ticker, "cik": cik, "name": yf.get("entityName") or title, "facts": yf, "sic": None,
+                    "sic_desc": "", "currency": cur, "shares_out": latest_shares_outstanding(yf), "is_demo": False,
+                    "source": "yahoo", "type_hint": _type_hint(ticker)}
         try:
             subs = _get_json(SUBS_URL.format(cik=cik), f"subs_{cik}.json")
         except EdgarError:

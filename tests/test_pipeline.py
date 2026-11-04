@@ -1163,6 +1163,22 @@ _appmod.edgar.find_company = _orig_fc
 check("technická: reálny ticker má TradingView prepínač so symbolom", 'data-symbol="AAPL"' in _tt2 and "embed-widget-" in _tt2 and "tradingview.com/chart/?symbol=AAPL" in _tt2)
 _appmod.prices.get_ohlcv = _orig_oh2
 
+import edgar as _ed2, yahoo_fin as _yf2  # noqa: E402
+_og, _oy = _ed2._get_json, _yf2.load
+def _boom(url, name):
+    raise _ed2.EdgarError("SEC vrátilo 404.")
+_ed2._get_json = _boom
+_yf2.load = lambda t, n: ({"entityName": "Grab Holdings", "facts": {"us-gaap": {}}}, "USD")
+_cg = _ed2.load_company("GRAB", 1855612, "Grab Holdings Ltd")
+check("GRAB: ak SEC nevráti výkazy (404), použije sa Yahoo", _cg["source"] == "yahoo" and _cg["name"] == "Grab Holdings")
+_yf2.load = lambda t, n: None
+try:
+    _ed2.load_company("GRAB", 1855612, "Grab Holdings Ltd"); _ok = False
+except _ed2.EdgarError as e:
+    _ok = "404" in str(e) and "Yahoo" in str(e)
+check("GRAB: ak zlyhá aj Yahoo, chyba povie oboje", _ok)
+_ed2._get_json, _yf2.load = _og, _oy
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
