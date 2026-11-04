@@ -41,6 +41,42 @@
 <script id="techdata" type="application/json">{{ t|tojson }}</script>
 <script src="{{ url_for('static', filename='technical.js') }}"></script>
 
+
+<div class="card" id="tvcard">
+  <h2>TradingView</h2>
+  {% if t.tv %}
+  <div class="techbar">
+    <div class="tgrp" role="group" aria-label="TradingView">
+      <button type="button" data-tv="chart">Graf s kreslením</button><button type="button" data-tv="ta">Signály TradingView</button>
+    </div>
+    <a class="btnlink" href="https://www.tradingview.com/chart/?symbol={{ t.tv|urlencode }}" target="_blank" rel="noopener">Otvoriť na tradingview.com ↗</a>
+  </div>
+  <div id="tvbox" data-symbol="{{ t.tv }}"></div>
+  <p class="note">Widgety sa načítajú až po kliknutí priamo z TradingView (potrebuješ internet). Symbol: <code>{{ t.tv }}</code>. Ich dáta a signály nepoužívajú moje výpočty ani verdikt vyššie, slúžia na porovnanie a ručnú kontrolu. Niektoré burzy majú oneskorené ceny.</p>
+  <script>
+  (function(){
+    var box=document.getElementById('tvbox'); if(!box) return;
+    var sym=box.dataset.symbol;
+    var cfg={chart:['advanced-chart',{autosize:false,width:'100%',height:620,symbol:sym,interval:'D',timezone:'Europe/Bratislava',theme:'light',style:'1',locale:'en',allow_symbol_change:false,calendar:false,support_host:'https://www.tradingview.com'}],
+             ta:['technical-analysis',{interval:'1D',width:'100%',height:450,isTransparent:true,symbol:sym,showIntervalTabs:true,displayMode:'single',locale:'en',colorTheme:'light'}]};
+    document.querySelectorAll('[data-tv]').forEach(function(b){
+      b.addEventListener('click',function(){
+        document.querySelectorAll('[data-tv]').forEach(function(x){x.classList.toggle('on',x===b);});
+        var c=cfg[b.dataset.tv]; box.innerHTML='';
+        var w=document.createElement('div'); w.className='tradingview-widget-container';
+        var i=document.createElement('div'); i.className='tradingview-widget-container__widget'; w.appendChild(i);
+        var sc=document.createElement('script'); sc.type='text/javascript'; sc.async=true;
+        sc.src='https://s3.tradingview.com/external-embedding/embed-widget-'+c[0]+'.js';
+        sc.text=JSON.stringify(c[1]); w.appendChild(sc); box.appendChild(w);
+      });
+    });
+  })();
+  </script>
+  {% else %}
+  <p class="note">Pre tento ticker nepoznám symbol TradingView{% if t.demo %} (ukážková firma){% endif %}. Skús ho nájsť ručne: <a href="https://www.tradingview.com/symbols/" target="_blank" rel="noopener">tradingview.com</a>.</p>
+  {% endif %}
+</div>
+
 <div class="card">
   <h2>Signály</h2>
   <div class="tablewrap"><table class="plain">

@@ -1147,6 +1147,22 @@ _appmod.prices.get_ohlcv = lambda t: None
 check("technická: nedostupné ceny dajú hlášku, nie pád", "nepodarilo stiahnuť" in cl.get("/company/ZZEU/technical").get_data(as_text=True) or cl.get("/company/ZZEU/technical").status_code in (200, 400))
 _appmod.prices.get_ohlcv = _orig_oh
 
+import tvsymbol as _tv  # noqa: E402
+check("TradingView symboly: US, trieda akcií, Soul, Tokio, Hongkong, Xetra, neznáma prípona",
+      _tv.to_tv("AAPL") == "AAPL" and _tv.to_tv("BRK-B") == "BRK.B" and _tv.to_tv("000660.KS") == "KRX:000660"
+      and _tv.to_tv("6146.T") == "TSE:6146" and _tv.to_tv("0700.HK") == "HKEX:700" and _tv.to_tv("SAP.DE") == "XETR:SAP"
+      and _tv.to_tv("ABC.ZZ") is None and _tv.to_tv("") is None and _tv.to_tv("<script>") is None)
+_tt = cl.get("/company/DEMOCO/technical").get_data(as_text=True)
+check("technická: demo firma nemá TradingView widget, ale stránka sa vykreslí", 'id="tvcard"' in _tt and 'id="tvbox"' not in _tt)
+_orig_oh2 = _appmod.prices.get_ohlcv
+_appmod.prices.get_ohlcv = lambda t, years=5: _appmod.technical.synthetic(seed=3)
+_orig_fc = _appmod.edgar.find_company
+_appmod.edgar.find_company = lambda q: ((q.upper(), "0000320193", "Apple Inc."), [])
+_tt2 = cl.get("/company/AAPL/technical").get_data(as_text=True)
+_appmod.edgar.find_company = _orig_fc
+check("technická: reálny ticker má TradingView prepínač so symbolom", 'data-symbol="AAPL"' in _tt2 and "embed-widget-" in _tt2 and "tradingview.com/chart/?symbol=AAPL" in _tt2)
+_appmod.prices.get_ohlcv = _orig_oh2
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

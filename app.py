@@ -29,6 +29,7 @@ import updater
 import yahoo_fin
 import watchlist
 import statements
+import tvsymbol
 import technical
 from taxonomy import BUSINESS_TYPES
 
@@ -905,7 +906,8 @@ def _technical(ticker):
     series = {k: (d[k] if k == "dates" else r2(d[k])) for k in keep}
     return {"error": None, "demo": demo, "currency": o.get("currency") or "", "series": series, "stats": d["stats"],
             "signals": d["signals"], "verdict": d["verdict"], "support": d["support"], "resistance": d["resistance"],
-            "last": d["close"][-1], "last_date": d["dates"][-1]}
+            "last": d["close"][-1], "last_date": d["dates"][-1],
+            "tv": None if demo else tvsymbol.to_tv(ticker)}
 
 
 def _earnings(comp, ticker):
