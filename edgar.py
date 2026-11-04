@@ -108,6 +108,20 @@ def find_company(query):
 
 
 # ------------------------------------------------------------------ načítanie firmy
+def yahoo_company(ticker, cik, title):
+    """Firma postavená z neoficiálnych výkazov Yahoo (záložný zdroj), alebo None, ak ich Yahoo nemá."""
+    import yahoo_fin
+    got = yahoo_fin.load(ticker, title)
+    if not got:
+        return None
+    yf, cur = got
+    return {"filings": {}, "sec": {"exchanges": [], "website": None, "description": None, "place": "",
+                                   "fiscal_year_end": "", "category": None, "former": []},
+            "ticker": ticker, "cik": cik, "name": yf.get("entityName") or title, "facts": yf, "sic": None,
+            "sic_desc": "", "currency": cur, "shares_out": latest_shares_outstanding(yf), "is_demo": False,
+            "source": "yahoo", "type_hint": _type_hint(ticker)}
+
+
 def _type_hint(ticker):
     import directory
     d = directory.by_symbol(ticker)

@@ -258,7 +258,15 @@ def build_context(ticker, section):
     is_demo = comp["is_demo"]
     quote = DEMO_QUOTE if is_demo else prices.get_price(match[0])
     n = p["years"] if p["mode"] == "annual" else p["years"] * 4
-    built = statements.build(comp, mode=p["mode"], n=n)
+    try:
+        built = statements.build(comp, mode=p["mode"], n=n)
+    except edgar.EdgarError:
+        # SEC dáta existujú, ale bez použiteľných výkazov (napr. zahraničný emitent s 20-F bez kvartálov): skús Yahoo
+        alt = None if comp.get("source") == "yahoo" or comp["is_demo"] else edgar.yahoo_company(*match)
+        if not alt:
+            raise
+        comp = alt
+        built = statements.build(comp, mode=p["mode"], n=n)
     user_price = parse_price(p["price_raw"])
     price = user_price
     quote = dict(quote) if quote else None

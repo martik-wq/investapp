@@ -1179,6 +1179,24 @@ except _ed2.EdgarError as e:
 check("GRAB: ak zlyhá aj Yahoo, chyba povie oboje", _ok)
 _ed2._get_json, _yf2.load = _og, _oy
 
+_og3, _oy3, _ofc3, _olc3 = _appmod.edgar.load_company, _appmod.edgar.yahoo_company, _appmod.edgar.find_company, _appmod.statements.build
+_cmp_sec = dict(_appmod.edgar.load_company("DEMOCO", *_appmod.edgar.find_company("DEMOCO")[0][1:]))
+_cmp_sec["is_demo"] = False; _cmp_sec["source"] = "sec"
+_cmp_yf = dict(_cmp_sec); _cmp_yf["source"] = "yahoo"
+_calls = []
+def _fake_build(comp, mode="annual", n=8):
+    _calls.append(comp["source"])
+    if comp["source"] == "sec":
+        raise _appmod.edgar.EdgarError("Pre túto firmu sa nenašli žiadne výkazy v XBRL dátach")
+    return _olc3(_cmp_sec | {"source": "sec", "is_demo": True}, mode=mode, n=n)
+_appmod.edgar.find_company = lambda q: ((q.upper(), "1855612", "Grab Holdings Ltd"), [])
+_appmod.edgar.load_company = lambda t, c, n: _cmp_sec
+_appmod.edgar.yahoo_company = lambda t, c, n: _cmp_yf
+_appmod.statements.build = _fake_build
+_rg = cl.get("/company/GRAB")
+check("GRAB: SEC bez výkazov -> stránka sa načíta cez Yahoo, nie chyba", _rg.status_code == 200 and _calls[:2] == ["sec", "yahoo"], (_rg.status_code, _calls))
+_appmod.edgar.load_company, _appmod.edgar.yahoo_company, _appmod.edgar.find_company, _appmod.statements.build = _og3, _oy3, _ofc3, _olc3
+
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)
