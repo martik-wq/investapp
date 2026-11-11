@@ -1381,6 +1381,14 @@ for _lbl, _kw in (("daňový benefit", {}), ("strata", {"pretax": -301.0, "tax":
     check(f"Sankey banky ({_lbl}): každý uzol má prítok = odtok", _f is not None and _bal(_f), _f and _f["links"])
 check("reverzný DCF pri zápornej FCF marži nič netvrdí", _va.implied_growth(10, dict(rev0=1e9, g1=0.1, margin0=-0.1, margin5=-0.05, wacc=0.09,
       g_term=0.025, net_debt=0, shares=1e8, dilution=0)) is None)
+
+# --- audit živých dát 11/2026: BitMine (SIC 6199 bez úverov) nie je banka, SoFi s NII áno; dividendy ASML
+import metrics as _mt2  # noqa: E402
+_e1 = _dt(2025, 8, 31)
+check("typ: SIC 6199 bez úverov a úrokov = všeobecná firma (BitMine)", _mt2.detect_type({"sic": 6199}, {"data": {"revenue": {_e1: 1e8}}}) == "general")
+check("typ: SIC 6199 s čistým úrokovým výnosom = banka (SoFi)", _mt2.detect_type({"sic": 6199}, {"data": {"nii": {_e1: 1e9}}}) == "bank")
+check("typ: depozitná banka podľa SIC vždy banka", _mt2.detect_type({"sic": 6022}, {"data": {}}) == "bank")
+check("dividendy: značka PaymentsOfOrdinaryDividends (ASML)", "PaymentsOfOrdinaryDividends" in __import__("taxonomy").ITEM_BY_KEY["div_paid"]["tags"])
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

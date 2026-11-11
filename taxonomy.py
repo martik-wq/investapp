@@ -201,7 +201,7 @@ CASHFLOW = [
         "NetCashProvidedByUsedInInvestingActivitiesContinuingOperations",
         "ifrs:CashFlowsFromUsedInInvestingActivities"], bold=True),
     I("div_paid", "Vyplatené dividendy", [
-        "PaymentsOfDividends", "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividends", "PaymentsOfDividendsCommonStock", "PaymentsOfOrdinaryDividends",   # ASML: Ordinary
         "ifrs:DividendsPaidClassifiedAsFinancingActivities"], indent=1),
     I("buybacks", "Spätné odkupy akcií", ["PaymentsForRepurchaseOfCommonStock"], indent=1),
     I("debt_issued", "Emisia dlhu", ["ProceedsFromIssuanceOfLongTermDebt",
@@ -249,6 +249,9 @@ CF_ROWS = [it["key"] for it in CASHFLOW]
 FLOW_KEYS = {it["key"] for it in ALL_ITEMS if it["kind"] == "flow" and it["additive"]}
 
 # SIC kódy -> typ biznisu
+# depozitné banky (vždy banka); ostatné „finančné“ SIC (napr. 6199) majú aj kryptofirmy či fintechy bez úverov
+DEPOSITORY_SIC = {6021, 6022, 6029, 6035, 6036}
+COMMODITY_FUND_SIC = {6221}          # komoditné fondy a trusty (WEAT): nie sú to firmy
 BANK_SIC = {6021, 6022, 6029, 6035, 6036, 6099, 6111, 6141, 6153, 6159, 6162, 6163,
             6172, 6199}
 INSURANCE_SIC = set(range(6300, 6400)) | {6411}

@@ -35,7 +35,7 @@ import watchlist
 import statements
 import tvsymbol
 import technical
-from taxonomy import BUSINESS_TYPES
+from taxonomy import BUSINESS_TYPES, COMMODITY_FUND_SIC
 
 app = Flask(__name__)
 app.secret_key = os.urandom(16).hex()      # len na hlásenia po importe
@@ -308,6 +308,10 @@ def build_context(ticker, section):
         quote["mismatch"] = True
     elif price is None and quote:
         price = quote["price"]
+    if comp.get("sic") in COMMODITY_FUND_SIC:
+        ctx["mode_note"] = ((ctx.get("mode_note") or "") + " Toto je komoditný fond (ETF/trust), nie firma: tržby, zisk ani "
+                            "valuačné modely preň nedávajú zmysel, hodnota fondu sleduje cenu komodity (futures). "
+                            "Použi radšej technickú analýzu a portfólio.").strip()
     auto_type = metrics.detect_type(comp, built)
     btype = p["typ"] if p["typ"] != "auto" else auto_type
     result = metrics.compute(comp, built, btype)

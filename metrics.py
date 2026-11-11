@@ -6,7 +6,7 @@ takže ratio ako ROE či marže sú porovnateľné s ročnými.
 """
 from datetime import timedelta
 
-from taxonomy import (BANK_SIC, BUSINESS_TYPES, FLOW_KEYS, INSURANCE_SIC, REIT_SIC,
+from taxonomy import (BANK_SIC, DEPOSITORY_SIC, BUSINESS_TYPES, FLOW_KEYS, INSURANCE_SIC, REIT_SIC,
                       TECH_SIC)
 
 
@@ -409,8 +409,10 @@ def detect_type(company, built):
         return "reit"
     if sic in INSURANCE_SIC:
         return "insurance"
-    if sic in BANK_SIC:
+    if sic in DEPOSITORY_SIC:
         return "bank"
+    if sic in BANK_SIC and any(d.get(k) for k in ("loans", "deposits", "nii", "provision")):
+        return "bank"          # BitMine má SIC 6199 „Finance Services“, ale žiadne úvery ani úroky: nie je banka
     if d.get("deposits") and d.get("loans"):
         return "bank"
     if d.get("premiums") and d.get("claims"):
