@@ -254,6 +254,31 @@ def _flow_costs(comp, built, end, btype, mode):
         return None, None
 
 
+def _align_quote(quote, ccy, ticker):
+    """Cena z Yahoo v mene výkazov a na jednu kmeňovú akciu: prepočet kurzom (ASML: USD -> EUR) a pomerom ADR
+    (TSM: 1 ADR = 5 akcií). Ak kurz chýba, cena sa označí ako nezhodná (mismatch) a valuácia sa nepočíta."""
+    import directory
+    if not quote:
+        return None
+    q = dict(quote)
+    qc, price, chg = q.get("currency") or ccy, q["price"], q.get("change")
+    if qc == "GBp":                                   # Londýn uvádza pence
+        qc, price, chg = "GBP", price / 100, (chg / 100 if chg is not None else None)
+    ratio = directory.ADR_RATIO.get((ticker or "").upper(), 1)
+    rate = 1.0
+    if qc != ccy:
+        fx = None if ccy == "" else prices.get_price(f"{qc}{ccy}=X")
+        if not fx or not fx.get("price"):
+            q["mismatch"] = True
+            return q
+        rate = fx["price"]
+    if rate == 1.0 and ratio == 1 and qc == q.get("currency"):
+        return q
+    q.update(price=price * rate / ratio, currency=ccy, change=(chg * rate / ratio) if chg is not None else None,
+             converted={"from_price": quote["price"], "from_ccy": quote.get("currency"), "rate": rate, "ratio": ratio})
+    return q
+
+
 def _flow_options(built, mode):
     out = []
     for e in reversed(built["display"]):
@@ -303,10 +328,9 @@ def build_context(ticker, section):
             built = statements.build(comp, mode="annual" if alt.get("source") == "yahoo" else p["mode"], n=p["years"])
     user_price = parse_price(p["price_raw"])
     price = user_price
+    quote = quote if is_demo else _align_quote(quote, built["currency"], match[0])
     quote = dict(quote) if quote else None
-    if quote and quote["currency"] != built["currency"]:
-        quote["mismatch"] = True
-    elif price is None and quote:
+    if price is None and quote and not quote.get("mismatch"):
         price = quote["price"]
     if comp.get("sic") in COMMODITY_FUND_SIC:
         ctx["mode_note"] = ((ctx.get("mode_note") or "") + " Toto je komoditný fond (ETF/trust), nie firma: tržby, zisk ani "
@@ -324,7 +348,7 @@ def build_context(ticker, section):
         ctx["profile"] = profile
     elif section == "statements":
         ctx["stm"] = statements.all_statements(built)
-        if p["detail"]:
+        if p["detail"] and comp.get("source") != "yahoo":     # podrobné výkazy sú len v podaniach SEC
             try:
                 ctx["det"] = filings.get_detailed(comp, p["mode"], p["years"])
             except edgar.EdgarError as e:
@@ -402,7 +426,9 @@ def _fundamental(comp, ticker, btype, price, quote, is_demo):
     beta = (analyst or {}).get("beta") or (profile or {}).get("beta")
     rf = None if is_demo else prices.get_risk_free()
     shares = comp.get("shares_out")
-    mcap = (profile or {}).get("market_cap") or ((price * shares) if price and shares else None)
+    mcap = (profile or {}).get("market_cap")
+    if quote and quote.get("converted") or not mcap:     # kapitalizácia z Yahoo je v mene burzy, nie výkazov
+        mcap = (price * shares) if price and shares else None
     note = None
     if quote and quote.get("mismatch"):
         note = "Cena akcie je v inej mene ako výkazy, preto sa výsledok neporovnáva s trhom."
@@ -458,10 +484,7 @@ def _load_peer(t):
             b = statements.build(c, "annual", 8)
         f = valuation.history_facts(b, None)
         bt = metrics.detect_type(c, b)
-        q = DEMO_QUOTE if c["is_demo"] else prices.get_price(m[0])
-        q = dict(q) if q else None
-        if q and q["currency"] != b["currency"]:
-            q["mismatch"] = True
+        q = dict(DEMO_QUOTE) if c["is_demo"] else _align_quote(prices.get_price(m[0]), b["currency"], m[0])
         return t, fundamental.peer_metrics(c["name"], m[0], b, f, bt, q, c.get("shares_out")), None
     except Exception as e:  # noqa: BLE001 - jedna zlá firma nesmie zhodiť stránku
         return t, None, f"{t}: {e}"
@@ -1071,7 +1094,18 @@ def calendar_view():
 # ------------------------------------------------------------------ makro
 @app.route("/macro")
 def macro_view():
-    return render_template("macro.html", page="macro", ticker=None, section=None, cards=macro.page_data())
+    cards = macro.page_data()
+    return render_template("macro.html", page="macro", ticker=None, section=None, cards=cards,
+                           failed=all(c["points"] is None for c in cards), has_key=bool(macro.api_key()),
+                           error=macro.LAST_ERROR["text"])
+
+
+@app.route("/macro/key", methods=["POST"])
+def macro_key():
+    ok = macro.save_key(request.form.get("key", ""))
+    flash("Kľúč uložený, údaje sa teraz stiahnu cez FRED API." if ok else
+          "Kľúč má 32 znakov (malé písmená a číslice). Skontroluj, či si ho skopíroval celý.", "ok" if ok else "warn")
+    return redirect(url_for("macro_view"))
 
 
 @app.route("/")

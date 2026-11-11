@@ -33,6 +33,11 @@ FIRMS = [
 ]
 
 
+# Koľko kmeňových akcií predstavuje jedno ADR (americký certifikát), ak to nie je 1. Výkazy v SEC sú na kmeňovú akciu,
+# cena na burze v USD je za ADR, preto sa cena delí týmto pomerom. Pri iných ADR over pomer u depozitárnej banky.
+ADR_RATIO = {"TSM": 5, "BABA": 8, "TM": 10, "HSBC": 5, "BP": 6, "SHEL": 2, "AZN": 0.5}
+
+
 def _norm(s):
     return re.sub(r"[^a-z0-9.]+", " ", s.lower()).strip()
 

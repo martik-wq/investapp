@@ -61,10 +61,14 @@ def install_zip(data, base=BASE):
         src_root = os.path.join(tmp, roots[0])
         if not os.path.exists(os.path.join(src_root, "app.py")):
             raise ValueError("Stiahnutý súbor neobsahuje aplikáciu.")
+        todo = []
         for dirpath, dirnames, filenames in os.walk(src_root):
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            todo += [(dirpath, fn) for fn in filenames]
+        todo.sort(key=lambda x: x[1].endswith(".py"))      # .py súbory až nakoniec (spustia reštart servera)
+        for dirpath, fn in todo:
             rel_dir = os.path.relpath(dirpath, src_root)
-            for fn in filenames:
+            if True:
                 rel = fn if rel_dir == "." else os.path.join(rel_dir, fn)
                 if rel_dir == "." and fn in SKIP_FILES:
                     continue
@@ -94,13 +98,26 @@ def apply():
     try:
         r = requests.get(url, timeout=60, headers={"Cache-Control": "no-cache", "User-Agent": "investapp"})
         r.raise_for_status()
-        changed = install_zip(r.content)
+        zipfile.ZipFile(io.BytesIO(r.content)).testzip()
     except (requests.RequestException, zipfile.BadZipFile, ValueError, OSError) as e:
         return {"ok": False, "error": f"Aktualizácia sa nepodarila: {e}", "changed": []}
+    # číslo verzie zapísať PRED prepísaním .py súborov: server sa po ich zmene hneď reštartuje (use_reloader)
+    # a zápis po inštalácii by sa už nestihol, appka by potom aktualizáciu ponúkala stále dokola
+    old = current_version()
     if ver:
-        try:
-            with open(VERSION_FILE, "w", encoding="ascii") as f:
-                f.write(ver)
-        except OSError:
-            pass
+        _write_version(ver)
+    try:
+        changed = install_zip(r.content)
+    except (zipfile.BadZipFile, ValueError, OSError) as e:
+        if old:
+            _write_version(old)
+        return {"ok": False, "error": f"Aktualizácia sa nepodarila: {e}", "changed": []}
     return {"ok": True, "changed": changed, "version": ver}
+
+
+def _write_version(ver):
+    try:
+        with open(VERSION_FILE, "w", encoding="ascii") as f:
+            f.write(ver)
+    except OSError:
+        pass

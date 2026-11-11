@@ -92,7 +92,9 @@ def list_releases(company, n=12):
 
 
 def _exhibits(company, acc):
-    """Názvy príloh EX-99.x z indexu podania (najprv EX-99.1)."""
+    """Názvy príloh s tlačovou správou (EX-99.x), najlepšia prvá. Firmy ich pomenúvajú rôzne
+    (ex99-1.htm, a2026q3earningsrelease.htm), preto sa skúša: názov s ex99, typ prílohy v indexe podania,
+    nakoniec ostatné .htm súbory s „earnings/release/results“ v názve."""
     txt = filings.fetch_text(company, acc, "index.json")
     if not txt:
         return []
@@ -100,9 +102,25 @@ def _exhibits(company, acc):
         items = json.loads(txt)["directory"]["item"]
     except (ValueError, KeyError, TypeError):
         return []
-    names = [i["name"] for i in items if re.search(r"(ex|exhibit)[-_]?99", i["name"], re.I)
-             and i["name"].lower().endswith((".htm", ".html", ".txt"))]
-    return sorted(names, key=lambda n: (not re.search(r"99[-_.]?0?1", n), n))
+    htm = [i["name"] for i in items if i["name"].lower().endswith((".htm", ".html", ".txt"))
+           and not re.search(r"(-index|-index-headers)\.html?$|^R\d+\.htm$|^FilingSummary|\.txt$", i["name"], re.I)
+           or re.search(r"(ex|exhibit)[-_]?99", i["name"], re.I) and i["name"].lower().endswith(".txt")]
+    names = [n for n in htm if re.search(r"(ex|exhibit)[-_]?99", n, re.I)]
+    if not names:
+        # typ prílohy z indexu podania: riadok tabuľky s odkazom na súbor a typom EX-99.x
+        idx = filings.fetch_text(company, acc, f"{acc}-index.html") or ""
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", idx, re.S | re.I):
+            m = re.search(r'href="[^"]*/([^/"]+\.html?)"', row, re.I)
+            if m and re.search(r">\s*EX-99(\.\d+)?\s*<", row, re.I):
+                names.append(m.group(1))
+    if not names:
+        names = [n for n in htm if re.search(r"earning|release|result|press", n, re.I)]
+    seen, out = set(), []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return sorted(out, key=lambda n: (not re.search(r"99[-_.]?0?1|earning|release", n, re.I), n))
 
 
 def get_release(company, acc):

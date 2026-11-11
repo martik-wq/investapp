@@ -4,7 +4,7 @@
 {% set last = built.display[-1] %}
 {% set place = (profile.city ~ ', ' ~ profile.country) if profile and profile.city and profile.country else comp.sec.place %}
 {% set web = (profile.website if profile and profile.website else comp.sec.website) %}
-{% set mc = (profile.market_cap if profile and profile.market_cap else (val['items'][0][1] if val else none)) %}
+{% set mc = (val['items'][0][1] if val and quote and quote.converted else (profile.market_cap if profile and profile.market_cap else (val['items'][0][1] if val else none))) %}
 <div class="hero card">
   <div class="heroL">
     <h1>{{ comp.name }} <span class="badge">{{ comp.ticker }}</span></h1>
@@ -28,6 +28,7 @@
         <div class="chg {{ 'up' if quote.change >= 0 else 'down' }}">{{ '▲ +' if quote.change >= 0 else '▼ ' }}{{ (quote.change)|num(2) }} ({{ (quote.change_pct * 100)|num(2, true) }} %) za posledný deň</div>
       {% endif %}
       <div class="note">Yahoo Finance, {{ quote.time }}</div>
+      {% if quote.converted %}<div class="note">prepočítané z {{ (quote.converted.from_price)|num(2) }} {{ quote.converted.from_ccy }}{% if quote.converted.rate != 1 %} kurzom {{ (quote.converted.rate)|num(4) }}{% endif %}{% if quote.converted.ratio != 1 %}, 1 ADR = {{ quote.converted.ratio }} akcie{% endif %}</div>{% endif %}
     {% elif quote and quote.mismatch %}
       <div class="warn" style="margin:6px 0">Yahoo uvádza cenu v {{ quote.currency }}, firma vykazuje v {{ built.currency }}: <strong>{{ (quote.price)|num(2) }} {{ quote.currency }}</strong></div>
     {% else %}

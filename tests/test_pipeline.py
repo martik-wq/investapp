@@ -1389,6 +1389,27 @@ check("typ: SIC 6199 bez úverov a úrokov = všeobecná firma (BitMine)", _mt2.
 check("typ: SIC 6199 s čistým úrokovým výnosom = banka (SoFi)", _mt2.detect_type({"sic": 6199}, {"data": {"nii": {_e1: 1e9}}}) == "bank")
 check("typ: depozitná banka podľa SIC vždy banka", _mt2.detect_type({"sic": 6022}, {"data": {}}) == "bank")
 check("dividendy: značka PaymentsOfOrdinaryDividends (ASML)", "PaymentsOfOrdinaryDividends" in __import__("taxonomy").ITEM_BY_KEY["div_paid"]["tags"])
+
+# --- prepočet ceny: ASML (USD -> EUR), TSM (1 ADR = 5 akcií), chýbajúci kurz = mismatch
+_ogpr = _appmod.prices.get_price
+_appmod.prices.get_price = lambda s: {"price": 0.9, "currency": "EUR"} if s == "USDEUR=X" else ({"price": 32.0, "currency": "TWD"} if s == "USDTWD=X" else None)
+_qa = _appmod._align_quote({"price": 1000.0, "currency": "USD", "change": 10.0}, "EUR", "ASML")
+check("cena ASML v USD sa prepočíta kurzom do EUR", abs(_qa["price"] - 900) < 1e-9 and _qa["currency"] == "EUR" and not _qa.get("mismatch") and _qa["converted"]["rate"] == 0.9)
+_qt = _appmod._align_quote({"price": 200.0, "currency": "USD"}, "TWD", "TSM")
+check("cena TSM: kurz aj pomer ADR (1 ADR = 5 akcií)", abs(_qt["price"] - 200 * 32 / 5) < 1e-9)
+check("bez kurzu sa cena označí ako nezhodná", _appmod._align_quote({"price": 5.0, "currency": "USD"}, "KRW", "X").get("mismatch") is True)
+check("rovnaká mena bez ADR: cena sa nemení", _appmod._align_quote({"price": 5.0, "currency": "USD"}, "USD", "AAPL")["price"] == 5.0)
+_appmod.prices.get_price = _ogpr
+
+import macro as _mc3  # noqa: E402
+check("FRED API: parser JSON vynechá chýbajúce hodnoty", _mc3.parse_api_json({"observations": [{"date": "2026-01-01", "value": "3.88"}, {"date": "2026-02-01", "value": "."}]}) == [("2026-01-01", 3.88)])
+_mc3.KEY_PATH = os.path.join(_tmpf.mkdtemp(), "fred_key.txt")
+check("FRED API: neplatný kľúč sa neuloží, platný áno", not _mc3.save_key("abc") and _mc3.save_key("a" * 32) and _mc3.api_key() == "a" * 32)
+_ogp3 = _mc3.get_points
+_mc3.get_points = lambda sid: None
+_rmk = cl.get("/macro").get_data(as_text=True)
+check("Makro: pri zlyhaní FRED návod a formulár na kľúč", "bezplatným kľúčom" in _rmk and 'name="key"' in _rmk)
+_mc3.get_points = _ogp3
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

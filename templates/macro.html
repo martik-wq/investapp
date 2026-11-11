@@ -3,6 +3,20 @@
 {% block content %}
 <div class="pagehead"><h1>🌍 Makro dáta</h1>
   <div class="sub">Sadzby, výnosová krivka, inflácia a práca · zdroj FRED (Federal Reserve Bank of St. Louis) · posledných 10 rokov · obnova každých 12 hodín</div></div>
+{% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="{{ 'warn' if cat == 'warn' else 'okmsg' }}">{{ msg }}</div>{% endfor %}
+{% if failed %}
+<div class="card">
+  <h2>Údaje z FRED sa nepodarilo stiahnuť</h2>
+  <p>FRED niekedy blokuje automatické sťahovanie súborov. Spoľahlivé je ich oficiálne API s <strong>bezplatným kľúčom</strong>:
+    zaregistruj sa na <a href="https://fredaccount.stlouisfed.org/apikeys" target="_blank" rel="noopener">fredaccount.stlouisfed.org/apikeys</a>,
+    vytvor kľúč (32 znakov) a vlož ho sem. Uloží sa len u teba v priečinku appky (data/fred_key.txt).</p>
+  <form method="post" action="{{ url_for('macro_key') }}" class="controls">
+    <label style="min-width:380px">FRED API kľúč <input name="key" autocomplete="off" placeholder="napr. abcdef0123456789abcdef0123456789"></label>
+    <button>Uložiť</button>
+  </form>
+  {% if error %}<p class="note">Posledná chyba: {{ error }}{% if has_key %} (kľúč je nastavený){% endif %}. Ďalší pokus o 30 minút alebo po uložení kľúča.</p>{% endif %}
+</div>
+{% endif %}
 <script id="macrodata" type="application/json">{{ cards|tojson }}</script>
 <div class="grid2" id="macrogrid">
 {% for c in cards %}
