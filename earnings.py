@@ -85,7 +85,7 @@ def list_releases(company, n=12):
     for i, form in enumerate(r.get("form", [])):
         items = (r.get("items") or [""] * len(r["form"]))[i] or ""
         if form in ("8-K", "6-K") and ("2.02" in items.split(",") or form == "6-K" and not items):
-            out.append({"acc": r["accessionNumber"][i], "date": r.get("filingDate", [""] * len(r["form"]))[i],
+            out.append({"acc": r["accessionNumber"][i], "form": form, "date": r.get("filingDate", [""] * len(r["form"]))[i],
                         "doc": r.get("primaryDocument", [""] * len(r["form"]))[i]})
     out.sort(key=lambda x: x["date"], reverse=True)
     return out[:n]

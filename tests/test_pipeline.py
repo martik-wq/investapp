@@ -1289,7 +1289,7 @@ check("kalendár: štvrťročná dividenda a odhad ďalšej ex-dividendy", _dv["
 check("kalendár: stará alebo žiadna dividenda = nevypláca", _ev.dividend_info([("2023-01-01", 1.0)], _tt) is None and _ev.dividend_info([], _tt) is None)
 _up = _ev.upcoming([{"ticker": "AAA", "name": "A", "earnings": {"date": "2026-11-20", "basis": "x"}, "dividend": {"next_date": "2026-11-10", "last_amount": 0.5}, "div_ccy": "USD", "shares": 10},
                     {"ticker": "BBB", "earnings": {"date": "2027-06-01", "basis": "x"}}], _tt)
-check("kalendár: časová os zoradená, ďaleké udalosti vynechané, dividenda × počet kusov", [e["ticker"] for e in _up] == ["AAA", "AAA"] and _up[0]["kind"].startswith("Ex-div") and "5.00" in _up[0]["note"])
+check("kalendár: časová os zoradená, ďaleké udalosti vynechané, dividenda × počet kusov", [e["ticker"] for e in _up] == ["AAA", "AAA"] and _up[0]["kind"].startswith("Ex-div") and "5,00" in _up[0]["note"])
 
 _csv = "observation_date,CPIAUCSL\n" + "\n".join(f"{y}-{m:02d}-01,{100 + (y - 2024) * 3 + m * 0.1}" for y in (2024, 2025, 2026) for m in range(1, 13))
 _pts = _mc.parse_fred_csv(_csv)

@@ -1062,6 +1062,9 @@ def _calendar_row(item):
         if m and str(m[1]).isdigit():
             subs = edgar._get_json(edgar.SUBS_URL.format(cik=m[1]), f"subs_{m[1]}.json")
             rel = earnings.list_releases({"filings": (subs.get("filings") or {}).get("recent") or {}}, n=12)
+            rel = [r for r in rel if r.get("form", "8-K") != "6-K"]
+            if not rel and (subs.get("filings") or {}).get("recent", {}).get("form") and "6-K" in subs["filings"]["recent"]["form"]:
+                row["note"] = "Zahraničný emitent: výsledky podáva ako 6-K spolu s inými správami, dátum neodhadujem."
             if rel:
                 row["last_release"] = rel[0]["date"]
                 row["earnings"] = events.estimate_next_earnings([r["date"] for r in rel])

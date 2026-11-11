@@ -71,9 +71,10 @@ def upcoming(rows, today=None, horizon=120):
         dv = r.get("dividend")
         if dv and dv.get("next_date") and today.isoformat() <= dv["next_date"] <= lim:
             amt = dv["last_amount"]
-            note = f"naposledy {amt:.4g} {r.get('div_ccy') or ''}".strip()
+            sk = lambda x, f: format(x, f).replace(".", ",")  # noqa: E731
+            note = f"naposledy {sk(amt, '.4g')} {r.get('div_ccy') or ''}".strip()
             if r.get("shares"):
-                note += f" × {r['shares']:.6g} ks = {amt * r['shares']:.2f} {r.get('div_ccy') or ''}".rstrip()
+                note += f" × {sk(r['shares'], '.6g')} ks = {sk(amt * r['shares'], '.2f')} {r.get('div_ccy') or ''}".rstrip()
             out.append({"date": dv["next_date"], "ticker": r["ticker"], "name": r.get("name") or r["ticker"],
                         "kind": "Ex-dividenda (odhad)", "note": note})
     out.sort(key=lambda x: (x["date"], x["ticker"]))
