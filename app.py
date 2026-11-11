@@ -43,9 +43,16 @@ app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
 
 # ----------------------------------------------------------------- formátovanie
+def _sk(txt):
+    """Slovenský zápis čísla: medzera medzi tisícami, desatinná čiarka, mínus (1,234.5 -> 1 234,5)."""
+    return txt.replace(",", "\u00a0").replace(".", ",").replace("-", "−").replace("mil,", "mil.").replace("mld,", "mld.")
+
+
 def fmt_value(v, fmt, scale_note=None):
-    if v is None:
-        return "–"
+    return "–" if v is None else _sk(_fmt_raw(v, fmt))
+
+
+def _fmt_raw(v, fmt):
     if fmt == "money":
         m = v / 1e6
         return f"{m:,.0f}" if abs(m) >= 1000 else f"{m:,.1f}"
@@ -86,9 +93,19 @@ def signed_pct(v, digits=1):
 def signed_amt(v):
     if v is None:
         return "–"
-    return f"{'+' if v >= 0 else '−'}{abs(v):,.2f}"
+    return f"{'+' if v >= 0 else '−'}" + _sk(f"{abs(v):,.2f}")
 
 
+def num_sk(v, d=2, sign=False, g=False):
+    """Číslo v slovenskom zápise pre šablóny: {{ x|num(2) }}, so znamienkom {{ x|num(2, true) }}."""
+    if v is None:
+        return "–"
+    if g:
+        return _sk(f"{v:.{d}g}")
+    return _sk(f"{v:{'+' if sign else ''},.{d}f}")
+
+
+app.jinja_env.filters["num"] = num_sk
 app.jinja_env.filters["fmt"] = fmt_value
 app.jinja_env.filters["spct"] = signed_pct
 def signed_pp(v):

@@ -15,7 +15,7 @@
     <label>Nová poznámka do denníka (voliteľné)
       <input name="note" maxlength="600" placeholder="napr. po Q3: marže lepšie, téza platí"></label>
     <div><button>Uložiť</button>
-      <span class="note">{% if thesis %}Naposledy upravená téza: {{ thesis.updated }}{% if thesis.price is not none %} · cena vtedy {{ '%.2f'|format(thesis.price) }}{% endif %}{% else %}Zatiaľ nič nezapísané{% endif %} · uložené len u teba v počítači.</span></div>
+      <span class="note">{% if thesis %}Naposledy upravená téza: {{ thesis.updated }}{% if thesis.price is not none %} · cena vtedy {{ (thesis.price)|num(2) }}{% endif %}{% else %}Zatiaľ nič nezapísané{% endif %} · uložené len u teba v počítači.</span></div>
   </form>
   {% if thesis and thesis.log %}
   <details style="margin-top:8px"><summary>Denník poznámok ({{ thesis.log|length }})</summary>

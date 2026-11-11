@@ -18,10 +18,10 @@
 <div class="card"><h2>Prehľad po firmách</h2>
   <div class="tablewrap"><table class="plain"><thead><tr><th>Firma</th><th>Posledné výsledky</th><th>Ďalšie výsledky (odhad)</th><th>Dividenda</th><th>Ďalšia ex-dividenda (odhad)</th></tr></thead><tbody>
   {% for r in rows %}<tr>
-    <td><a href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}">{{ r.ticker }}</a> <span class="note">{{ r.name }}</span>{% if r.shares %}<div class="note">{{ '%.6g'|format(r.shares) }} ks</div>{% endif %}</td>
+    <td><a href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}">{{ r.ticker }}</a> <span class="note">{{ r.name }}</span>{% if r.shares %}<div class="note">{{ (r.shares)|num(6, g=true) }} ks</div>{% endif %}</td>
     <td>{{ r.last_release or '–' }}</td>
     <td>{% if r.earnings %}{{ r.earnings.date }}<div class="note">{{ r.earnings.basis }}</div>{% else %}–{% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}{% endif %}</td>
-    <td>{% if r.dividend %}{{ '%.4g'|format(r.dividend.last_amount) }} {{ r.div_ccy or '' }} {{ r.dividend.freq }}<div class="note">za 12 mesiacov {{ '%.4g'|format(r.dividend.year_sum) }}{% if r.shares %} × {{ '%.6g'|format(r.shares) }} ks ≈ {{ '%.2f'|format(r.dividend.year_sum * r.shares) }} {{ r.div_ccy or '' }}{% endif %}</div>{% else %}nevypláca{% endif %}</td>
+    <td>{% if r.dividend %}{{ (r.dividend.last_amount)|num(4, g=true) }} {{ r.div_ccy or '' }} {{ r.dividend.freq }}<div class="note">za 12 mesiacov {{ (r.dividend.year_sum)|num(4, g=true) }}{% if r.shares %} × {{ (r.shares)|num(6, g=true) }} ks ≈ {{ (r.dividend.year_sum * r.shares)|num(2) }} {{ r.div_ccy or '' }}{% endif %}</div>{% else %}nevypláca{% endif %}</td>
     <td>{{ r.dividend.next_date if r.dividend and r.dividend.next_date else '–' }}</td></tr>{% endfor %}
   </tbody></table></div>
   <p class="note">Dividendový príjem pri pozíciách je hrubý (pred zrážkovou daňou) a v mene dividendy. Ak firma nezmenila výšku dividendy, ide o jednoduchý násobok počtu kusov.</p>

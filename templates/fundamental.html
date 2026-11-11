@@ -99,7 +99,7 @@
     <tr><td style="text-align:left">× Finančná páka (aktíva / vlastné imanie)</td>{% for r in q.dupont %}<td>{{ ('%.2f'|format(r.leverage)).replace('.', ',') }}×</td>{% endfor %}</tr>
     <tr><td style="text-align:left"><strong>= ROE</strong></td>{% for r in q.dupont %}<td><strong>{{ pc(r.roe) }}</strong></td>{% endfor %}</tr>
   </tbody></table></div>
-  <p class="note">Ukáže, či vysoké ROE vzniká zo ziskovosti, z efektívneho využitia majetku, alebo len z dlhu (vysoká páka).</p>
+  <p class="note">Ukáže, či vysoké ROE vzniká zo ziskovosti, z efektívneho využitia majetku, alebo len z dlhu (vysoká páka). Rozklad používa koncoročné aktíva a imanie, preto sa ROE mierne líši od ROE z priemerného imania v ostatných tabuľkách.</p>
   {% endif %}
   {% endif %}
 </div>
@@ -124,7 +124,7 @@
   <div class="revrow">
     <div><div class="bigprice" style="font-size:30px">{{ mo.verdict }}</div><div class="note">stopy konkurenčnej výhody v číslach</div></div>
     <div class="revtxt">
-      {% if mo.mult.pe or mo.mult.ps %}Trh dnes platí{% if mo.mult.pe %} P/E <strong>{{ '%.1f'|format(mo.mult.pe) }}×</strong>{% endif %}{% if mo.mult.ps %}, P/S <strong>{{ '%.1f'|format(mo.mult.ps) }}×</strong>{% endif %}{% if mo.mult.ev_ebitda %}, EV/EBITDA <strong>{{ '%.1f'|format(mo.mult.ev_ebitda) }}×</strong>{% endif %}{% if mo.mult.fcf_yield is not none %}, FCF výnos <strong>{{ pc(mo.mult.fcf_yield) }}</strong>{% endif %}.{% endif %}
+      {% if mo.mult.pe or mo.mult.ps %}Trh dnes platí{% if mo.mult.pe %} P/E <strong>{{ (mo.mult.pe)|num(1) }}×</strong>{% endif %}{% if mo.mult.ps %}, P/S <strong>{{ (mo.mult.ps)|num(1) }}×</strong>{% endif %}{% if mo.mult.ev_ebitda %}, EV/EBITDA <strong>{{ (mo.mult.ev_ebitda)|num(1) }}×</strong>{% endif %}{% if mo.mult.fcf_yield is not none %}, FCF výnos <strong>{{ pc(mo.mult.fcf_yield) }}</strong>{% endif %}.{% endif %}
       {% if mo.verdict == 'silné' and mo.priced_for_more %}Čísla podporujú prémiu (kvalitný podnik), no cena vyžaduje aj rast nad odporúčanie, takže prémia už zahŕňa veľa dobrého.
       {% elif mo.verdict == 'silné' %}Čísla prémiu zdôvodňujú: firma dlhodobo zarába viac, než kapitál stojí.
       {% elif mo.priced_for_more %}Čísla moat nepotvrdzujú a cena zároveň čaká viac rastu, než firma historicky dodáva. Prémia stojí hlavne na očakávaniach.

@@ -3,7 +3,7 @@
 {% block content %}
 {% set t = tech %}
 <div class="pagehead"><h1>📉 Technická analýza</h1>
-  <div class="sub">{{ name }} · denné ceny, indikátory a signály{% if t and t.last_date %} · posledná cena {{ '%.2f'|format(t.last) }} {{ t.currency }} ({{ t.last_date }}){% endif %}</div></div>
+  <div class="sub">{{ name }} · denné ceny, indikátory a signály{% if t and t.last_date %} · posledná cena {{ (t.last)|num(2) }} {{ t.currency }} ({{ t.last_date }}){% endif %}</div></div>
 {% if not t or t.error %}
   <div class="warn">{{ t.error if t else 'Údaje nie sú dostupné.' }}</div>
 {% else %}
@@ -104,11 +104,11 @@
   <div class="card">
     <h2>Úrovne</h2>
     <table class="plain"><tbody>
-      <tr><td>52-týždňové maximum</td><td>{{ '%.2f'|format(s.hi52) }} ({{ s.from_hi|fmt('pct') }})</td></tr>
-      <tr><td>52-týždňové minimum</td><td>{{ '%.2f'|format(s.lo52) }} ({{ s.from_lo|fmt('pct') }})</td></tr>
-      {% for r in t.resistance|reverse %}<tr><td>Odpor</td><td>{{ '%.2f'|format(r) }}</td></tr>{% endfor %}
-      <tr><td><strong>Posledná cena</strong></td><td><strong>{{ '%.2f'|format(t.last) }}</strong></td></tr>
-      {% for r in t.support %}<tr><td>Podpora</td><td>{{ '%.2f'|format(r) }}</td></tr>{% endfor %}
+      <tr><td>52-týždňové maximum</td><td>{{ (s.hi52)|num(2) }} ({{ s.from_hi|fmt('pct') }})</td></tr>
+      <tr><td>52-týždňové minimum</td><td>{{ (s.lo52)|num(2) }} ({{ s.from_lo|fmt('pct') }})</td></tr>
+      {% for r in t.resistance|reverse %}<tr><td>Odpor</td><td>{{ (r)|num(2) }}</td></tr>{% endfor %}
+      <tr><td><strong>Posledná cena</strong></td><td><strong>{{ (t.last)|num(2) }}</strong></td></tr>
+      {% for r in t.support %}<tr><td>Podpora</td><td>{{ (r)|num(2) }}</td></tr>{% endfor %}
     </tbody></table>
     <p class="note">Úrovne sú zhluky lokálnych maxím a miním za posledný rok (hladiny, kde cena v minulosti obracala).</p>
   </div>

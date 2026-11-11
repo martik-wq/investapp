@@ -59,7 +59,7 @@
 </div>
 {% if val %}
 <div class="card">
-  <h2>Valuácia pri cene {{ '%.2f'|format(price_used) }} {{ built.currency }}</h2>
+  <h2>Valuácia pri cene {{ (price_used)|num(2) }} {{ built.currency }}</h2>
   <div class="kpis">
     {% for l, v, f in val['items'] %}
       <div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v|fmt(f) }}</div></div>

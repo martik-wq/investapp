@@ -23,13 +23,13 @@
   <div class="heroR">
     <div class="note" style="margin:0">Cena akcie</div>
     {% if quote and not quote.mismatch %}
-      <div class="bigprice">{{ '%.2f'|format(quote.price) }} <span class="cur">{{ quote.currency }}</span></div>
-      {% if quote.change is not none %}
-        <div class="chg {{ 'up' if quote.change >= 0 else 'down' }}">{{ '▲ +' if quote.change >= 0 else '▼ ' }}{{ '%.2f'|format(quote.change) }} ({{ '%+.2f'|format(quote.change_pct * 100) }} %) za posledný deň</div>
+      <div class="bigprice">{{ (quote.price)|num(2) }} <span class="cur">{{ quote.currency }}</span></div>
+      {% if quote.get('change') is not none and quote.get('change_pct') is not none %}
+        <div class="chg {{ 'up' if quote.change >= 0 else 'down' }}">{{ '▲ +' if quote.change >= 0 else '▼ ' }}{{ (quote.change)|num(2) }} ({{ (quote.change_pct * 100)|num(2, true) }} %) za posledný deň</div>
       {% endif %}
       <div class="note">Yahoo Finance, {{ quote.time }}</div>
     {% elif quote and quote.mismatch %}
-      <div class="warn" style="margin:6px 0">Yahoo uvádza cenu v {{ quote.currency }}, firma vykazuje v {{ built.currency }}: <strong>{{ '%.2f'|format(quote.price) }} {{ quote.currency }}</strong></div>
+      <div class="warn" style="margin:6px 0">Yahoo uvádza cenu v {{ quote.currency }}, firma vykazuje v {{ built.currency }}: <strong>{{ (quote.price)|num(2) }} {{ quote.currency }}</strong></div>
     {% else %}
       <p class="note">Cenu z Yahoo Finance sa nepodarilo načítať. Môžeš ju zadať ručne.</p>
     {% endif %}
@@ -45,10 +45,10 @@
 
 {% if quote and not quote.mismatch and (quote.low52 or mc or (profile and (profile.dividend_yield or profile.beta))) %}
 <div class="mini">
-  {% if quote.low52 and quote.high52 %}<div><span>52-týždňové rozpätie</span><strong>{{ '%.2f'|format(quote.low52) }} – {{ '%.2f'|format(quote.high52) }}</strong></div>{% endif %}
+  {% if quote.low52 and quote.high52 %}<div><span>52-týždňové rozpätie</span><strong>{{ (quote.low52)|num(2) }} – {{ (quote.high52)|num(2) }}</strong></div>{% endif %}
   {% if mc %}<div><span>Trhová kapitalizácia</span><strong>{{ mc|fmt('big') }} {{ quote.currency }}</strong></div>{% endif %}
   {% if profile and profile.dividend_yield %}<div><span>Dividendový výnos</span><strong>{{ (profile.dividend_yield*100)|round(2) }} %</strong></div>{% endif %}
-  {% if profile and profile.beta %}<div><span>Beta</span><strong>{{ '%.2f'|format(profile.beta) }}</strong></div>{% endif %}
+  {% if profile and profile.beta %}<div><span>Beta</span><strong>{{ (profile.beta)|num(2) }}</strong></div>{% endif %}
 </div>
 {% endif %}
 
@@ -61,7 +61,7 @@
     {% endfor %}
   </div>
   {% if val %}
-  <h3>Valuácia pri cene {{ '%.2f'|format(price_used) }} {{ built.currency }}</h3>
+  <h3>Valuácia pri cene {{ (price_used)|num(2) }} {{ built.currency }}</h3>
   <div class="kpis kpis-big">
     {% for l, v, f in val['items'] %}
       <div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v|fmt(f) }}</div></div>

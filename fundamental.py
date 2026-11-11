@@ -251,7 +251,7 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
     out["wacc_parts"] = {"ke": ke, "rf": rf_used, "beta": beta_used, "w_d": w_d, "kd": kd}
     # reverzný DCF: aký rast trh očakáva
     out["reverse"] = None
-    if price and out["dcf"]["base"]:
+    if price and out["dcf"]["base"] and not is_fin:     # u bánk FCF (a teda DCF) nedáva zmysel
         ig = V.implied_growth(price, out["dcf"]["p"])
         if ig:
             out["reverse"] = {"g": ig["g"], "edge": ig["edge"], "rec": g_rec, "hist": facts.get("rev_cagr5")}

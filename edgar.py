@@ -197,6 +197,7 @@ def load_company(ticker, cik, title):
         "currency": detect_currency(facts),
         "shares_out": latest_shares_outstanding(facts),
         "is_demo": ticker in DEMO_TICKERS,
+        "type_hint": None if ticker in DEMO_TICKERS else _type_hint(ticker),   # napr. Nu = banka (IFRS nemá SIC banky)
     }
 
 

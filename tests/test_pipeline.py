@@ -881,7 +881,7 @@ check("neexistujúca záložka -> 404", cl.get("/company/DEMOCO/blabla").status_
 html = cl.get("/company/DEMOCO/statements?price=50").get_data(as_text=True)
 check("výkazy: súvaha a metriky", "Súvaha" in html and "Rule of 40" in html)
 ov = cl.get("/company/DEMOCO").get_data(as_text=True)
-check("úvod: popis, vedenie, cena", "Jana Ukážková" in ov and "50.00" in ov and "Vedenie" in ov)
+check("úvod: popis, vedenie, cena", "Jana Ukážková" in ov and "50,00" in ov and "Vedenie" in ov)
 check("úvod: bočný panel so všetkými záložkami",
       all(x in ov for x in ["Úvod", "Výkazy", "Grafy", "Fundamentálna analýza", "Technická analýza"]))
 q = cl.get("/company/DEMOCO/statements?mode=quarterly&years=5").get_data(as_text=True)

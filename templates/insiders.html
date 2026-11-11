@@ -23,7 +23,7 @@
     {% for t in i.txs %}<tr class="{{ 'ins-buy' if t.code == 'P' else 'ins-sell' if t.code == 'S' }}">
       <td style="white-space:nowrap">{{ t.date }}</td><td>{{ t.who }}<div class="note">{{ t.title }}</div></td>
       <td>{{ t.kind }}{% if t.plan %} <span class="note">(plán 10b5-1)</span>{% endif %}</td>
-      <td>{{ '{:,.0f}'.format(t.shares).replace(',', ' ') }}</td><td>{{ '%.2f'|format(t.price) if t.price else '–' }}</td>
+      <td>{{ '{:,.0f}'.format(t.shares).replace(',', ' ') }}</td><td>{{ (t.price)|num(2) if t.price else '–' }}</td>
       <td>{{ (t.shares * t.price)|fmt('big') if t.price else '–' }}</td><td>{{ '{:,.0f}'.format(t.after).replace(',', ' ') if t.after is not none else '–' }}</td></tr>{% endfor %}
   </tbody></table></div>
   {% else %}<p class="note">Vo formulároch 4 nie sú žiadne transakcie s akciami.</p>{% endif %}

@@ -28,13 +28,13 @@
       <tr>
         <td><a href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}"><strong>{{ r.ticker }}</strong></a></td>
         <td>{{ r.name }}<div class="note">od {{ r.added }}</div></td>
-        <td data-v="{{ r.price or 0 }}">{% if r.price is not none %}{{ '%.2f'|format(r.price) }} {{ r.ccy or '' }}{% else %}–{% endif %}</td>
+        <td data-v="{{ r.price or 0 }}">{% if r.price is not none %}{{ (r.price)|num(2) }} {{ r.ccy or '' }}{% else %}–{% endif %}</td>
         <td data-v="{{ r.day_pct or 0 }}" class="{{ 'neg' if r.day_pct is not none and r.day_pct < 0 }}">{{ r.day_pct|fmt('pct') if r.day_pct is not none else '–' }}</td>
         <td data-v="{{ r.since_add or 0 }}" class="{{ 'neg' if r.since_add is not none and r.since_add < 0 }}">{{ r.since_add|fmt('pct') if r.since_add is not none else '–' }}</td>
         <td data-v="{{ r.range_pos or 0 }}">
           {% if r.range_pos is not none %}
-          <div class="wlrange" title="{{ '%.0f'|format(r.range_pos*100) }} % rozsahu medzi minimom a maximom za 52 týždňov"><i style="left:{{ '%.1f'|format(r.range_pos*100) }}%"></i></div>
-          <div class="note">{{ '%.2f'|format(r.quote.low52) }} – {{ '%.2f'|format(r.quote.high52) }}</div>
+          <div class="wlrange" title="{{ (r.range_pos*100)|num(0) }} % rozsahu medzi minimom a maximom za 52 týždňov"><i style="left:{{ (r.range_pos*100)|num(1) }}%"></i></div>
+          <div class="note">{{ (r.quote.low52)|num(2) }} – {{ (r.quote.high52)|num(2) }}</div>
           {% else %}–{% endif %}
         </td>
         <td data-v="{{ r.from_high or 0 }}" class="{{ 'neg' if r.from_high is not none and r.from_high < 0 }}">{{ r.from_high|fmt('pct') if r.from_high is not none else '–' }}</td>

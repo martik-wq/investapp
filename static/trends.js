@@ -32,18 +32,20 @@
     return n;
   }
   function num(x, d) { return x.toLocaleString('sk-SK', {minimumFractionDigits: d || 0, maximumFractionDigits: d || 0}); }
+  // počet desatinných miest na osi: celé čísla bez desatín, inak toľko, koľko treba (2,5 mld., 0,25 %)
+  function axd(x) { var r = Math.abs(x); return Math.abs(r - Math.round(r)) < 1e-9 ? 0 : Math.abs(r * 10 - Math.round(r * 10)) < 1e-9 ? 1 : 2; }
   function money(v, axis) {
     var a = Math.abs(v), sgn = v < 0 ? '−' : '', t;
-    if (a >= 1e9) t = num(a / 1e9, a >= 1e11 || axis ? (a % 1e9 === 0 || axis ? 0 : 1) : 1) + ' mld.';
-    else if (a >= 1e6) t = num(a / 1e6, axis || a >= 1e8 ? 0 : 1) + ' mil.';
-    else if (a >= 1e3) t = num(a / 1e3, axis ? 0 : 1) + ' tis.';
-    else t = num(a, 0);
+    if (a >= 1e9) t = num(a / 1e9, axis ? axd(a / 1e9) : (a >= 1e11 && a % 1e9 === 0 ? 0 : 1)) + ' mld.';
+    else if (a >= 1e6) t = num(a / 1e6, axis ? axd(a / 1e6) : (a >= 1e8 ? 0 : 1)) + ' mil.';
+    else if (a >= 1e3) t = num(a / 1e3, axis ? axd(a / 1e3) : 1) + ' tis.';
+    else t = num(a, axis ? axd(a) : 0);
     if (axis && a === 0) t = '0';
     return CUR_SYM ? sgn + CUR_SYM + t : sgn + t + ' ' + D.currency;
   }
   function fmt(v, g, axis) {
     if (v == null) return '–';
-    if (g === 'pct') return (v * 100).toFixed(axis ? 0 : 1).replace('.', ',') + ' %';
+    if (g === 'pct') return (v * 100).toFixed(axis ? axd(v * 100) : 1).replace('.', ',') + ' %';
     if (g === 'eps') return (v < 0 ? '−' : '') + (CUR_SYM || '') + num(Math.abs(v), 2) + (CUR_SYM ? '' : ' ' + D.currency);
     return money(v, axis);
   }
