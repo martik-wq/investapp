@@ -18,18 +18,29 @@
 </div>
 {% endif %}
 <script id="macrodata" type="application/json">{{ cards|tojson }}</script>
+<div class="card">
+  <div class="techbar" id="macrobar">
+    <div class="tgrp" role="group" aria-label="Obdobie" data-g="range"></div>
+    <div class="tgrp" role="group" aria-label="Zobrazenie" data-g="mode"></div>
+  </div>
+  <p class="note" style="margin:4px 0 0">„Zmena za 12 mesiacov“ ukazuje tempo: o koľko percentuálnych bodov sa hodnota zmenila oproti rovnakému dňu pred rokom (pri inflácii je to zrýchľovanie alebo spomaľovanie). Klikni na dva body v grafe a uvidíš zmenu medzi nimi. Tlačidlo ⤢ graf zväčší.</p>
+</div>
 <div class="grid2" id="macrogrid">
 {% for c in cards %}
   <div class="card macrocard" data-id="{{ c.id }}">
-    <h2>{{ c.name }}</h2>
+    <div class="ghead"><h2 style="margin:0">{{ c.name }}</h2>
+      {% if c.points %}<button type="button" class="gexp" data-expand="{{ c.id }}" aria-label="Zväčšiť graf" title="Zväčšiť">⤢</button>{% endif %}</div>
     {% if c.points %}
-    <div class="revrow"><div class="bigprice" style="font-size:26px">{{ ('%.2f'|format(c.last)).replace('.', ',') }} {{ c.unit }}</div>
-      <div class="note">k {{ c.last_date }}{% if c.chg_1y is not none %} · za rok {{ ('%+.2f'|format(c.chg_1y)).replace('.', ',') }} p. b.{% endif %}</div></div>
+    <div class="revrow"><div class="bigprice" style="font-size:26px">{{ (c.last)|num(2) }} {{ c.unit }}</div>
+      <div class="note">k {{ c.last_date }}{% if c.chg_1y is not none %} · za rok {{ (c.chg_1y)|num(2, true) }} p. b.{% endif %}</div></div>
+    <div class="gcmp" id="mcmp-{{ c.id }}"></div>
     <div class="macrochart" id="mc-{{ c.id }}"></div>
+    <details class="mdet"><summary>Zmena za obdobie (1 mesiac až 10 rokov)</summary><div id="mtab-{{ c.id }}"></div></details>
     {% else %}<div class="warn">Údaje z FRED sa nepodarilo načítať (internet alebo FRED nie je dostupný).</div>{% endif %}
     <p class="note">{{ c.desc }}</p>
   </div>
 {% endfor %}
 </div>
+<div id="m-modal" class="gmodal" hidden></div>
 <script src="{{ url_for('static', filename='macro.js') }}"></script>
 {% endblock %}

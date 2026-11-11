@@ -1097,7 +1097,7 @@ def calendar_view():
 # ------------------------------------------------------------------ makro
 @app.route("/macro")
 def macro_view():
-    cards = macro.page_data()
+    cards = macro.page_data(years=12)
     return render_template("macro.html", page="macro", ticker=None, section=None, cards=cards,
                            failed=all(c["points"] is None for c in cards), has_key=bool(macro.api_key()),
                            error=macro.LAST_ERROR["text"])

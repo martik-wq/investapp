@@ -501,3 +501,10 @@ tr.ins-sell td:first-child{box-shadow:inset 3px 0 #b91c1c}
 .macrochart{margin:4px 0}
 table.sens td.sgood{background:#ecfdf3}
 table.sens td.sbad{background:#fef2f2}
+.macrocard .ghead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mdet{margin-top:6px}.mdet>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--acc2,#c2410c)}
+table.mtab td,table.mtab th{font-size:13px;white-space:nowrap}
+.gmbox .tgrp{margin:6px 0 4px}
+table.mtab th:first-child,table.mtab td:first-child{min-width:0}
+.tablewrap table.mtab th:not(:first-child),.tablewrap table.mtab td:not(:first-child){min-width:0}
+table.mtab th,table.mtab td{padding:6px 8px}
