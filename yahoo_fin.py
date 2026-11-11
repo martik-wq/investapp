@@ -28,15 +28,15 @@ MAP = {
     "pretax": ("PretaxIncome", 1), "tax": ("TaxProvision", 1), "net_income": ("NetIncomeCommonStockholders", 1),
     "eps_diluted": ("DilutedEPS", 1), "shares_diluted": ("DilutedAverageShares", 1),
     "cash": ("CashAndCashEquivalents", 1), "total_assets": ("TotalAssets", 1),
-    "current_liabilities": ("CurrentLiabilities", 1), "debt_current": ("CurrentDebt", 1),
+    "current_assets": ("CurrentAssets", 1), "current_liabilities": ("CurrentLiabilities", 1), "debt_current": ("CurrentDebt", 1),
     "debt_lt": ("LongTermDebt", 1), "equity": ("StockholdersEquity", 1),
     "total_liabilities": ("TotalLiabilitiesNetMinorityInterest", 1),
     "da": ("DepreciationAndAmortization", 1), "sbc": ("StockBasedCompensation", 1),
     "cfo": ("OperatingCashFlow", 1), "capex": ("CapitalExpenditure", -1),
     "div_paid": ("CashDividendsPaid", -1),
 }
-EXTRA = ["OrdinarySharesNumber", "CurrentAssets", "ShareIssued"]
-INSTANT = {"cash", "total_assets", "current_liabilities", "debt_current", "debt_lt", "equity", "total_liabilities"}
+EXTRA = ["OrdinarySharesNumber", "ShareIssued"]
+INSTANT = {"cash", "total_assets", "current_assets", "current_liabilities", "debt_current", "debt_lt", "equity", "total_liabilities"}
 
 
 def _cache_path(sym):

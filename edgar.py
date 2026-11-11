@@ -162,6 +162,10 @@ def load_company(ticker, cik, title):
             subs = _get_json(SUBS_URL.format(cik=cik), f"subs_{cik}.json")
         except EdgarError:
             subs = {}
+    ff = facts.get("facts") or {}
+    if "ifrs-full" in ff and len(ff.get("us-gaap") or {}) < 5:
+        # IFRS firma s pár zablúdenými us-gaap značkami (Grab: CostOfRevenue len za 2022): tie by pokazili riadky
+        facts = dict(facts, facts={k: v for k, v in ff.items() if k != "us-gaap"})
     if not any(k in (facts.get("facts") or {}) for k in ("us-gaap", "ifrs-full")):
         # firma je v SEC, ale zatiaľ nemá výkazy (napr. nový ADR, ktorý podal len F-1): skús Yahoo, inak vysvetli
         import yahoo_fin

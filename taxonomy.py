@@ -131,11 +131,13 @@ BALANCE = [
     I("other_cl", "Ostatné krátkodobé záväzky", ["OtherLiabilitiesCurrent"], "instant"),
     I("deposits", "Vklady", ["Deposits", "ifrs:DepositsFromCustomers"], "instant"),
     I("debt_current", "Krátkodobý dlh", [
-        "DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings"], "instant"),
+        "DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings",
+        "ifrs:CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings", "ifrs:ShorttermBorrowings"], "instant"),
     I("current_liabilities", "Krátkodobé záväzky spolu", [
         "LiabilitiesCurrent", "ifrs:CurrentLiabilities"], "instant", bold=True),
     I("debt_lt", "Dlhodobý dlh", [
-        "LongTermDebtNoncurrent", "LongTermDebt", "ifrs:NoncurrentPortionOfNoncurrentLoansReceived"],
+        "LongTermDebtNoncurrent", "LongTermDebt", "ifrs:LongtermBorrowings",
+        "ifrs:NoncurrentPortionOfNoncurrentBorrowings", "ifrs:NoncurrentPortionOfNoncurrentLoansReceived"],
       "instant"),
     I("lease_nc", "Dlhodobé záväzky z lízingov (operatívne)", ["OperatingLeaseLiabilityNoncurrent"], "instant"),
     I("deferred_rev_nc", "Výnosy budúcich období (dlhodobé)", [
@@ -223,6 +225,7 @@ HIDDEN = [
     I("stb", "Krátkodobé pôžičky", ["ShortTermBorrowings", "OtherShortTermBorrowings"], "instant"),
     I("ltd_nc", "Dlhodobý dlh bez krátkodobej časti", ["LongTermDebtNoncurrent"], "instant"),
     I("ltd_total", "Dlhodobý dlh vrátane krátkodobej časti", ["LongTermDebt"], "instant"),
+    I("ifrs_borrowings", "Úvery a pôžičky spolu (IFRS)", ["ifrs:Borrowings"], "instant"),
 ]
 
 ALL_ITEMS = INCOME + BALANCE + CASHFLOW + HIDDEN

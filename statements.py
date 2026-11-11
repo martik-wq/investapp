@@ -22,7 +22,8 @@ def _total_debt(data, e):
         return g("ltd_nc") + (short or 0)
     if g("ltd_total") is not None:                            # LongTermDebt už obsahuje krátkodobú časť
         return g("ltd_total") + short_extra
-    return _sum_any(g("debt_current"), g("debt_lt"))
+    parts = _sum_any(g("debt_current"), g("debt_lt"))
+    return parts if parts is not None else g("ifrs_borrowings")
 
 
 def build(company, mode="annual", n=8):
