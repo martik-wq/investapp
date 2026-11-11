@@ -98,19 +98,32 @@ def roic(built, tax_default=0.21):
     return roic_at(built, _years(built)[-1], tax_default)
 
 
+def _ic(built, t):
+    """Investovaný kapitál = dlh + vlastné imanie − hotovosť a krátkodobé investície."""
+    g = lambda k: _g(built, k, t)  # noqa: E731
+    eq = g("equity")
+    if eq is None:
+        return None
+    debt = g("total_debt")
+    if debt is None:
+        debt = (g("debt_current") or 0) + (g("debt_lt") or 0)
+    return debt + eq - (g("cash") or 0) - (g("st_investments") or 0)
+
+
 def roic_at(built, t, tax_default=0.21):
     """To isté pre ľubovoľný rok t."""
     g = lambda k: _g(built, k, t)  # noqa: E731
     ebit, eq = g("op_income"), g("equity")
     if ebit is None or eq is None:
         return None
-    debt = g("total_debt")
-    if debt is None:
-        debt = (g("debt_current") or 0) + (g("debt_lt") or 0)
-    cash = (g("cash") or 0) + (g("st_investments") or 0)
-    ic = debt + eq - cash
-    if ic <= 0:
+    ic = _ic(built, t)
+    if ic is None or ic <= 0:
         return None
+    ys = _years(built)
+    prev = ys[ys.index(t) - 1] if t in ys and ys.index(t) > 0 else None
+    ic_p = _ic(built, prev) if prev else None
+    if ic_p is not None and ic_p > 0:
+        ic = (ic + ic_p) / 2          # priemer začiatku a konca roka (rovnako ako v tabuľke metrík)
     pretax, tax = g("pretax"), g("tax")
     rate = tax_default
     if pretax and tax is not None and pretax > 0:

@@ -85,11 +85,18 @@ def history_facts(built, ttm=None):
                 roe.append((e, n / base))
     last = built["display"][-1]
     g = lambda k: built["data"].get(k, {}).get(last)  # noqa: E731
+    gl = g
+    bs = (ttm or {}).get("bs") or {}
+    bs_end = last
+    if bs.get("cash") is not None and (ttm or {}).get("bs_end") and ttm["bs_end"] > last:
+        # novšia kvartálna súvaha ako posledný ročný výkaz: dlh, hotovosť a imanie ber z nej
+        bs_end = ttm["bs_end"]
+        g = lambda k: bs.get(k)  # noqa: E731
     cash = (g("cash") or 0) + (g("st_investments") or 0)
     lt_inv = g("lt_investments") or 0
     debt = g("total_debt")
-    if debt is None:
-        debt = (g("debt_current") or 0) + (g("debt_lt") or 0)
+    if debt is None and bs_end == last:
+        debt = (built["data"].get("debt_current", {}).get(last) or 0) + (built["data"].get("debt_lt", {}).get(last) or 0)
     divs = _series(built, "div_paid")
     dps = []
     for (e, dv) in divs:
@@ -122,12 +129,12 @@ def history_facts(built, ttm=None):
         "eps_ttm": (ttm or {}).get("eps") or (eps[-1][1] if eps else None),
         "eps_cagr3": _cagr_n(eps, 3), "eps_cagr5": _cagr_n(eps, 5),
         "ni": (ttm or {}).get("net_income") if ttm and ttm.get("net_income") is not None else (ni[-1][1] if ni else None),
-        "equity": eq[-1][1] if eq else None,
+        "equity": g("equity") if g("equity") is not None else (eq[-1][1] if eq else None), "bs_end": bs_end,
         "roe_last": roe[-1][1] if roe else None,
         "roe_avg3": _avg([r for _, r in roe[-3:]]), "roe_avg5": _avg([r for _, r in roe[-5:]]),
         "cash": cash, "lt_inv": lt_inv, "debt": debt, "net_debt": (debt or 0) - cash - lt_inv,
-        "op_margin_fy": (g("op_income") / g("revenue")) if g("op_income") is not None and g("revenue") else None,
-        "interest_expense": g("interest_expense"),
+        "op_margin_fy": (gl("op_income") / gl("revenue")) if gl("op_income") is not None and gl("revenue") else None,
+        "interest_expense": gl("interest_expense"),
     }
     out["rev_base"] = out["rev_ttm"] or out["rev_fy"]
     out["rev_base_label"] = "posledných 12 mesiacov (TTM)" if out["rev_ttm"] else "posledný fiškálny rok"
@@ -412,6 +419,9 @@ def implied_growth(price, p, lo=-0.20, hi=0.60):
         return None if "error" in r else r["per_share"]
     a, b = val(lo), val(hi)
     if a is None or b is None or not price:
+        return None
+    if b <= a or b <= 0:
+        # pri zápornej FCF marži vyšší rast hodnotu znižuje: reverzný DCF nemá zmysel
         return None
     if price <= a:
         return {"g": lo, "edge": "low"}

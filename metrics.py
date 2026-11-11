@@ -90,11 +90,12 @@ class Ctx:
 
     # odvodené veličiny
     def revenue_like(self, e):
+        """Tržby; u bánk NII + neúrokové výnosy, ak sú zjavne väčšie (rovnako ako valuation.net_revenue)."""
         r = self.v("revenue", e)
-        if r is not None:
-            return r
-        return add(self.nii(e), self.v("nonint_income", e)) \
-            if self.nii(e) is not None and self.v("nonint_income", e) is not None else None
+        n, ni = self.nii(e), self.v("nonint_income", e)
+        if n is not None and ni is not None and (r is None or n + ni > r * 1.05):
+            return n + ni
+        return r
 
     def nii(self, e):
         return self.v("nii", e)
@@ -107,7 +108,8 @@ class Ctx:
         cash = self.v("cash", e)
         if td is None or cash is None:
             return None
-        return td - cash - (self.v("st_investments", e) or 0)
+        # rovnaká definícia ako vo valuácii: hotovosť, krátkodobé aj dlhodobé investície (cenné papiere)
+        return td - cash - (self.v("st_investments", e) or 0) - (self.v("lt_investments", e) or 0)
 
     def tangible_equity(self, e):
         eq = self.v("equity", e)
@@ -177,7 +179,7 @@ def groups_general(c, tech=False):
         M("nm", "Čistá marža", lambda e: div(c.v("net_income", e), c.v("revenue", e)),
           "pct"),
     ] + _common_returns(c) + [
-        M("roic", "ROIC (NOPAT / (dlh + imanie − hotovosť))",
+        M("roic", "ROIC (NOPAT / priem. (dlh + imanie − hotovosť))",
           lambda e: div(
               mul(c.v("op_income", e), 1 - c.tax_rate(e)),
               (lambda a, b: None if a is None or b is None else (a + b) / 2)(
@@ -215,7 +217,7 @@ def groups_general(c, tech=False):
                              c.v("receivables", e)), c.v("current_liabilities", e)), "x"),
         M("de", "Dlh / vlastné imanie",
           lambda e: div(c.v("total_debt", e), c.v("equity", e)), "x"),
-        M("net_debt", "Čistý dlh", c.net_debt, "money"),
+        M("net_debt", "Čistý dlh (dlh − hotovosť − investície)", c.net_debt, "money", "Odpočítava sa hotovosť, krátkodobé aj dlhodobé investície a cenné papiere. Lízingy nie sú v dlhu."),
         M("nd_ebitda", "Čistý dlh / EBITDA",
           lambda e: div(c.net_debt(e), c.ebitda(e)), "x"),
         M("icov", "Úrokové krytie (prev. zisk / úrokové náklady)",
@@ -242,7 +244,7 @@ def _ic(c, e):
     td, eq, cash = c.v("total_debt", e), c.v("equity", e), c.v("cash", e)
     if eq is None:
         return None
-    return (td or 0) + eq - (cash or 0)
+    return (td or 0) + eq - (cash or 0) - (c.v("st_investments", e) or 0)
 
 
 def groups_bank(c):

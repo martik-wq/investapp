@@ -266,12 +266,24 @@ def build_context(ticker, section):
     try:
         built = statements.build(comp, mode=p["mode"], n=n)
     except edgar.EdgarError:
-        # SEC dáta existujú, ale bez použiteľných výkazov (napr. zahraničný emitent s 20-F bez kvartálov): skús Yahoo
-        alt = None if comp.get("source") == "yahoo" or comp["is_demo"] else edgar.yahoo_company(*match)
-        if not alt:
-            raise
-        comp = alt
-        built = statements.build(comp, mode=p["mode"], n=n)
+        built = None
+        if p["mode"] != "annual":
+            # zahraniční emitenti (20-F) podávajú kvartály bez XBRL: ukáž ročné výkazy a vysvetli prečo
+            try:
+                built = statements.build(comp, mode="annual", n=p["years"])
+                p["mode"] = "annual"
+                ctx["mode"] = "annual"
+                ctx["mode_note"] = ("Firma v SEC dátach nemá kvartálne výkazy (zahraniční emitenti podávajú štvrťročné "
+                                    "výsledky len ako tlačovú správu bez XBRL). Zobrazujem ročné výkazy.")
+            except edgar.EdgarError:
+                built = None
+        if built is None:
+            # SEC dáta existujú, ale bez použiteľných výkazov: skús Yahoo
+            alt = None if comp.get("source") == "yahoo" or comp["is_demo"] else edgar.yahoo_company(*match)
+            if not alt:
+                raise
+            comp = alt
+            built = statements.build(comp, mode="annual" if alt.get("source") == "yahoo" else p["mode"], n=p["years"])
     user_price = parse_price(p["price_raw"])
     price = user_price
     quote = dict(quote) if quote else None
@@ -356,7 +368,9 @@ def _fundamental(comp, ticker, btype, price, quote, is_demo):
             disp, data = tt
             e = disp[-1]
             ttm = {"revenue": data["revenue"].get(e), "fcf": data.get("fcf", {}).get(e),
-                   "net_income": data.get("net_income", {}).get(e), "eps": data.get("eps_diluted", {}).get(e)}
+                   "net_income": data.get("net_income", {}).get(e), "eps": data.get("eps_diluted", {}).get(e),
+                   "bs_end": e, "bs": {k: data.get(k, {}).get(e) for k in
+                                       ("cash", "st_investments", "lt_investments", "total_debt", "equity")}}
             if not ttm["revenue"]:
                 ttm = None
     except edgar.EdgarError:

@@ -1354,6 +1354,33 @@ _appmod.macro.get_points = lambda sid: None
 check("banky: bez dát z FRED karta nevznikne, appka nespadne", _appmod._rates_card(_bb, "bank") is None)
 _appmod.macro.get_points = _ogp2
 
+
+# --- audit 11/2026: Sankey bánk sedí aj pri strate, daňovom benefite a ostatných výnosoch
+import flow as _fl  # noqa: E402
+from collections import defaultdict as _dd  # noqa: E402
+def _bal(f):
+    inn, out = _dd(float), _dd(float)
+    for l in f["links"]:
+        out[l["s"]] += l["v"]; inn[l["t"]] += l["v"]
+    ok = True
+    for n in f["nodes"]:
+        a, b = inn.get(n["id"], 0), out.get(n["id"], 0)
+        if (a and abs(a - n["value"]) > 1) or (b and abs(b - n["value"]) > 1) or (a and b and abs(a - b) > 1):
+            ok = False
+    return ok
+_e0 = _dt(2024, 12, 31)
+def _bk(**kw):
+    base = {"int_income": 2800.0, "interest_expense": 1090.0, "nonint_income": 958.0, "provision": 400.0,
+            "nonint_expense": 2000.0, "pretax": 233.0, "tax": -265.0, "net_income": 498.0}
+    base.update(kw)
+    return {"display": [_e0], "ends": [_e0], "data": {k: {_e0: v} for k, v in base.items()}, "mode": "annual", "currency": "USD"}
+for _lbl, _kw in (("daňový benefit", {}), ("strata", {"pretax": -301.0, "tax": 0.0, "net_income": -301.0, "nonint_expense": 2969.0}),
+                  ("ostatné výnosy", {"pretax": 300.0, "tax": 60.0, "net_income": 240.0}),
+                  ("ostatné náklady", {"pretax": 100.0, "tax": 20.0, "net_income": 80.0})):
+    _f = _fl.build_flow(_bk(**_kw), _e0, "bank")
+    check(f"Sankey banky ({_lbl}): každý uzol má prítok = odtok", _f is not None and _bal(_f), _f and _f["links"])
+check("reverzný DCF pri zápornej FCF marži nič netvrdí", _va.implied_growth(10, dict(rev0=1e9, g1=0.1, margin0=-0.1, margin5=-0.05, wacc=0.09,
+      g_term=0.025, net_debt=0, shares=1e8, dilution=0)) is None)
 r = cl.get("/company/NEEXISTUJE123")
 check("neznámy ticker -> chybová stránka", r.status_code == 400)
 os.environ.pop("SEC_USER_AGENT", None)

@@ -134,6 +134,23 @@ class _Flow:
         self.links.append({"s": s, "t": t, "v": v})
 
 
+def _alloc(f, sources, targets):
+    """Prepojí zdroje s cieľmi tak, aby každý uzol mal prítok = odtok (postupne, v danom poradí).
+    Uzly, ktoré v diagrame nie sú (hodnota 0 alebo None), sa preskočia."""
+    src = [[i, v] for i, v in sources if v and v > 0 and i in f._ids]
+    tgt = [[i, v] for i, v in targets if v and v > 0 and i in f._ids]
+    a = b = 0
+    while a < len(src) and b < len(tgt):
+        m = min(src[a][1], tgt[b][1])
+        f.link(src[a][0], tgt[b][0], m)
+        src[a][1] -= m
+        tgt[b][1] -= m
+        if src[a][1] <= 1e-6 * max(1.0, m):
+            a += 1
+        if tgt[b][1] <= 1e-6 * max(1.0, m):
+            b += 1
+
+
 def _streams(f, streams, revenue, prev_rev):
     """Zdroje tržieb (stĺpec 0). Vráti True, ak sa pridali."""
     if not streams or len(streams) < 2 or not revenue:
@@ -306,31 +323,45 @@ def _bank(cur, prev):
     f.link("revenue", "int_exp", ie)
     prov, nonexp, pretax = cur["prov"], cur["nonint_exp"], cur["pretax"]
     prov = max(prov, 0) if prov is not None else 0.0
+    nonexp = nonexp or 0.0
     if pretax is None:
-        pretax = net_rev - prov - (nonexp or 0)
+        pretax = net_rev - prov - nonexp
+    # rozdiel medzi čistými výnosmi a (náklady + zisk pred zdanením): > 0 ostatné náklady, < 0 ostatné výnosy
+    gap = net_rev - prov - nonexp - pretax
+    if 0 < gap <= OTHER_MIN_SHARE * net_rev and nonexp:
+        nonexp, gap = nonexp + gap, 0.0           # drobnosť pripočítať k nákladom, aby tok sedel
     f.node("pretax", "Zisk pred zdanením", 3, "profit", pretax if pretax > 0 else None,
            prev.get("pretax"), sub=(f"marža {pretax / rev * 100:.0f} %" if pretax > 0 else None))
     if prov > 0:
         f.node("prov", "Rezervy na úverové straty", 3, "cost", prov, prev.get("prov"))
     if nonexp:
         f.node("nonexp", "Neúrokové náklady", 3, "cost", nonexp, prev.get("nonint_exp"))
-    other = net_rev - prov - (nonexp or 0) - max(pretax, 0)
-    if other > OTHER_MIN_SHARE * net_rev:
-        f.node("other_cost", "Ostatné náklady (netto)", 3, "cost", other)
-    f.link("net_rev", "pretax", max(pretax, 0))
-    f.link("net_rev", "prov", prov)
-    f.link("net_rev", "nonexp", nonexp)
-    f.link("net_rev", "other_cost", other if other > OTHER_MIN_SHARE * net_rev else 0)
+    if gap > 0:
+        f.node("other_cost", "Ostatné náklady (netto)", 3, "cost", gap)
+    if gap < 0:
+        f.node("other_inc", "Ostatné výnosy (netto)", 2, "profit", -gap, ord=1)
+    if pretax < 0:
+        f.node("loss", "Strata pred zdanením", 2, "cost", -pretax, sub="kryje sa z kapitálu", ord=2)
+    _alloc(f, [("net_rev", net_rev), ("other_inc", max(-gap, 0)), ("loss", max(-pretax, 0))],
+           [("pretax", max(pretax, 0)), ("prov", prov), ("nonexp", nonexp), ("other_cost", max(gap, 0))])
     tax, ni = cur["tax"], cur["ni"]
     if pretax > 0 and ni is not None:
-        tax = max(tax if tax is not None else pretax - ni, 0)
+        tax = tax if tax is not None else pretax - ni
         nif = max(ni, 0)
+        rest = pretax - tax - ni                   # menšinové podiely, ukončené činnosti a pod.
         f.node("ni", "Čistý zisk", 4, "profit", nif if nif > 0 else None, prev.get("ni"),
                sub=(f"marža {nif / rev * 100:.0f} %" if nif > 0 else None))
         if tax > 0:
             f.node("tax", "Dane", 4, "cost", tax, prev.get("tax"))
-        f.link("pretax", "ni", min(nif, pretax))
-        f.link("pretax", "tax", min(tax, pretax))
+        else:
+            f.node("tax_benefit", "Daňový benefit", 3, "profit", -tax if tax < 0 else None,
+                   sub="napr. uvoľnenie odloženej dane", ord=1)
+        if rest > OTHER_MIN_SHARE * pretax:
+            f.node("other_out", "Ostatné (menšinové podiely a i.)", 4, "cost", rest)
+        elif rest < -OTHER_MIN_SHARE * pretax:
+            f.node("other_in2", "Ostatné výnosy po zdanení", 3, "profit", -rest, ord=1)
+        _alloc(f, [("pretax", pretax), ("tax_benefit", max(-tax, 0)), ("other_in2", max(-rest, 0))],
+               [("ni", nif), ("tax", max(tax, 0)), ("other_out", max(rest, 0))])
     return f
 
 

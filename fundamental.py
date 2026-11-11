@@ -117,7 +117,7 @@ def build_view(args, facts, analyst, price, currency, btype, beta, rf, mcap, sha
         _fld("d_rev", f"Základ tržieb ({facts.get('rev_base_label', '')})", f"mil. {currency}", rv, round(rev_mil, 1),
              "Z výkazov firmy.", [], None, "1", "{:.1f}"),
         _fld("d_nd", "Čistý dlh (dlh − hotovosť)", f"mil. {currency}", nd, round(nd_mil, 1),
-             "Z poslednej súvahy: dlh mínus hotovosť a investície (krátkodobé aj dlhodobé cenné papiere).",
+             f"Z poslednej súvahy{(' k ' + facts['bs_end'].strftime('%d.%m.%Y')) if facts.get('bs_end') else ''}: dlh mínus hotovosť a investície (krátkodobé aj dlhodobé cenné papiere).",
              [f"Dlh {(facts.get('debt') or 0) / 1e6:,.0f} mil., hotovosť a krátkodobé investície {(facts.get('cash') or 0) / 1e6:,.0f} mil."
               + (f", dlhodobé investície a cenné papiere {(facts.get('lt_inv') or 0) / 1e6:,.0f} mil. (tiež odpočítané)" if facts.get("lt_inv") else "")],
              "Záporný = firma má viac hotovosti ako dlhu.", "1", "{:.1f}"),

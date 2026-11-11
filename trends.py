@@ -13,10 +13,13 @@ def _add(a, b):
 
 
 def _rev(g, e):
+    """Tržby; u bánk čistý výnos (NII + neúrokové výnosy), ak je zjavne väčší ako riadok Revenues
+    (rovnaké pravidlo ako valuation.net_revenue)."""
     r = g("revenue", e)
-    if r is not None:
-        return r
-    return _add(g("nii", e), g("nonint_income", e))
+    nr = _add(g("nii", e), g("nonint_income", e))
+    if nr is not None and (r is None or nr > r * 1.05):
+        return nr
+    return r
 
 
 def _capex(g, e):
