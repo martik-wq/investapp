@@ -200,8 +200,13 @@ def load_company(ticker, cik, title):
     }
 
 
+# skratky v taxonómii -> menné priestory v SEC companyfacts (IFRS firmy majú "ifrs-full", nie "ifrs")
+NS_ALIAS = {"ifrs": "ifrs-full"}
+
+
 def _concept(facts, tag):
     tax, name = tag.split(":", 1) if ":" in tag else ("us-gaap", tag)
+    tax = NS_ALIAS.get(tax, tax)
     return facts.get("facts", {}).get(tax, {}).get(name)
 
 
@@ -235,6 +240,14 @@ def latest_shares_outstanding(facts):
         key = max((e.get("end", ""), e.get("filed", "")) for e in ents)
         vals = {e["val"] for e in ents if (e.get("end", ""), e.get("filed", "")) == key}
         return float(sum(vals))
+    # zahraniční emitenti (20-F, IFRS) často neuvádzajú počet akcií na obálke: použi posledný vážený priemer
+    for tag in ("ifrs:AdjustedWeightedAverageShares", "ifrs:WeightedAverageShares",
+                "WeightedAverageNumberOfDilutedSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic"):
+        c = _concept(facts, tag)
+        ents = [e for e in ((c or {}).get("units", {}).get("shares") or []) if e.get("end") and e.get("start")
+                and (_d(e["end"]) - _d(e["start"])).days > 300]
+        if ents:
+            return float(max(ents, key=lambda e: (e["end"], e.get("filed", "")))["val"])
     return None
 
 

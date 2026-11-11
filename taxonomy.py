@@ -170,7 +170,7 @@ CASHFLOW = [
     I("da", "Odpisy a amortizácia", [
         "DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
         "DepreciationAmortizationAndAccretionNet",
-        "DepreciationAmortizationAndOther", "Depreciation",   # Microsoft vykazuje odpisy pod značkou Depreciation
+        "DepreciationAmortizationAndOther",
         "ifrs:DepreciationAndAmortisationExpense"], indent=1),
     I("sbc", "Akciová kompenzácia", [
         "ShareBasedCompensation", "AllocatedShareBasedCompensationExpense",
@@ -212,7 +212,20 @@ CASHFLOW = [
         "ifrs:CashFlowsFromUsedInFinancingActivities"], bold=True),
 ]
 
-ALL_ITEMS = INCOME + BALANCE + CASHFLOW
+# Pomocné riadky (nezobrazujú sa), z ktorých sa skladajú odvodené hodnoty v statements.build
+HIDDEN = [
+    I("rev_net_int", "Čisté tržby po úrokových nákladoch", ["RevenuesNetOfInterestExpense"]),
+    I("dep_only", "Odpisy hmotného majetku", ["Depreciation"]),
+    I("amort_intang", "Amortizácia nehmotného majetku", ["AmortizationOfIntangibleAssets"]),
+    I("debt_cur_total", "Krátkodobý dlh spolu", ["DebtCurrent"], "instant"),
+    I("ltd_cur", "Krátkodobá časť dlhodobého dlhu", ["LongTermDebtCurrent"], "instant"),
+    I("cp", "Komerčné papiere", ["CommercialPaper"], "instant"),
+    I("stb", "Krátkodobé pôžičky", ["ShortTermBorrowings", "OtherShortTermBorrowings"], "instant"),
+    I("ltd_nc", "Dlhodobý dlh bez krátkodobej časti", ["LongTermDebtNoncurrent"], "instant"),
+    I("ltd_total", "Dlhodobý dlh vrátane krátkodobej časti", ["LongTermDebt"], "instant"),
+]
+
+ALL_ITEMS = INCOME + BALANCE + CASHFLOW + HIDDEN
 ITEM_BY_KEY = {it["key"]: it for it in ALL_ITEMS}
 
 # Tagy pre počet akcií na obálke 10-K/10-Q (namespace dei)

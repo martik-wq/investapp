@@ -12,6 +12,19 @@ def _sum_any(*xs):
     return sum(vals) if vals else None
 
 
+def _total_debt(data, e):
+    """Celkový finančný dlh (bez lízingov). Komerčné papiere a krátkodobé pôžičky firmy často vykazujú mimo
+    „krátkodobej časti dlhodobého dlhu“ (Apple, Microsoft), preto sa skladá z jednotlivých častí."""
+    g = lambda k: data[k].get(e)  # noqa: E731
+    short_extra = max(g("cp") or 0, g("stb") or 0)            # CP býva súčasťou krátkodobých pôžičiek: neduplikovať
+    if g("ltd_nc") is not None:
+        short = g("debt_cur_total") if g("debt_cur_total") is not None else _sum_any(g("ltd_cur"), short_extra or None)
+        return g("ltd_nc") + (short or 0)
+    if g("ltd_total") is not None:                            # LongTermDebt už obsahuje krátkodobú časť
+        return g("ltd_total") + short_extra
+    return _sum_any(g("debt_current"), g("debt_lt"))
+
+
 def build(company, mode="annual", n=8):
     """Vráti dict: ends (vzostupne, vrátane extra období pre priemery),
     display (posledných n), data {kľúč: {end: hodnota}}."""
@@ -23,7 +36,14 @@ def build(company, mode="annual", n=8):
     for e in ends:
         g = lambda k: data[k].get(e)  # noqa: E731
 
-        if g("gross_profit") is None and g("revenue") is not None \
+        # banky a brokeri: tržby po úrokových nákladoch sú skutočný „top line“, riadok Revenues býva len časť (poplatky)
+        rn = g("rev_net_int")
+        net_rev = rn is not None and (g("revenue") is None or rn > g("revenue") * 1.05)
+        if net_rev:
+            data["revenue"][e] = rn
+        if g("da") is None and g("dep_only") is not None:      # napr. Microsoft: odpisy a amortizácia zvlášť
+            data["da"][e] = g("dep_only") + (g("amort_intang") or 0)
+        if g("gross_profit") is None and g("revenue") is not None and not net_rev \
                 and g("cost_of_revenue") is not None:
             data["gross_profit"][e] = g("revenue") - g("cost_of_revenue")
         if g("nii") is None and g("int_income") is not None \
@@ -39,7 +59,7 @@ def build(company, mode="annual", n=8):
     data["total_debt"] = {}
     data["fcf"] = {}
     for e in ends:
-        td = _sum_any(data["debt_current"].get(e), data["debt_lt"].get(e))
+        td = _total_debt(data, e)
         if td is not None:
             data["total_debt"][e] = td
         cfo, capex = data["cfo"].get(e), data["capex"].get(e)

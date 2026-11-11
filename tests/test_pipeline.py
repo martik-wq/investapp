@@ -746,7 +746,38 @@ check("excel fundamentálna: hárky a živé vzorce v DCF, P/B a P/E",
 
 # --- Microsoft vykazuje odpisy pod značkou Depreciation (inak chýbalo EBITDA a EV/EBITDA)
 import taxonomy as _tx  # noqa: E402
-check("taxonómia: odpisy majú záložnú značku Depreciation", "Depreciation" in _tx.ITEM_BY_KEY["da"]["tags"])
+check("taxonómia: odpisy majú záložnú značku Depreciation (pomocný riadok)", "Depreciation" in _tx.ITEM_BY_KEY["dep_only"]["tags"])
+
+# --- audit 11/2026: IFRS menný priestor, tržby bánk, celkový dlh, odpisy, počet akcií IFRS firiem
+import edgar as _eda, statements as _sta  # noqa: E402
+def _fy(v, y=2024):
+    return {"start": f"{y}-01-01", "end": f"{y}-12-31", "val": v, "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y + 1}-02-01"}
+def _bs(v, y=2024):
+    return {"end": f"{y}-12-31", "val": v, "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y + 1}-02-01"}
+def _co(ns, tags, cur="USD"):
+    facts = {"entityName": "T", "facts": {ns: {t: {"units": {("shares" if "Shares" in t else cur): vals}} for t, vals in tags.items()}}}
+    return {"filings": {}, "sec": {}, "ticker": "T", "cik": 1, "name": "T", "facts": facts, "sic": None, "sic_desc": "",
+            "currency": _eda.detect_currency(facts), "shares_out": _eda.latest_shares_outstanding(facts), "is_demo": False}
+_ifrs = _co("ifrs-full", {"Revenue": [_fy(100, 2023), _fy(150)], "ProfitLoss": [_fy(10, 2023), _fy(20)], "Assets": [_bs(900, 2023), _bs(1000)],
+                          "AdjustedWeightedAverageShares": [_fy(50, 2023), _fy(55)]})
+_bi = _sta.build(_ifrs, "annual", 2)
+_e24 = _bi["display"][-1]
+check("IFRS: firmy s menným priestorom ifrs-full (Nu, Grab) sa načítajú", _bi["data"]["revenue"][_e24] == 150 and _bi["data"]["net_income"][_e24] == 20)
+check("IFRS: bez počtu akcií na obálke sa použije posledný vážený priemer", _ifrs["shares_out"] == 55)
+_bank = _co("us-gaap", {"RevenueFromContractWithCustomerExcludingAssessedTax": [_fy(500)], "RevenuesNetOfInterestExpense": [_fy(2675)],
+                        "CostOfRevenue": [_fy(460)], "NetIncomeLoss": [_fy(499)]})
+_bb2 = _sta.build(_bank, "annual", 1)
+check("banky: tržby = čisté tržby po úrokoch (SoFi), hrubý zisk sa z poplatkov nedopočíta",
+      _bb2["data"]["revenue"][_bb2["display"][-1]] == 2675 and _bb2["data"]["gross_profit"].get(_bb2["display"][-1]) is None)
+_debt = _co("us-gaap", {"Revenues": [_fy(1000)], "NetIncomeLoss": [_fy(100)], "CommercialPaper": [_bs(9967)], "LongTermDebtCurrent": [_bs(10912)],
+                        "LongTermDebtNoncurrent": [_bs(85750)], "LongTermDebt": [_bs(96662)], "Depreciation": [_fy(152)], "AmortizationOfIntangibleAssets": [_fy(48)]})
+_bd = _sta.build(_debt, "annual", 1)
+_ed = _bd["display"][-1]
+check("dlh: komerčné papiere sa započítajú (Apple 2024 = 106 629)", _bd["data"]["total_debt"][_ed] == 106629)
+check("odpisy: Depreciation + amortizácia nehmotného majetku (Microsoft)", _bd["data"]["da"][_ed] == 200)
+_debt2 = _co("us-gaap", {"Revenues": [_fy(1000)], "NetIncomeLoss": [_fy(100)], "LongTermDebt": [_bs(500)], "ShortTermBorrowings": [_bs(50)], "CommercialPaper": [_bs(30)]})
+_bd2 = _sta.build(_debt2, "annual", 1)
+check("dlh: LongTermDebt už obsahuje krátkodobú časť, CP sa nezduplikuje so ShortTermBorrowings", _bd2["data"]["total_debt"][_bd2["display"][-1]] == 550)
 _nd = _va.history_facts({"display": [_dt(2025, 12, 31)], "data": {"cash": {_dt(2025, 12, 31): 100.0}, "st_investments": {_dt(2025, 12, 31): 50.0},
       "lt_investments": {_dt(2025, 12, 31): 30.0}, "total_debt": {_dt(2025, 12, 31): 400.0}, "revenue": {_dt(2025, 12, 31): 1000.0}}})
 check("čistý dlh = dlh − hotovosť − krátkodobé aj dlhodobé investície (400 − 150 − 30)", _nd["net_debt"] == 220.0, _nd["net_debt"])
