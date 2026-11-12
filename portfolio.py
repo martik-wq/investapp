@@ -291,11 +291,22 @@ def _mark_transfers(items):
                 break
 
 
+def _norm_ccy(c):
+    """GBp/GBX (pence) → GBP."""
+    return "GBP" if c in ("GBp", "GBX") else c
+
+
 def _amount(t, pccy, mism):
     """Suma obchodu v mene pozície."""
     if t["ccy"] == pccy and t["total"] is not None:
         return abs(t["total"])
-    if t["price_ccy"] == pccy and t["price"] is not None and t["shares"]:
+    pc = t["price_ccy"]
+    pence = pc in ("GBp", "GBX")
+    npc = "GBP" if pence else pc
+    if npc == pccy and t["price"] is not None and t["shares"]:
+        p = t["price"] / 100 if pence else t["price"]
+        return t["shares"] * p
+    if pc == pccy and t["price"] is not None and t["shares"]:
         return t["shares"] * t["price"]
     mism.add(t.get("ticker") or t["isin"])
     return abs(t["total"] or 0.0)
@@ -317,13 +328,14 @@ def build_positions(txns):
             price_ccys[t["isin"]][t["price_ccy"]] += 1
 
     def pos_ccy(isin, fallback):
-        s = ccys.get(isin)
-        if s and len(s) == 1:
-            return next(iter(s))
+        # uprednostni menu akcie (price_ccy) pred menou účtu (ccy)
         c = price_ccys.get(isin)
         if c:
-            return c.most_common(1)[0][0]
-        return fallback
+            return _norm_ccy(c.most_common(1)[0][0])
+        s = ccys.get(isin)
+        if s and len(s) == 1:
+            return _norm_ccy(next(iter(s)))
+        return _norm_ccy(fallback)
 
     pos = {}
     totals = defaultdict(dict)

@@ -326,8 +326,8 @@ check("portfólio: zmiešaná mena zúčtovania -> mena akcie, suma = kusy × ce
       by["DEMOCO"]["ccy"] == "USD" and abs(by["DEMOCO"]["cost"] - (400 + 90 - (400 + 90) / 12 * 4)) < 1e-9, by["DEMOCO"]["cost"])
 check("portfólio: predaj používa výsledok z Trading 212", abs(by["DEMOCO"]["realized"]["USD"] - 54.0) < 1e-9)
 check("portfólio: kusy po predaji", abs(by["DEMOCO"]["shares"] - 8) < 1e-9)
-check("portfólio: londýnsky ETF zúčtovaný v EUR -> pozícia v EUR", by["DEMOUK"]["ccy"] == "EUR"
-      and abs(by["DEMOUK"]["cost"] - 229.89) < 1e-9)
+check("portfólio: londýnsky ETF zúčtovaný v EUR -> pozícia v GBP (mena akcie)", by["DEMOUK"]["ccy"] == "GBP"
+      and abs(by["DEMOUK"]["cost"] - 200.0) < 1e-9)
 check("portfólio: predaj bez histórie -> zisk z Trading 212 a upozornenie", any("DEMOOLD" in w and "staršia história" in w
       for w in pd_["warnings"]) and abs(pd_["all"][-1]["realized"].get("USD", 0) + 0) >= 0
       and any(abs(p["realized"].get("USD", 0) - 15.0) < 1e-9 for p in pd_["closed"]))
@@ -350,8 +350,8 @@ conv = portfolio.Converter(lambda a, b: fxt.get((a, b)))
 vals = portfolio.value_positions(pd_["open"], "EUR", lambda i, t: t, lambda s: quotes.get(s), conv)
 bt = {p["ticker"]: p for p in vals}
 check("ocenenie: USD pozícia v USD aj v EUR", abs(bt["DEMOCO"]["value"] - 400) < 1e-9 and abs(bt["DEMOCO"]["value_b"] - 360) < 1e-9)
-check("ocenenie: pence -> libry -> EUR pozície", abs(bt["DEMOUK"]["price_pc"] - 25 * 1.2) < 1e-9
-      and abs(bt["DEMOUK"]["value"] - 300) < 1e-9)
+check("ocenenie: pence -> libry, pozícia v GBP", abs(bt["DEMOUK"]["price_pc"] - 25.0) < 1e-9
+      and abs(bt["DEMOUK"]["value"] - 250.0) < 1e-9)
 sm = portfolio.summarize(pd_, vals, "EUR", conv)
 check("súhrn: trhová hodnota v EUR", abs(sm["value"] - (360 + 600 + 300 + 40)) < 1e-9, sm["value"])
 check("súhrn: realizovaný zisk (USD výsledky prepočítané)", abs(sm["realized"] - (54 + 15) * 0.9) < 1e-9, sm["realized"])
@@ -385,12 +385,13 @@ check("T212 (starší formát): mena z hlavičky Total (EUR)", pl["acct_ccy"] ==
 check("T212 (starší formát): 9 transakcií, konverzia mien sa preskočí", len(pl["txns"]) == 9 and not pl["warnings"])
 ld = portfolio.build_positions(pl["txns"])
 dco = next(p for p in ld["open"] if p["ticker"] == "DEMOCO")
-cost1, cost2 = round(10 * 40 / 1.10, 2), round(5 * 45 / 1.08, 2)
-avg = (cost1 + cost2) / 15
-sold = round(6 * 52 / 1.05, 2)
+# pozícia teraz v USD (mena akcie), cost = kusy × cena v USD
+cost1, cost2 = 10 * 40.0, 5 * 45.0     # 400 + 225 = 625 USD
+avg = (cost1 + cost2) / 15              # 41.6667 USD
+sold = 6 * 52.0                         # 312 USD
 check("starší formát: kusy, priemerná cena, realizovaný zisk (vlastný výpočet bez Result)",
       abs(dco["shares"] - 9) < 1e-9 and abs(dco["avg_cost"] - avg) < 1e-6
-      and abs(dco["realized"]["EUR"] - (sold - avg * 6)) < 1e-6, dco["realized"])
+      and abs(dco["realized"]["USD"] - (sold - avg * 6)) < 1e-6, dco["realized"])
 check("starší formát: dividendy a vklady", ld["dividends_by_year"] == {"2024": {"EUR": 3.4}, "2025": {"EUR": 5.1}}
       and ld["totals"]["deposits"] == {"EUR": 5000.0} and ld["totals"]["withdrawals"] == {"EUR": 200.0})
 unk = portfolio.parse_csv(legacy + "Neznama akcia,2024-03-01 10:00:00,,,,,,,,,1.00,,,,,Z9\n")
