@@ -425,8 +425,15 @@ def risk_stats(tl, benches, start, end, rf=0.0):
     port_r = [port_lv[i] / port_lv[i - 1] - 1.0 for i in range(1, len(rows))]
     years = (rows[-1][0] - rows[0][0]).days / 365.25
     rfd = rf / TRADING_DAYS
+    port = _single(port_lv, port_r, years, rf)
+    # TWR z celej timeline (nie len spoločné obchodné dni) pre konzistenciu s tabuľkou výnosov
+    w = window(tl, start, end, from_scratch=(start < first))
+    if w and w["twr"] is not None:
+        port["total"] = w["twr"]
+        if years >= 1.0 and w["twr"] > -1.0:
+            port["cagr"] = (1.0 + w["twr"]) ** (1.0 / years) - 1.0
     out = {"ok": True, "n": len(port_r), "start": rows[0][0], "end": rows[-1][0], "years": years,
-           "rf": rf, "port": _single(port_lv, port_r, years, rf), "bench": {}}
+           "rf": rf, "port": port, "bench": {}}
     for k, b in enumerate(ids):
         lv = [x[2][k] for x in rows]
         br = [lv[i] / lv[i - 1] - 1.0 for i in range(1, len(rows))]
