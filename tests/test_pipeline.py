@@ -193,6 +193,15 @@ edgar._get_json = _orig_gj
 check("SEC: pri málo výročných správach v „recent“ sa pripoja staršie stránky zoznamu (Meta)",
       _ext["filings"]["recent"]["form"] == ["10-K", "4", "10-K", "4", "10-K"]
       and _ext["filings"]["recent"]["accessionNumber"][-1] == "c" and len(_pages) == 1, _ext)
+_fn2 = filings.parse_report(
+    '<table class="report"><tr><th class="tl" rowspan="2"><div>Cash Flows - USD ($) $ in Thousands</div></th>'
+    '<th class="th" colspan="5">12 Months Ended</th></tr><tr><th class="th" colspan="2">Dec. 31, 2021</th>'
+    '<th class="th" colspan="2">Dec. 31, 2020</th><th class="th">Dec. 31, 2019</th></tr>'
+    '<tr><td class="pl"><a>Net cash used in operating activities</a></td><td class="nump">(1,350)</td>'
+    '<td class="fn"><sup>[1]</sup></td><td class="nump">(479)</td><td class="fn"></td><td class="nump">(55)</td></tr></table>')
+check("podrobné výkazy: bunky s poznámkami (fn) a roky cez 2 stĺpce sa zarovnajú (SoFi 10-K 2021)",
+      _fn2 and _fn2["rows"][0]["vals"] == [-1350e3, -479e3, -55e3] and _fn2["cols"][1]["months"] == 12,
+      _fn2 and (_fn2["rows"][0]["vals"], _fn2["cols"]))
 check("IFRS: jediný výkaz súhrnného zisku sa použije ako výkaz ziskov a strát",
       filings.parse_filing_summary(_fs) == {"balance": "R2.htm", "income": "R3.htm"}, filings.parse_filing_summary(_fs))
 check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")

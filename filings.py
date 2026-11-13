@@ -366,7 +366,14 @@ def parse_report(html):
             date_idx = i
     if date_idx is None:
         return None
-    dates = [parse_date(c.text) for c in value_cells(hdr[date_idx])]
+    dcells = value_cells(hdr[date_idx])
+    dates = [parse_date(c.text) for c in dcells]
+    # poloha stĺpcov v mriežke: niektoré podania majú za hodnotou bunku na poznámku („fn“) a rok cez 2 stĺpce
+    starts, pos = [], 0
+    for c in dcells:
+        starts.append(pos)
+        pos += c.colspan
+    width = pos
     months = [None] * len(dates)
     if date_idx > 0:
         exp = []
@@ -374,6 +381,8 @@ def parse_report(html):
             exp += [parse_months(c.text)] * c.colspan
         if len(exp) == len(dates):
             months = exp
+        elif len(exp) == width:
+            months = [exp[st] for st in starts]
     cols = [{"end": d, "months": m} for d, m in zip(dates, months)]
 
     out_rows, in_group, group_kind = [], False, "money"
@@ -384,7 +393,14 @@ def parse_report(html):
             continue
         # bunka triedy „th“ za názvom riadku je stĺpec na poznámky pod čiarou (staršie 20-F Grabu), nie hodnota
         cells = [c for c in r[1:] if "th" not in c.cls.split()]
-        raw_vals = [parse_number(c.text) for c in cells[:len(cols)]]
+        if width > len(cols) and sum(c.colspan for c in cells) == width:
+            at, p0 = {}, 0
+            for c in cells:
+                at[p0] = c
+                p0 += c.colspan
+            raw_vals = [parse_number(at[st].text) if st in at else None for st in starts]
+        else:
+            raw_vals = [parse_number(c.text) for c in cells[:len(cols)]]
         raw_vals += [None] * (len(cols) - len(raw_vals))
         has_vals = any(v is not None for v in raw_vals)
         kind = row_kind(label)
