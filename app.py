@@ -105,6 +105,10 @@ def num_sk(v, d=2, sign=False, g=False):
     return _sk(f"{v:{'+' if sign else ''},.{d}f}")
 
 
+# šablóny načítať znova po aktualizácii aj bez reštartu (config TEMPLATES_AUTO_RELOAD v __main__ prišiel neskoro:
+# jinja_env už existoval, preto sa zmeny .html prejavili až po reštarte servera)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 app.jinja_env.filters["num"] = num_sk
 app.jinja_env.filters["fmt"] = fmt_value
 app.jinja_env.filters["spct"] = signed_pct
