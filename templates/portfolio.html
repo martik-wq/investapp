@@ -103,8 +103,8 @@
         <td data-v="{{ p.avg_cost }}">{{ p.avg_cost|fmt('amt') }}</td>
         <td data-v="{{ p.price_pc or 0 }}">{{ p.price_pc|fmt('amt') if p.price_pc is not none else '–' }}</td>
         <td data-v="{{ p.value or 0 }}">{{ p.value|fmt('amt') if p.value is not none else '–' }}</td>
-        <td data-v="{{ p.unrealized or 0 }}" class="{{ 'neg' if p.unrealized is not none and p.unrealized < 0 }}">{{ p.unrealized|fmt('amt') if p.unrealized is not none else '–' }}</td>
-        <td data-v="{{ p.unrealized_pct or 0 }}" class="{{ 'neg' if p.unrealized_pct is not none and p.unrealized_pct < 0 }}">{{ p.unrealized_pct|fmt('pct') if p.unrealized_pct is not none else '–' }}</td>
+        <td data-v="{{ p.unrealized or 0 }}" class="{{ 'neg' if p.unrealized is not none and p.unrealized < 0 else 'pos' if p.unrealized }}">{{ p.unrealized|fmt('amt') if p.unrealized is not none else '–' }}</td>
+        <td data-v="{{ p.unrealized_pct or 0 }}" class="{{ 'neg' if p.unrealized_pct is not none and p.unrealized_pct < 0 else 'pos' if p.unrealized_pct }}">{{ p.unrealized_pct|fmt('pct') if p.unrealized_pct is not none else '–' }}</td>
         <td data-v="{{ p.value_b or 0 }}">{{ p.value_b|fmt('amt') if p.value_b is not none else '–' }}</td>
         <td data-v="{{ p.weight or 0 }}">{{ p.weight|fmt('pct') if p.weight is not none else '–' }}</td>
         <td data-v="{{ p.div_b or 0 }}">{{ p.div_b|fmt('amt') }}</td>
@@ -129,7 +129,7 @@
   <div class="tablewrap" style="margin-top:10px"><table class="pf">
     <thead><tr><th>Ticker</th><th>Názov</th><th>Mena</th><th>Posledný predaj</th><th>Nákupy</th><th>Predaje</th><th>Realizovaný zisk ({{ base }})</th></tr></thead>
     <tbody>{% for p in closed %}<tr><td><strong>{{ p.ticker or p.isin }}</strong></td><td style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.ccy }}</td><td>{{ p.last }}</td>
-      <td>{{ p.bought|fmt('amt') if p.bought else '–' }}</td><td>{{ p.sold|fmt('amt') if p.sold else '–' }}</td><td class="{{ 'neg' if p.realized_b < 0 }}">{{ p.realized_b|fmt('amt') }}</td></tr>{% endfor %}</tbody>
+      <td>{{ p.bought|fmt('amt') if p.bought else '–' }}</td><td>{{ p.sold|fmt('amt') if p.sold else '–' }}</td><td class="{{ 'neg' if p.realized_b < 0 else 'pos' if p.realized_b }}">{{ p.realized_b|fmt('amt') }}</td></tr>{% endfor %}</tbody>
   </table></div>
   <p class="note">Zisk z predaja beriem z exportu Trading 212 (stĺpec Result), ak v ňom je. Ak pozícia vznikla pred začiatkom exportu, nákupy v tabuľke chýbajú.</p>
 </details>
