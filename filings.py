@@ -305,7 +305,7 @@ def _scales(title):
 
 EPS_RE = re.compile(r"per (common |ordinary )?(share|adr)|earnings per|\beps\b", re.I)
 SHARES_RE = re.compile(r"\bshares\b|number of (common )?shares", re.I)
-TOTAL_RE = re.compile(r"^(total|net (cash|income|loss|increase|decrease|earnings|change)|"
+TOTAL_RE = re.compile(r"^(total|net (cash|income|loss|increase|decrease|earnings|change(?! in fair value))|"
                       r"gross (profit|margin)|operating (income|loss|profit)|"
                       r"income \(loss\) before|income before|profit before|loss before)", re.I)
 
@@ -367,7 +367,9 @@ def parse_report(html):
         label = re.sub(r"\s*\[\d+\]", "", label_cell.text).strip()
         if not label:
             continue
-        raw_vals = [parse_number(c.text) for c in r[1:1 + len(cols)]]
+        # bunka triedy „th“ za názvom riadku je stĺpec na poznámky pod čiarou (staršie 20-F Grabu), nie hodnota
+        cells = [c for c in r[1:] if "th" not in c.cls.split()]
+        raw_vals = [parse_number(c.text) for c in cells[:len(cols)]]
         raw_vals += [None] * (len(cols) - len(raw_vals))
         has_vals = any(v is not None for v in raw_vals)
         kind = row_kind(label)
@@ -419,12 +421,27 @@ def _norm(label):
 def _merge_rows(reports):
     """reports: spracované výkazy od najnovšieho. Vráti (order, meta, raw)."""
     order, meta, raw = [], {}, {}
+    by_concept = {}                                  # koncept -> kľúč (len koncepty, ktoré sú vo výkaze raz)
     for rep in reports:
-        seen, prev = {}, None
+        seen, prev, used = {}, None, set()
+        cnt = {}
+        for row in rep["rows"]:
+            if row.get("concept"):
+                cnt[row["concept"]] = cnt.get(row["concept"], 0) + 1
         for row in rep["rows"]:
             nk = _norm(row["label"])
             seen[nk] = seen.get(nk, 0) + 1
             key = (nk, seen[nk])
+            c = row.get("concept")
+            unique = c and cnt.get(c) == 1
+            if key not in meta and unique and by_concept.get(c) and by_concept[c] not in used:
+                key = by_concept[c]                  # firma riadok len premenovala („expense“ -> „expenses“)
+            if unique:
+                if c not in by_concept:
+                    by_concept[c] = key
+                elif by_concept[c] != key:
+                    by_concept[c] = None             # koncept sa používa pre rôzne riadky: nezlučovať
+            used.add(key)
             if key not in meta:
                 meta[key] = {k: row[k] for k in ("label", "kind", "indent", "bold", "header")}
                 pos = order.index(prev) + 1 if prev in order else 0
@@ -434,6 +451,40 @@ def _merge_rows(reports):
                 if v is not None:
                     raw.setdefault(key, {}).setdefault((col["end"], col["months"]), v)
     return order, meta, raw
+
+
+def _stem(label):
+    return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") else w for w in _norm(label).split())
+
+
+def _merge_similar(order, meta, raw):
+    """Zlúči riadky, ktoré firma medzi podaniami premenovala aj s iným konceptom („Restucturing costs“ ->
+    „Restructuring costs“, „Loss for the year“ -> „Profit/ (loss) for the year“). Podmienka: podobný názov
+    a v spoločnom období (prekryv podaní) rovnaká hodnota."""
+    from difflib import SequenceMatcher
+    gone = set()
+    for i, a in enumerate(order):
+        if a in gone or meta[a]["header"] or a not in raw:
+            continue
+        for b in order[i + 1:]:
+            if b in gone or meta[b]["header"] or b not in raw or meta[b]["kind"] != meta[a]["kind"]:
+                continue
+            va, vb = raw[a], raw[b]
+            common = set(va) & set(vb)
+            if not common or set(vb) <= set(va):
+                continue
+            if any(abs(va[k] - vb[k]) > max(abs(va[k]), abs(vb[k])) * 0.005 + 1e-9 for k in common):
+                continue
+            sa, sb = _stem(meta[a]["label"]), _stem(meta[b]["label"])
+            if sa != sb and SequenceMatcher(None, sa, sb).ratio() < 0.8:
+                continue
+            if max(vb)[0] > max(va)[0]:              # názov z novšieho podania
+                meta[a] = dict(meta[a], label=meta[b]["label"])
+            for k, v in vb.items():
+                va.setdefault(k, v)
+            gone.add(b)
+            break
+    return [k for k in order if k not in gone]
 
 
 def _near(target, candidates, tol):
@@ -473,6 +524,7 @@ def merge_statement(reports, kind, mode, n):
     if not reports:
         return None
     order, meta, raw = _merge_rows(reports)
+    order = _merge_similar(order, meta, raw)
     if kind == "balance":
         ends = sorted({e for v in raw.values() for (e, _m) in v})
         series = {k: {e: val for (e, m), val in v.items()} for k, v in raw.items()}

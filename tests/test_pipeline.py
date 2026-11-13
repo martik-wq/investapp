@@ -144,6 +144,24 @@ _fs = ("<FilingSummary><MyReports>"
        "<Report><ShortName>Consolidated statement of comprehensive income</ShortName><MenuCategory>Statements"
        "</MenuCategory><Position>3</Position><HtmlFileName>R3.htm</HtmlFileName></Report>"
        "</MyReports></FilingSummary>")
+_r_new = {"cols": [{"end": date(2025, 12, 31), "months": 12}, {"end": date(2024, 12, 31), "months": 12}],
+          "rows": [{"label": "Restructuring costs", "concept": "x_A", "kind": "money", "indent": 0, "bold": False,
+                    "header": False, "vals": [-12.0, -14.0]}]}
+_r_old = {"cols": [{"end": date(2024, 12, 31), "months": 12}, {"end": date(2023, 12, 31), "months": 12}],
+          "rows": [{"label": "Restucturing costs", "concept": "x_B", "kind": "money", "indent": 0, "bold": False,
+                    "header": False, "vals": [-14.0, -56.0]}]}
+_mr = filings._build_statement("income", [_r_new, _r_old], "annual",
+                               [date(2023, 12, 31), date(2024, 12, 31), date(2025, 12, 31)])
+check("podrobné výkazy: premenovaný riadok s rovnakou hodnotou v prekryve = jeden riadok s novým názvom",
+      len(_mr) == 1 and _mr[0]["label"] == "Restructuring costs" and list(_mr[0]["vals"].values()) == [-56.0, -14.0, -12.0],
+      _mr)
+_fn_html = ('<table class="report"><tr><th class="tl"><div>Statement - USD ($) $ in Millions</div></th>'
+            '<th>12 Months Ended</th></tr><tr><th><div>Dec. 31, 2023</div></th><th><div>Dec. 31, 2022</div></th></tr>'
+            '<tr class="ro"><td class="pl"><a onclick="defref_ifrs-full_Revenue">Revenue</a></td>'
+            '<td class="th"><sup></sup></td><td class="nump">$ 2,359</td><td class="nump">$ 1,433</td></tr></table>')
+_fn = filings.parse_report(_fn_html)
+check("podrobné výkazy: stĺpec na poznámky pod čiarou sa nepovažuje za hodnotu (Grab 20-F)",
+      _fn and _fn["rows"][0]["vals"] == [2359e6, 1433e6], _fn and _fn["rows"][0]["vals"])
 check("IFRS: jediný výkaz súhrnného zisku sa použije ako výkaz ziskov a strát",
       filings.parse_filing_summary(_fs) == {"balance": "R2.htm", "income": "R3.htm"}, filings.parse_filing_summary(_fs))
 check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")
