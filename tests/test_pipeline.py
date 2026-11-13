@@ -162,6 +162,26 @@ _fn_html = ('<table class="report"><tr><th class="tl"><div>Statement - USD ($) $
 _fn = filings.parse_report(_fn_html)
 check("podrobné výkazy: stĺpec na poznámky pod čiarou sa nepovažuje za hodnotu (Grab 20-F)",
       _fn and _fn["rows"][0]["vals"] == [2359e6, 1433e6], _fn and _fn["rows"][0]["vals"])
+def _h(label):
+    return {"label": label, "concept": None, "kind": "money", "indent": 0, "bold": True, "header": True,
+            "vals": [None, None]}
+
+
+def _v(label, a, b):
+    return {"label": label, "concept": None, "kind": "money", "indent": 0, "bold": False, "header": False,
+            "vals": [a, b]}
+
+
+_dim = {"cols": [{"end": date(2025, 12, 31), "months": 12}, {"end": date(2024, 12, 31), "months": 12}],
+        "rows": [_h("Disclosure of revenue"), _v("Revenue", 3370.0, 2797.0),
+                 _h("Deliveries"), _h("Disclosure of revenue"), _v("Revenue", 1800.0, 1493.0),
+                 _h("Mobility"), _h("Disclosure of revenue"), _v("Revenue", 1219.0, 1047.0),
+                 _h("Financial services"), _h("Disclosure of revenue"), _v("Revenue", 351.0, 257.0)]}
+_db = filings.extract_breakdown(_dim, date(2025, 12, 31), 12, 3370.0)
+check("členenie tržieb: dimenzionálny tvar 20-F (segmenty Grabu) a rozpoznanie krajín",
+      _db and [i["label"] for i in _db["items"]] == ["Deliveries", "Mobility", "Financial services"]
+      and _db["items"][0]["prev"] == 1493.0 and not filings._looks_geo(_db["items"])
+      and filings._looks_geo([{"label": "Indonesia"}, {"label": "Malaysia"}, {"label": "Rest of Southeast Asia"}]), _db)
 check("IFRS: jediný výkaz súhrnného zisku sa použije ako výkaz ziskov a strát",
       filings.parse_filing_summary(_fs) == {"balance": "R2.htm", "income": "R3.htm"}, filings.parse_filing_summary(_fs))
 check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")

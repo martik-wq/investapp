@@ -671,6 +671,46 @@ def _expand(rows, idx, depth=0):
     return [(label, v, pv)]
 
 
+COUNTRY_RE = re.compile(r"\b(indonesia|malaysia|philippines|singapore|thailand|vietnam|cambodia|myanmar|brazil|"
+                        r"mexico|colombia|china|japan|korea|india|taiwan|hong kong|united states|u\.s\.|usa|"
+                        r"canada|united kingdom|germany|france|netherlands|europe|emea|apac|asia|americas|"
+                        r"latin america|north america|rest of|other countries|international|domestic)\b", re.I)
+
+
+def _dimensional_breakdown(rep, ci, pi, expected_total, tol):
+    """IFRS/20-F tvar (Grab): najprv súčet, potom člen dimenzie ako nadpis („Deliveries“), pod ním
+    nadpis skupiny riadkov a znova ten istý riadok („Revenue“) s hodnotou za daný člen."""
+    rows = rep["rows"]
+    total, members, cur = None, [], None
+    for i, r in enumerate(rows):
+        nxt = rows[i + 1] if i + 1 < len(rows) else None
+        if r["header"]:
+            if nxt is not None and nxt["header"]:
+                cur = _clean_label(r["label"])     # nadpis hneď nad ďalším nadpisom = člen dimenzie
+            continue
+        if r["kind"] != "money" or r["vals"][ci] is None:
+            continue
+        v, pv = r["vals"][ci], r["vals"][pi] if pi is not None else None
+        if cur is None:
+            if total is None:
+                total = (_clean_label(r["label"]), v, pv)
+        elif not members or members[-1][0] != cur:
+            members.append((cur, v, pv))
+    if not total or len(members) < 2:
+        return None
+    lab, tv, tpv = total
+    if expected_total and abs(tv - expected_total) > tol * abs(expected_total):
+        return None
+    if abs(sum(m[1] for m in members) - tv) > 0.003 * abs(tv):
+        return None
+    return {"items": [{"label": a, "value": b, "prev": c} for a, b, c in members],
+            "total": tv, "total_prev": tpv, "total_label": lab}
+
+
+def _looks_geo(items):
+    return sum(1 for it in items if COUNTRY_RE.search(it["label"])) * 2 > len(items)
+
+
 def extract_breakdown(rep, end, months, expected_total=None, tol=0.012):
     """Členenie tržieb zo stránky výkazu/poznámky: riadky, ktorých súčet sedí s
     riadkom „Total“. Vráti {'items':[{'label','value','prev'}], 'total'} alebo None."""
@@ -678,6 +718,9 @@ def extract_breakdown(rep, end, months, expected_total=None, tol=0.012):
     if ci is None:
         return None
     pi = _col_index(rep, date(end.year - 1, end.month, min(end.day, 28)), months, tol=12)
+    dim = _dimensional_breakdown(rep, ci, pi, expected_total, tol)
+    if dim:
+        return dim
     rows = []
     for r in rep["rows"]:
         if r["header"] or r["kind"] != "money" or r["vals"][ci] is None:
@@ -930,7 +973,7 @@ def _filing_candidates(company, filing, end, months, expected_total):
             continue
         bd = extract_breakdown(rep, end, months, expected_total)
         if bd:
-            bd["geo"], bd["page"] = geo, short
+            bd["geo"], bd["page"] = geo or _looks_geo(bd["items"]), short
             out.append(bd)
     return out
 
