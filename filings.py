@@ -115,6 +115,8 @@ def classify(short_name):
     if any(k in s for k in ("BALANCE SHEET", "FINANCIAL POSITION", "FINANCIAL CONDITION",
                             "ASSETS AND LIABILITIES")):
         return "balance"
+    if "PROFIT OR LOSS" in s or "PROFIT AND LOSS" in s:      # IFRS (20-F): „…profit or loss and other comprehensive income“
+        return "income"
     if "COMPREHENSIVE" in s and not any(k in s for k in ("OPERATIONS", "INCOME AND", "EARNINGS")):
         return None
     if any(k in s for k in ("OPERATIONS", "INCOME", "EARNINGS", "PROFIT OR LOSS",
@@ -144,12 +146,19 @@ def _reports(xml_text):
 def parse_filing_summary(xml_text):
     """{'income': 'R4.htm', 'balance': 'R2.htm', 'cashflow': 'R8.htm'}"""
     out = {}
+    comprehensive = None
     for _, short, fname, cat in _reports(xml_text):
         if cat and cat.lower() != "statements":
             continue
         kind = classify(short)
         if kind and kind not in out and fname:
             out[kind] = fname
+        up = short.upper()
+        if comprehensive is None and fname and "COMPREHENSIVE" in up and "PARENTHETICAL" not in up:
+            comprehensive = fname
+    # IFRS firmy často majú jediný „Statement of comprehensive income“, ktorý obsahuje aj zisk a stratu
+    if "income" not in out and comprehensive:
+        out["income"] = comprehensive
     return out
 
 

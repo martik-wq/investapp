@@ -115,7 +115,10 @@ class Ctx:
         eq = self.v("equity", e)
         if eq is None:
             return None
-        return eq - (self.v("goodwill", e) or 0) - (self.v("intangibles", e) or 0)
+        gw, ia = self.v("goodwill", e), self.v("intangibles", e)
+        if gw is None and ia is None:                      # IFRS: niekedy len súčet (Grab)
+            return eq - (self.v("intangibles_gw", e) or 0)
+        return eq - (gw or 0) - (ia or 0)
 
     def shares(self, e):
         return self.v("shares_diluted", e)

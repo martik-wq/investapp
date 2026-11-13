@@ -135,6 +135,17 @@ check("classify: výkazy",
       filings.classify("CONSOLIDATED BALANCE SHEETS (Parenthetical)") is None and
       filings.classify("CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS") == "cashflow" and
       filings.classify("CONSOLIDATED STATEMENTS OF INCOME AND COMPREHENSIVE INCOME") == "income")
+check("classify: IFRS výkaz ziskov a strát (20-F, Grab)",
+      filings.classify("Consolidated statement of profit or loss and other comprehensive income") == "income"
+      and filings.classify("Consolidated statement of financial position") == "balance")
+_fs = ("<FilingSummary><MyReports>"
+       "<Report><ShortName>Consolidated statement of financial position</ShortName><MenuCategory>Statements"
+       "</MenuCategory><Position>2</Position><HtmlFileName>R2.htm</HtmlFileName></Report>"
+       "<Report><ShortName>Consolidated statement of comprehensive income</ShortName><MenuCategory>Statements"
+       "</MenuCategory><Position>3</Position><HtmlFileName>R3.htm</HtmlFileName></Report>"
+       "</MyReports></FilingSummary>")
+check("IFRS: jediný výkaz súhrnného zisku sa použije ako výkaz ziskov a strát",
+      filings.parse_filing_summary(_fs) == {"balance": "R2.htm", "income": "R3.htm"}, filings.parse_filing_summary(_fs))
 check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")
       == (1e6, 1e3))
 

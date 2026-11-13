@@ -3,6 +3,9 @@ from edgar import all_item_series, align, determine_periods
 from taxonomy import (BALANCE, CASHFLOW, INCOME, ITEM_BY_KEY, DERIVED_LABELS)
 
 
+EXPENSE_KEYS = ("cost_of_revenue", "rnd", "sales_mkt", "sga", "ga", "other_op_expense", "opex_total")
+
+
 def _sub(a, b):
     return None if a is None or b is None else a - b
 
@@ -55,6 +58,34 @@ def build(company, mode="annual", n=8):
             data["total_liabilities"][e] = g("total_liab_equity") - g("equity")
         if g("net_income") is None and g("cf_net_income") is not None:
             data["net_income"][e] = g("cf_net_income")
+        # Niektoré firmy (Grab v 20-F za 2022 a 2023) otagovali stratu pred zdanením s opačným znamienkom.
+        # Zisk pred zdanením − daň musí sedieť s čistým ziskom (vrátane menšinových podielov).
+        pt, ni = g("pretax"), g("ni_total") if g("ni_total") is not None else g("net_income")
+        if pt is not None and ni is not None and pt != 0:
+            tx = g("tax") or 0
+            if abs((-pt - tx) - ni) + 1 < abs((pt - tx) - ni) and abs(-pt - ni) < abs(pt - ni):
+                data["pretax"][e] = -pt
+        # IFRS: krátkodobé investície = investície spolu − dlhodobé (Grab ich vykazuje vlastnou značkou)
+        if g("st_investments") is None and g("inv_total_ifrs") is not None and g("lt_investments") is not None:
+            st = g("inv_total_ifrs") - g("lt_investments")
+            if st > 0:
+                data["st_investments"][e] = st
+
+    # nákladové riadky sú vo výkazoch kladné; niektoré IFRS firmy (Nu) ich tagujú so záporným znamienkom
+    for k in EXPENSE_KEYS:
+        for e, v in list(data[k].items()):
+            if v is not None and v < 0:
+                data[k][e] = -v
+    # čistý zisk vrátane menšinových podielov má zmysel len pri firmách s menšinovými podielmi
+    if not any(v for v in data["ni_nci"].values()):
+        data["ni_total"] = {}
+    # IFRS: „finančné náklady“ sú už v riadku úrokových nákladov, ak sú rovnaké, neduplikovať
+    fc, ie = data["fin_costs"], data["interest_expense"]
+    if fc and all(ie.get(e) == v for e, v in fc.items()):
+        data["fin_costs"] = {}
+    # nehmotný majetok s goodwillom spolu zobraziť len vtedy, keď firma nedáva zvlášť goodwill a nehmotný majetok
+    if any(data["goodwill"].values()) or any(data["intangibles"].values()):
+        data["intangibles_gw"] = {}
 
     # odvodené riadky
     data["total_debt"] = {}
