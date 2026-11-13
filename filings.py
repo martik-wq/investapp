@@ -320,6 +320,8 @@ MONEY_SHARES_RE = re.compile(r"preference shares|preferred shares|proceeds|repur
 
 def row_kind(label):
     low = label.lower().strip()
+    if re.search(r"par value|redemption value|liquidation preference", low) and "in shares" not in low:
+        return "money"                       # „Preferred stock, $0.0001 par value; 20,000,000 shares authorized…“
     if SHARES_FIRST_RE.search(low) and not low.startswith(("basic", "diluted", "net", "earnings",
                                                            "income", "loss")):
         return "shares"

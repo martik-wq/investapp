@@ -206,6 +206,11 @@ BALANCE = [
       "instant", bold=True),
     I("total_liabilities", "Záväzky spolu", ["Liabilities", "ifrs:Liabilities"],
       "instant", bold=True),
+    I("temp_equity", "Dočasné vlastné imanie (odkúpiteľné prioritné akcie / menšinové podiely)", [
+        "TemporaryEquityCarryingAmountIncludingPortionAttributableToNoncontrollingInterests",
+        "TemporaryEquityCarryingAmountAttributableToParent",
+        "RedeemableNoncontrollingInterestEquityCarryingAmount",
+        "RedeemableNoncontrollingInterestEquityCommonCarryingAmount"], "instant", bold=True),
     I("common_stock", "Základné imanie a emisné ážio", [
         "CommonStocksIncludingAdditionalPaidInCapital", "CommonStockValue", "ifrs:IssuedCapital"], "instant", indent=1),
     I("share_premium", "Emisné ážio", ["ifrs:SharePremium"], "instant", indent=1),

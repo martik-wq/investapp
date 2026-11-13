@@ -182,6 +182,17 @@ check("členenie tržieb: dimenzionálny tvar 20-F (segmenty Grabu) a rozpoznani
       _db and [i["label"] for i in _db["items"]] == ["Deliveries", "Mobility", "Financial services"]
       and _db["items"][0]["prev"] == 1493.0 and not filings._looks_geo(_db["items"])
       and filings._looks_geo([{"label": "Indonesia"}, {"label": "Malaysia"}, {"label": "Rest of Southeast Asia"}]), _db)
+_orig_gj = edgar._get_json
+_pages = []
+edgar._get_json = lambda url, name: (_pages.append(url) or {"form": ["10-K", "4", "10-K"], "accessionNumber": ["a", "b", "c"],
+                                                            "reportDate": ["2023-12-31", "", "2022-12-31"]})
+_sub = {"filings": {"recent": {"form": ["10-K", "4"], "accessionNumber": ["x", "y"], "reportDate": ["2025-12-31", ""]},
+                    "files": [{"name": "CIK0001326801-submissions-001.json"}]}}
+_ext = edgar._extend_filings(_sub, 1326801)
+edgar._get_json = _orig_gj
+check("SEC: pri málo výročných správach v „recent“ sa pripoja staršie stránky zoznamu (Meta)",
+      _ext["filings"]["recent"]["form"] == ["10-K", "4", "10-K", "4", "10-K"]
+      and _ext["filings"]["recent"]["accessionNumber"][-1] == "c" and len(_pages) == 1, _ext)
 check("IFRS: jediný výkaz súhrnného zisku sa použije ako výkaz ziskov a strát",
       filings.parse_filing_summary(_fs) == {"balance": "R2.htm", "income": "R3.htm"}, filings.parse_filing_summary(_fs))
 check("scales: tisíce a milióny", filings._scales("X - USD ($) shares in Thousands, $ in Millions")

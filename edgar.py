@@ -71,6 +71,36 @@ def _get_json(url, cache_name):
     return data
 
 
+ANNUAL_FORMS_ALL = ("10-K", "10-KT", "10-K405", "20-F", "40-F")
+SUBS_PAGE_URL = "https://data.sec.gov/submissions/{name}"
+
+
+def _extend_filings(subs, cik, want=8):
+    """SEC dáva v „recent“ len posledných ~1000 podaní. Firmy s množstvom formulárov 4 (Meta) tam majú len
+    1–2 výročné správy, staršie sú v ďalších súboroch. Ak výročných správ chýba, pripoja sa (staršie na koniec)."""
+    try:
+        f = subs.get("filings") or {}
+        recent = f.get("recent") or {}
+        forms = recent.get("form") or []
+        if not forms or sum(1 for x in forms if x in ANNUAL_FORMS_ALL) >= want:
+            return subs
+        merged = {k: list(v) for k, v in recent.items() if isinstance(v, list)}
+        for page in (f.get("files") or [])[:2]:
+            name = page.get("name") or ""
+            if not re.fullmatch(r"CIK\d{10}-submissions-\d{3}\.json", name):
+                continue
+            more = _get_json(SUBS_PAGE_URL.format(name=name), f"subs_{cik}_{name[-8:-5]}.json")
+            n = len(more.get("form") or [])
+            for k in merged:
+                vals = more.get(k)
+                merged[k] += list(vals) if isinstance(vals, list) and len(vals) == n else [""] * n
+            if sum(1 for x in merged["form"] if x in ANNUAL_FORMS_ALL) >= want:
+                break
+        return dict(subs, filings=dict(f, recent=merged))
+    except Exception:  # noqa: BLE001 - staršie podania sú doplnok, nesmú zhodiť načítanie firmy
+        return subs
+
+
 def _load_demo(ticker, kind):
     p = os.path.join(DEMO_DIR, f"{ticker}_{kind}.json")
     if not os.path.exists(p):
@@ -162,6 +192,7 @@ def load_company(ticker, cik, title):
             subs = _get_json(SUBS_URL.format(cik=cik), f"subs_{cik}.json")
         except EdgarError:
             subs = {}
+        subs = _extend_filings(subs, cik)
     ff = facts.get("facts") or {}
     if "ifrs-full" in ff and len(ff.get("us-gaap") or {}) < 5:
         # IFRS firma s pár zablúdenými us-gaap značkami (Grab: CostOfRevenue len za 2022): tie by pokazili riadky
