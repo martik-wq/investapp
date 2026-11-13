@@ -21,6 +21,7 @@ thead th{background:#fffaf5;font-weight:600;color:var(--mute)}
 tr.bold td{font-weight:700}tr.ind1 td:first-child{padding-left:26px;color:#3b4656}
 td.neg{color:var(--neg)}
 td.pos{color:var(--pos)}
+td.pfname{color:#2f5b7c;font-weight:500}
 #postable td:nth-child(3),#postable td:nth-child(n+5){font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fcfcfd}
