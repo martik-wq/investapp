@@ -156,6 +156,13 @@ def parse_filing_summary(xml_text):
         up = short.upper()
         if comprehensive is None and fname and "COMPREHENSIVE" in up and "PARENTHETICAL" not in up:
             comprehensive = fname
+    # niektoré podania majú výkaz zle zaradený (Meta 10-K 2021: súvaha v „Uncategorized“): hľadaj medzi prvými stránkami
+    for pos, short, fname, cat in _reports(xml_text):
+        if pos > 12 or not fname or (cat or "").lower() in ("statements", "details", "tables", "policies"):
+            continue
+        kind = classify(short)
+        if kind and kind not in out:
+            out[kind] = fname
     # IFRS firmy často majú jediný „Statement of comprehensive income“, ktorý obsahuje aj zisk a stratu
     if "income" not in out and comprehensive:
         out["income"] = comprehensive
