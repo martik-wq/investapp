@@ -314,6 +314,10 @@ SHARES_FIRST_RE = re.compile(r"weighted|shares (used|outstanding|issued)|number 
                              r"(common |ordinary )?shares", re.I)
 
 
+MONEY_SHARES_RE = re.compile(r"preference shares|preferred shares|proceeds|repurchase|payments? |purchase of|"
+                             r"issuance of|redemption|dividend|share capital|share premium|treasury", re.I)
+
+
 def row_kind(label):
     low = label.lower().strip()
     if SHARES_FIRST_RE.search(low) and not low.startswith(("basic", "diluted", "net", "earnings",
@@ -321,6 +325,8 @@ def row_kind(label):
         return "shares"
     if EPS_RE.search(label):
         return "eps"
+    if MONEY_SHARES_RE.search(low) and "in shares" not in low:
+        return "money"                       # peňažný riadok o akciách (emisia, odkup, prioritné akcie)
     if SHARES_RE.search(label):
         return "shares"
     return "money"
