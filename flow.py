@@ -85,7 +85,7 @@ def _vals(data, e):
     abs_ = lambda v: None if v is None else abs(v)  # noqa: E731
     v = {
         "revenue": g("revenue"), "cogs": abs_(g("cost_of_revenue")), "gp": g("gross_profit"),
-        "rnd": abs_(g("rnd")), "sga": abs_(g("sga")), "ga": abs_(g("ga")),
+        "rnd": abs_(g("rnd")), "sga": abs_(g("sga")), "ga": abs_(g("ga")), "smk": abs_(g("sales_mkt")),
         "opex_rep": abs_(g("opex_total")), "oi": g("op_income"), "pretax": g("pretax"),
         "tax": g("tax"), "ni": g("net_income"),
         "int_income": g("int_income"), "int_exp": abs_(g("interest_expense")),
@@ -238,8 +238,10 @@ def _general(cur, prev, streams, opex_items=None, cogs_items=None):
                       for i, it in enumerate(rep_items)]
     else:
         comps = [("rnd", "Výskum a vývoj")]
-        comps.append(("sga", "Predaj a administratíva") if cur["sga"] else
-                     ("ga", "Správna réžia"))
+        if cur["sga"]:
+            comps.append(("sga", "Predaj a administratíva"))
+        else:
+            comps += [("smk", "Predaj a marketing"), ("ga", "Správna réžia")]
         used = 0
         for key, label in comps:
             v = cur[key]
