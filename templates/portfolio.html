@@ -96,7 +96,7 @@
     <tbody>
     {% for p in positions %}
       <tr>
-        <td data-v="{{ p.ticker }}">{% if p.symbol and us_symbol.match(p.symbol) %}<a href="{{ url_for('section_view', ticker=p.symbol, section='overview') }}"><strong>{{ p.ticker }}</strong></a>{% else %}<strong>{{ p.ticker or p.isin }}</strong>{% endif %}</td>
+        <td data-v="{{ p.ticker }}" class="pftk">{% if p.symbol and us_symbol.match(p.symbol) %}<a href="{{ url_for('section_view', ticker=p.symbol, section='overview') }}"><strong>{{ p.ticker }}</strong></a>{% else %}<strong>{{ p.ticker or p.isin }}</strong>{% endif %}</td>
         <td data-v="{{ p.name }}" class="pfname" style="text-align:left;white-space:normal">{{ p.name }}{% if p.spinoff %} <span class="note">(spin-off)</span>{% endif %}</td>
         <td data-v="{{ p.shares }}">{{ p.shares|fmt('sh') }}</td>
         <td data-v="{{ p.ccy }}">{{ p.ccy }}</td>
@@ -128,7 +128,7 @@
 <details class="card"><summary>Uzavreté pozície ({{ closed|length }})</summary>
   <div class="tablewrap" style="margin-top:10px"><table class="pf">
     <thead><tr><th>Ticker</th><th>Názov</th><th>Mena</th><th>Posledný predaj</th><th>Nákupy</th><th>Predaje</th><th>Realizovaný zisk ({{ base }})</th></tr></thead>
-    <tbody>{% for p in closed %}<tr><td><strong>{{ p.ticker or p.isin }}</strong></td><td class="pfname" style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.ccy }}</td><td>{{ p.last }}</td>
+    <tbody>{% for p in closed %}<tr><td class="pftk"><strong>{{ p.ticker or p.isin }}</strong></td><td class="pfname" style="text-align:left;white-space:normal">{{ p.name }}</td><td>{{ p.ccy }}</td><td>{{ p.last }}</td>
       <td>{{ p.bought|fmt('amt') if p.bought else '–' }}</td><td>{{ p.sold|fmt('amt') if p.sold else '–' }}</td><td class="{{ 'neg' if p.realized_b < 0 else 'pos' if p.realized_b }}">{{ p.realized_b|fmt('amt') }}</td></tr>{% endfor %}</tbody>
   </table></div>
   <p class="note">Zisk z predaja beriem z exportu Trading 212 (stĺpec Result), ak v ňom je. Ak pozícia vznikla pred začiatkom exportu, nákupy v tabuľke chýbajú.</p>
