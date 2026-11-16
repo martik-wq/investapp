@@ -70,7 +70,8 @@ def _score(q, sym, name):
     """Stupeň zhody (nižší = lepší): 0 presný ticker, 1 začiatok názvu alebo tickeru, 2 začiatok slova, 3 obsahuje."""
     qs, nn = q.upper(), _norm(name)
     ql = _norm(q)
-    if sym == qs or sym.split(".")[0] == qs:
+    # presný ticker len pri krátkom dopyte (ticker), inak „schneider“ vyhrá indické SCHNEIDER.NS
+    if (sym == qs or sym.split(".")[0] == qs) and (len(qs) <= 5 or re.search(r"[\d.]", qs)):
         return 0
     core = _norm(SUFFIX_RE.sub(" ", name))
     if nn.startswith(ql) or core.startswith(ql) or sym.startswith(qs):
@@ -125,10 +126,17 @@ def suggest(q, limit=10, use_yahoo=True):
             break
     if use_yahoo:
         sec_syms = {t for _k, t, _ in sec_hits}
+        per_name = {}
         for i, y in enumerate(_yahoo(q)):
             if y["symbol"] in found or y["symbol"].replace("-", ".") in sec_syms:
                 continue
+            nm = _norm(SUFFIX_RE.sub(" ", y["name"]))
+            if per_name.get(nm, 0) >= 2:                                 # najviac 2 burzy jednej firmy
+                continue
+            per_name[nm] = per_name.get(nm, 0) + 1
             sc = _score(q, y["symbol"], y["name"])
-            add(y, (sc if sc is not None else 2, 400 + i * 40))
+            # poradie Yahoo je podľa relevancie: prvý výsledok ~ veľká firma; vedľajšie burzy a OTC dozadu
+            minor = re.search(r"\.(F|BE|DU|MU|SG|HM|HA|VI|NE)$", y["symbol"]) or "OTC" in (y.get("ex") or "")
+            add(y, (sc if sc is not None else 2, 25 + i * 60 + (600 if minor else 0)))
     items = sorted(found.values(), key=lambda x: x[0])
     return [it for _s, it in items[:limit]]
