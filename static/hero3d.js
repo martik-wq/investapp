@@ -34,7 +34,7 @@
     return [W * 0.5 + (X / zz) * f, H * 0.40 + ((camY - y) / zz) * f * 0.5, zz];
   }
 
-  function frame(now) {
+  function frame(now, once) {
     var t = (now - t0) / 1000 * (reduce ? 0 : 1);
     ctx.clearRect(0, 0, W, H);
     var yaw = Math.sin(t * 0.08) * 0.18 - 0.12;
@@ -111,16 +111,18 @@
       ctx.beginPath(); ctx.arc(hp[0], hp[1], 3.6, 0, 6.283); ctx.fill();
     }
     ctx.restore();
-    if (running && !reduce) raf = requestAnimationFrame(frame);
+    if (!once && running && !reduce) raf = requestAnimationFrame(frame);
   }
 
+  function resize() { size(); frame(performance.now(), true); }   // po zmene veľkosti vždy aspoň jeden snímok
   size();
-  window.addEventListener('resize', function () { size(); if (reduce) frame(performance.now()); });
-  if (window.ResizeObserver) new ResizeObserver(function () { size(); if (reduce) frame(performance.now()); }).observe(cv.parentNode);
+  window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(cv.parentNode);
   document.addEventListener('visibilitychange', function () {
     running = !document.hidden;
     cancelAnimationFrame(raf);
     if (running) raf = requestAnimationFrame(frame);
   });
+  frame(performance.now(), true);
   raf = requestAnimationFrame(frame);
 })();
