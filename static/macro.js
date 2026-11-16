@@ -69,15 +69,15 @@
     var pk = opt.pick;
     if (pk && pk.a != null && pk.b != null) {
       var xa = X(pk.a[0]), xb = X(pk.b[0]);
-      s += '<rect x="' + Math.min(xa, xb) + '" y="' + MT + '" width="' + Math.abs(xb - xa) + '" height="' + (H - MT - MB) + '" fill="#c2410c" opacity="0.07"/>';
+      s += '<rect x="' + Math.min(xa, xb) + '" y="' + MT + '" width="' + Math.abs(xb - xa) + '" height="' + (H - MT - MB) + '" fill="#e2541c" opacity="0.07"/>';
     }
     var d = S.map(function (p, i) { return (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1); }).join('');
-    s += '<path d="' + d + '" fill="none" stroke="#c2410c" stroke-width="' + (big ? 2.2 : 1.8) + '"/>';
+    s += '<path d="' + d + '" fill="none" stroke="#e2541c" stroke-width="' + (big ? 2.2 : 1.8) + '"/>';
     [pk && pk.a, pk && pk.b].forEach(function (p) {
-      if (p) s += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="5" fill="#fff" stroke="#c2410c" stroke-width="2.2"/>';
+      if (p) s += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="5" fill="#fff" stroke="#e2541c" stroke-width="2.2"/>';
     });
     s += '<line class="mline" y1="' + MT + '" y2="' + (H - MB) + '" stroke="#475569" stroke-dasharray="3 3" style="display:none"/>' +
-         '<circle class="mdot" r="3.5" fill="#c2410c" style="display:none"/>' +
+         '<circle class="mdot" r="3.5" fill="#e2541c" style="display:none"/>' +
          '<text class="mtxt" font-size="' + (big ? 13 : 12) + '" fill="#1e293b" y="14"></text></svg>';
     box.innerHTML = s;
     var svg = box.firstChild, ln = svg.querySelector('.mline'), dot = svg.querySelector('.mdot'), tx = svg.querySelector('.mtxt');

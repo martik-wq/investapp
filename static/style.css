@@ -512,3 +512,62 @@ table.mtab td,table.mtab th{font-size:13px;white-space:nowrap}
 table.mtab th:first-child,table.mtab td:first-child{min-width:0}
 .tablewrap table.mtab th:not(:first-child),.tablewrap table.mtab td:not(:first-child){min-width:0}
 table.mtab th,table.mtab td{padding:6px 8px}
+
+/* ================= TÉMA: polnočná modrá · mandarínka · slonovina ================= */
+:root{
+  --navy:#0e1b33;--navy2:#1a2c4f;--navy3:#26457a;
+  --acc:#f26a2e;--acc2:#c2471a;--accg:linear-gradient(135deg,#ff8a3d 0%,#f26a2e 55%,#e2541c 100%);
+  --bg:#f8f3eb;--card:#fff;--ink:#0e1b33;--mute:#6a7287;--line:#ebe2d5;--tint:#fff1e8;
+  --shadow:0 1px 2px rgba(14,27,51,.05),0 8px 26px rgba(14,27,51,.07)
+}
+body{background:radial-gradient(1200px 500px at 85% -120px,#ffe6d3 0%,rgba(255,230,211,0) 70%),var(--bg);background-attachment:fixed}
+a{color:var(--acc2)}
+
+/* bočný panel: polnočná modrá */
+.side{background:linear-gradient(180deg,#0e1b33 0%,#13254a 100%);color:#c9d3e6;border-right:0;box-shadow:4px 0 30px rgba(14,27,51,.18)}
+.side .brand{color:#fff;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.side .brand::after{content:"";display:inline-block;width:8px;height:8px;margin-left:5px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.sideSearch input{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12);color:#fff}
+.sideSearch input::placeholder{color:#8a97b3}
+.sideSearch input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(242,106,46,.25)}
+.nav a,.gnav{color:#c9d3e6}
+.nav a:hover,.gnav:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav a.on,.gnav.on{background:var(--accg);color:#fff;font-weight:700;box-shadow:0 6px 18px rgba(242,106,46,.35)}
+.gnav{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
+.sideH{color:#7f8cab}
+.coBox,.recentBox,.updBox{border-top-color:rgba(255,255,255,.1)}
+.coTick{color:#fff}.coName{color:#8a97b3}
+.recent a{color:#aab5cc}.recent a:hover{background:rgba(255,255,255,.07);color:#fff}.recent a b{color:#fff}
+.recent.empty{color:#7f8cab}
+.side .note{color:#8a97b3}
+
+/* tlačidlá a záložky */
+button{background:var(--accg);border-color:transparent;color:#fff;box-shadow:0 3px 10px rgba(242,106,46,.25)}
+button:hover{filter:brightness(1.05);box-shadow:0 6px 16px rgba(242,106,46,.32)}
+button.ghost,.tabs button,.gtab{background:#fff;color:var(--navy);border-color:var(--line);box-shadow:none}
+.tabs button.on,#g-mode .gtab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+#g-cat .gtab.on{background:var(--accg);color:#fff}
+.gtab{background:transparent}
+.gtab:hover,.tabs button:hover{background:var(--tint);color:var(--acc2)}
+input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(242,106,46,.18);outline:0}
+
+/* karty a nadpisy */
+.card,.tcard,.pfk,.kpi,.ftile,.gcard{border-color:var(--line);box-shadow:var(--shadow)}
+.gcard:hover{border-color:#f6c3a6;box-shadow:0 2px 4px rgba(14,27,51,.05),0 14px 32px rgba(242,106,46,.12)}
+h1{color:var(--navy);letter-spacing:-.02em}
+.card>h2{color:var(--navy);position:relative;padding-left:14px}
+.card>h2::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:4px;border-radius:4px;background:var(--accg)}
+.pfk .v,.kpi .v{color:var(--navy)}
+
+/* tabuľky */
+thead th{background:#f3ece1;color:var(--navy2);font-weight:700}
+th:first-child,td:first-child{background:#fff}
+thead th:first-child{background:#f3ece1}
+tbody tr:hover td{background:#fff7f1}
+td.pfname{color:var(--navy3)}
+
+/* ostatné */
+body.loading::after,#updOverlay{background:rgba(248,243,235,.92);color:var(--acc2)}
+.tipx{background:var(--navy)}
+.pftabs a:hover{color:var(--acc2)}
+.linkbtn,.danger,.gtab,.tabs button{box-shadow:none}

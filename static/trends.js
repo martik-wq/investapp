@@ -6,7 +6,7 @@
   if (!el) return;
   var D = JSON.parse(el.textContent);
   var NS = 'http://www.w3.org/2000/svg';
-  var BAR = '#c4570f', BAR_DARK = '#9c420a', NEG = '#94a3b8';
+  var BAR = '#f26a2e', BAR_DARK = '#c2471a', NEG = '#94a3b8';
   var CATS = [
     {key: 'basic', label: 'Základné metriky', groups: ['money', 'eps']},
     {key: 'profit', label: 'Ziskovosť', groups: ['pct']},

@@ -6,7 +6,7 @@
   var W = 1000, ML = 8, MR = 64;
   var st = {range: 252, type: 'candle', sma20: false, sma50: true, sma200: true, bb: false, vol: true, rsi: true, macd: true};
   var box = document.getElementById('techchart'), info = document.getElementById('techinfo');
-  var C = {up: '#15803d', down: '#b91c1c', grid: '#e5e7eb', txt: '#64748b', s20: '#0ea5e9', s50: '#c2410c', s200: '#1e293b', bb: '#94a3b8', macd: '#2563eb', sig: '#c2410c'};
+  var C = {up: '#15803d', down: '#b91c1c', grid: '#e5e7eb', txt: '#64748b', s20: '#0ea5e9', s50: '#e2541c', s200: '#1e293b', bb: '#94a3b8', macd: '#2563eb', sig: '#e2541c'};
 
   function fmt(v, d) { return v == null ? '–' : v.toFixed(d == null ? 2 : d).replace('.', ','); }
   function fvol(v) { return v >= 1e9 ? fmt(v / 1e9, 2) + ' mld.' : v >= 1e6 ? fmt(v / 1e6, 1) + ' mil.' : v >= 1e3 ? fmt(v / 1e3, 0) + ' tis.' : fmt(v, 0); }
