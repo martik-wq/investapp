@@ -32,7 +32,7 @@
   <p class="note">Hodnoty sú z výkazov firmy, drobné rozdiely v súčtoch môže spôsobovať zaokrúhľovanie. „Ostatné náklady (netto)“ zahŕňajú neprevádzkové položky, napríklad úroky a ostatné výnosy a náklady. Nejde o investičné odporúčanie.</p>
 </div>
 <script type="application/json" id="flow-data">{{ flow|tojson }}</script>
-<script src="{{ url_for('static', filename='sankey.js') }}"></script>
+<script src="{{ url_for('static', filename='sankey.js', v=asset_v) }}"></script>
 {% endif %}
 {% if trend %}
 <div id="trends">
@@ -62,7 +62,7 @@
 </div>
 <div id="g-modal" class="gmodal" hidden></div>
 <script type="application/json" id="trend-data">{{ trend|tojson }}</script>
-<script src="{{ url_for('static', filename='trends.js') }}"></script>
+<script src="{{ url_for('static', filename='trends.js', v=asset_v) }}"></script>
 {% else %}
 <div class="warn">Pre túto firmu sa nepodarilo vytvoriť grafy (chýbajú údaje vo výkazoch).</div>
 {% endif %}

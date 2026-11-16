@@ -109,6 +109,18 @@ def num_sk(v, d=2, sign=False, g=False):
 # jinja_env už existoval, preto sa zmeny .html prejavili až po reštarte servera)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
+
+
+@app.context_processor
+def _asset_version():
+    """?v=verzia pri CSS/JS: po aktualizácii prehliadač nepoužije starú kópiu z pamäte."""
+    try:
+        v = (updater.current_version() or "")[:8]
+    except Exception:  # noqa: BLE001
+        v = ""
+    return {"asset_v": v or "dev"}
+
+
 app.jinja_env.filters["num"] = num_sk
 app.jinja_env.filters["fmt"] = fmt_value
 app.jinja_env.filters["spct"] = signed_pct

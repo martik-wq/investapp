@@ -251,6 +251,6 @@
 </script>
 
 <script type="application/json" id="perf-data">{{ payload|tojson }}</script>
-<script src="{{ url_for('static', filename='perf.js') }}"></script>
+<script src="{{ url_for('static', filename='perf.js', v=asset_v) }}"></script>
 {% endif %}
 {% endblock %}

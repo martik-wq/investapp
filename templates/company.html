@@ -94,7 +94,7 @@
   <div id="trend-table"></div>
 </div>
 <script type="application/json" id="trend-data">{{ trend|tojson }}</script>
-<script src="{{ url_for('static', filename='trends.js') }}"></script>
+<script src="{{ url_for('static', filename='trends.js', v=asset_v) }}"></script>
 {% endif %}
 
 <div class="card">

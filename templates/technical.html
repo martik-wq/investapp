@@ -39,7 +39,7 @@
   <p class="note">Prerušované čiary v grafe sú najbližšie úrovne podpory (zelená) a odporu (červená). Ceny sú upravené o splity. Prejdi myšou po grafe pre hodnoty v danom dni.</p>
 </div>
 <script id="techdata" type="application/json">{{ t|tojson }}</script>
-<script src="{{ url_for('static', filename='technical.js') }}"></script>
+<script src="{{ url_for('static', filename='technical.js', v=asset_v) }}"></script>
 
 
 <div class="card" id="tvcard">

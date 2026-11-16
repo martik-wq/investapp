@@ -42,5 +42,5 @@
 {% endfor %}
 </div>
 <div id="m-modal" class="gmodal" hidden></div>
-<script src="{{ url_for('static', filename='macro.js') }}"></script>
+<script src="{{ url_for('static', filename='macro.js', v=asset_v) }}"></script>
 {% endblock %}
