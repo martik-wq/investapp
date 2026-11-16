@@ -1,0 +1,11 @@
+<h2>Najbližšie udalosti</h2>
+{% if events %}
+<div class="ev">{% for e in events %}
+  <a class="ev-r" href="{{ url_for('section_view', ticker=e.ticker, section='earnings' if e.kind.startswith('Výsledky') else 'overview') }}">
+    <div class="ev-d"><b>{{ e.date[8:10]|int }}</b><span>{{ ['jan','feb','mar','apr','máj','jún','júl','aug','sep','okt','nov','dec'][e.date[5:7]|int - 1] }}</span></div>
+    <div class="ev-b"><div><strong>{{ e.ticker }}</strong> <span class="ev-k {{ 'earn' if e.kind.startswith('Výsledky') else 'div' }}">{{ 'Výsledky' if e.kind.startswith('Výsledky') else 'Ex-dividenda' }}</span></div>
+      <div class="note">{{ e.name }}{% if not e.kind.startswith('Výsledky') %} · {{ e.note }}{% endif %}</div></div>
+  </a>{% endfor %}</div>
+<p class="note">Dátumy sú odhady. <a href="{{ url_for('calendar_view') }}">Celý kalendár →</a></p>
+{% elif has_items %}<p class="note">V najbližších 60 dňoch podľa odhadu nič. <a href="{{ url_for('calendar_view') }}">Kalendár →</a></p>
+{% else %}<p class="note">Udalosti sa zobrazia pre firmy z portfólia a watchlistu.</p>{% endif %}

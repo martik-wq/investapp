@@ -6,7 +6,7 @@ import csv
 import io
 import os
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import quote
 
 from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
@@ -1115,10 +1115,119 @@ def macro_key():
     return redirect(url_for("macro_view"))
 
 
+# ------------------------------------------------------------------ úvodná stránka (prehľad)
+HOME_MARKETS = [
+    ("^GSPC", "S&P 500", ""), ("^NDX", "Nasdaq-100", ""), ("^GDAXI", "DAX", ""), ("^STOXX50E", "Euro Stoxx 50", ""),
+    ("EURUSD=X", "EUR/USD", "fx"), ("^TNX", "Výnos 10r. USA", "yield"), ("GC=F", "Zlato", ""), ("BTC-USD", "Bitcoin", ""),
+]
+
+
+def _spark(symbol, today):
+    """Posledných ~45 obchodných dní na minigraf (cache podľa mesiaca, aby sa nesťahovalo stále)."""
+    m = today.month - 3
+    start = date(today.year + (m - 1) // 12, (m - 1) % 12 + 1, 1)
+    h = prices.get_history(symbol, start)
+    if not h or len(h["close"]) < 5:
+        return None
+    return [round(x, 4) for x in h["close"][-45:]]
+
+
+def _home_markets():
+    from concurrent.futures import ThreadPoolExecutor
+    today = date.today()
+
+    def one(m):
+        sym, label, kind = m
+        q = _safe_call(prices.get_price, sym)
+        sp = _safe_call(_spark, sym, today)
+        path = area = None
+        if sp:
+            lo, hi = min(sp), max(sp)
+            rng = (hi - lo) or 1.0
+            pts = [(round(i * 120 / (len(sp) - 1), 1), round(34 - (v - lo) / rng * 30, 1)) for i, v in enumerate(sp)]
+            path = "M" + " L".join(f"{x},{y}" for x, y in pts)
+            area = path + f" L120,38 L0,38 Z"
+        up = None
+        if q and q.get("change_pct") is not None:
+            up = q["change_pct"] >= 0
+        elif sp:
+            up = sp[-1] >= sp[0]
+        return {"sym": sym, "label": label, "kind": kind, "q": q, "path": path, "area": area, "up": up,
+                "trend": (sp[-1] / sp[0] - 1) if sp and sp[0] else None}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        return list(ex.map(one, HOME_MARKETS))
+
+
+def _safe_call(fn, *a):
+    try:
+        return fn(*a)
+    except Exception:  # noqa: BLE001 - jedna dlaždica nesmie zhodiť úvodnú stránku
+        return None
+
+
+def _pf_snapshot():
+    """Ocenené portfólio pre prehľad: {'base','summary','positions','day','day_pct'} alebo None."""
+    store = portfolio.load_store()
+    txns = list(store["txns"].values())
+    if not txns:
+        return None
+    data = portfolio.build_positions(txns)
+    currencies = sorted(set(data["currencies"]) | {"EUR", "USD"})
+    base = store.get("base") if store.get("base") in currencies else portfolio.default_base(txns)
+    demo = any(t.get("ticker") in DEMO_SYMBOLS for t in txns)
+    conv = portfolio.Converter(_pf_fx_factory(demo))
+    valued = portfolio.value_positions(data["open"], base, _pf_symbol_fn(store), _pf_quote, conv)
+    summary = portfolio.summarize(data, valued, base, conv)
+    day = 0.0
+    for p in valued:
+        vb, dp = p.get("value_b"), p.get("day_change_pct")
+        p["day_b"] = vb * dp / (1 + dp) if vb is not None and dp is not None and dp > -1 else None
+        day += p["day_b"] or 0.0
+    prev = (summary.get("value") or 0) - day
+    return {"base": base, "summary": summary, "day": day, "day_pct": day / prev if prev > 0 else None,
+            "positions": sorted([p for p in valued if p.get("day_change_pct") is not None],
+                                key=lambda p: -p["day_change_pct"]),
+            "unpriced": [p for p in valued if p.get("day_change_pct") is None]}
+
+
 @app.route("/")
 def index():
+    hour = datetime.now().hour
+    greet = "Dobré ráno" if hour < 10 else "Dobrý deň" if hour < 18 else "Dobrý večer"
+    days = ["pondelok", "utorok", "streda", "štvrtok", "piatok", "sobota", "nedeľa"]
+    t = date.today()
     import directory
-    return render_template("index.html", types=BUSINESS_TYPES, section=None, firms=directory.entries())
+    return render_template("index.html", page="home", section=None, greet=greet, firms=directory.entries(),
+                           today=f"{days[t.weekday()]} {t.day}. {t.month}. {t.year}",
+                           has_pf=bool(portfolio.load_store()["txns"]), has_watch=bool(watchlist.load()))
+
+
+@app.route("/home/part/<name>")
+def home_part(name):
+    """Časti úvodnej stránky sa načítavajú dodatočne, aby stránka nečakala na Yahoo a SEC."""
+    try:
+        if name == "markets":
+            return render_template("_home_markets.html", markets=_home_markets())
+        if name == "portfolio":
+            return render_template("_home_portfolio.html", pf=_pf_snapshot(), us_symbol=US_SYMBOL)
+        if name == "events":
+            from concurrent.futures import ThreadPoolExecutor
+            items = _calendar_tickers()
+            rows = []
+            if items:
+                with ThreadPoolExecutor(max_workers=4) as ex:
+                    rows = list(ex.map(_calendar_row, items))
+            return render_template("_home_events.html", events=events.upcoming(rows, horizon=60)[:8],
+                                   today=date.today().isoformat(), has_items=bool(items))
+        if name == "watch":
+            items = watchlist.load()
+            rows = watchlist.enrich(items, prices.get_price) if items else []
+            rows.sort(key=lambda r: (r["to_target"] is None, abs(r["to_target"] or 0)))
+            return render_template("_home_watch.html", rows=rows[:8], total=len(items))
+    except Exception:  # noqa: BLE001
+        app.logger.exception("Úvodná stránka: časť %s", name)
+        return '<p class="note">Túto časť sa nepodarilo načítať.</p>'
+    abort(404)
 
 
 @app.route("/search")

@@ -1,0 +1,9 @@
+<h2>Watchlist</h2>
+<div class="wl">{% for r in rows %}
+  <a class="wl-r" href="{{ url_for('section_view', ticker=r.ticker, section='overview') }}">
+    <div class="wl-t"><strong>{{ r.ticker }}</strong><div class="note">{{ r.name }}</div></div>
+    <div class="wl-p">{{ r.price|num(2) if r.price is not none else '–' }} <span class="note">{{ r.ccy or '' }}</span>
+      {% if r.day_pct is not none %}<div class="{{ 'up' if r.day_pct >= 0 else 'down' }}">{{ r.day_pct|spct(2) }}</div>{% endif %}</div>
+    <div class="wl-g">{% if r.hit %}<span class="pill hit">cieľ dosiahnutý</span>{% elif r.to_target is not none %}<span class="pill">k cieľu {{ r.to_target|spct(1) }}</span>{% endif %}</div>
+  </a>{% endfor %}</div>
+{% if total > rows|length %}<p class="note"><a href="{{ url_for('watchlist_view') }}">Všetkých {{ total }} →</a></p>{% else %}<p class="note"><a href="{{ url_for('watchlist_view') }}">Otvoriť watchlist →</a></p>{% endif %}

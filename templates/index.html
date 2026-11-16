@@ -1,30 +1,70 @@
 {% extends "base.html" %}
+{% block title %}Prehľad · mkej{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>mkej</h1>
-  <h2 style="margin-top:2px">Analýza verejne obchodovaných firiem</h2>
-  <p class="sub">Dáta zo SEC EDGAR (XBRL). Zadaj ticker a zobrazí sa súvaha, výkaz ziskov a strát, cash flow a metriky podľa typu biznisu.</p>
-  <form action="{{ url_for('search') }}" method="get" class="controls">
-    <label>Ticker alebo názov firmy
-      <input name="q" size="32" placeholder="napr. AAPL, JPM, O, SoFi" required autofocus></label>
-    <button>Analyzovať</button>
-  </form>
-  <p class="sample note">Skús:
-    {% for t in ['AAPL','MSFT','JPM','SOFI','NU','O','ALL','DEMOCO','DEMOBANK'] %}
-      <a href="{{ url_for('section_view', ticker=t, section='overview') }}">{{ t }}</a>
-    {% endfor %}
-    (DEMOCO a DEMOBANK sú fiktívne ukážkové firmy, ktoré fungujú aj bez internetu)</p>
+<section class="hero">
+  <div class="hero-l">
+    <div class="hero-greet">{{ greet }}, Martin</div>
+    <div class="hero-date">{{ today }}</div>
+    <h1 class="hero-h">Čo dnes preskúmame?</h1>
+    <form action="{{ url_for('search') }}" method="get" class="hero-search">
+      <input name="q" placeholder="Ticker alebo názov firmy, napr. AAPL, Grab, ASML…" required autofocus>
+      <button>Analyzovať</button>
+    </form>
+    <div class="hero-links">
+      <a href="{{ url_for('portfolio_view') }}">💼 Portfólio</a>
+      <a href="{{ url_for('watchlist_view') }}">👁 Watchlist</a>
+      <a href="{{ url_for('compare_view') }}">⚖ Porovnanie</a>
+      <a href="{{ url_for('calendar_view') }}">🗓 Kalendár</a>
+      <a href="{{ url_for('macro_view') }}">🌍 Makro</a>
+    </div>
+  </div>
+  <div class="hero-r" data-part="portfolio-hero">
+    {% if has_pf %}<div class="sk sk-hero"></div>{% else %}
+    <div class="hero-empty">Nahraj export z Trading 212 a uvidíš tu stav portfólia.<a href="{{ url_for('portfolio_view') }}">Nahrať portfólio →</a></div>{% endif %}
+  </div>
+</section>
+
+<div class="hsec-h"><h2>Trhy</h2><span class="note">denná zmena · minigraf ≈ posledné 2 mesiace</span></div>
+<div class="mkts" data-part="markets">{% for i in range(8) %}<div class="mkt sk"></div>{% endfor %}</div>
+
+<div class="hgrid">
+  <div class="card hcard" data-part="portfolio">
+    <h2>Moje pozície dnes</h2>
+    {% if has_pf %}<div class="sk sk-list"></div>{% else %}<p class="note">Zatiaľ bez portfólia. <a href="{{ url_for('portfolio_view') }}">Nahraj export z Trading 212</a>.</p>{% endif %}
+  </div>
+  <div class="hcol">
+    <div class="card hcard" data-part="events"><h2>Najbližšie udalosti</h2><div class="sk sk-list"></div></div>
+    <div class="card hcard" data-part="watch"><h2>Watchlist</h2>
+      {% if has_watch %}<div class="sk sk-list"></div>{% else %}<p class="note">Prázdny. Firmy pridáš na stránke <a href="{{ url_for('watchlist_view') }}">Watchlist</a> alebo pri analýze firmy.</p>{% endif %}
+    </div>
+  </div>
 </div>
-<div class="card">
+
+{% if firms %}
+<div class="card firms">
   <h2>Moje firmy</h2>
-  <p class="note">Rýchly výber. Firmy so značkou „Yahoo“ nie sú v SEC, výkazy sú neoficiálne (cca 4 roky).</p>
-  <div class="tablewrap"><table class="plain"><thead><tr><th>Firma</th><th>Symbol</th><th>Krajina</th><th>Zdroj</th></tr></thead><tbody>
-  {% for f in firms %}<tr><td><a href="{{ url_for('section_view', ticker=f.symbol, section='overview') }}">{{ f.name }}</a></td><td>{{ f.symbol }}</td><td>{{ f.country }}</td><td>{{ 'SEC' if f.src == 'sec' else 'Yahoo' }}</td></tr>{% endfor %}
-  </tbody></table></div>
+  <div class="chips">{% for f in firms %}<a class="chip" href="{{ url_for('section_view', ticker=f.symbol, section='overview') }}"><b>{{ f.symbol }}</b> {{ f.name }}{% if f.src != 'sec' %} <i>Yahoo</i>{% endif %}</a>{% endfor %}</div>
+  <p class="note">Firmy so značkou Yahoo nie sú v SEC, ich výkazy sú neoficiálne (cca 4 roky). Ukážkové firmy bez internetu: <a href="{{ url_for('section_view', ticker='DEMOCO', section='overview') }}">DEMOCO</a>, <a href="{{ url_for('section_view', ticker='DEMOBANK', section='overview') }}">DEMOBANK</a>.</p>
 </div>
-<div class="card">
-  <h2>Podporované typy biznisu</h2>
-  <ul>{% for k,v in types.items() %}<li>{{ v }}</li>{% endfor %}</ul>
-  <p class="note">Typ sa určí automaticky podľa SIC kódu firmy a dostupných dát, môžeš ho ručne prepnúť na stránke firmy.</p>
-</div>
+{% endif %}
+
+<script>
+(function () {
+  function load(name, targets) {
+    fetch('{{ url_for("home_part", name="__") }}'.replace('__', name)).then(function (r) { return r.text(); }).then(function (html) {
+      var tmp = document.createElement('div'); tmp.innerHTML = html;
+      targets.forEach(function (t) {
+        var el = document.querySelector('[data-part="' + t + '"]');
+        var src = tmp.querySelector('[data-fill="' + t + '"]');
+        if (el && src) { el.innerHTML = src.innerHTML; el.classList.add('filled'); }
+        else if (el && targets.length === 1) { el.innerHTML = html; el.classList.add('filled'); }
+      });
+    }).catch(function () {});
+  }
+  load('markets', ['markets']);
+  {% if has_pf %}load('portfolio', ['portfolio-hero', 'portfolio']);{% endif %}
+  load('events', ['events']);
+  {% if has_watch %}load('watch', ['watch']);{% endif %}
+})();
+</script>
 {% endblock %}

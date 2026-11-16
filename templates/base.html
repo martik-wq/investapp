@@ -14,6 +14,7 @@
     <input name="q" placeholder="Ticker alebo názov" required>
     <button aria-label="Hľadať">🔍</button>
   </form>
+  <a class="gnav {{ 'on' if page == 'home' }}" href="{{ url_for('index') }}"><span class="ic">🏠</span>Prehľad</a>
   <a class="gnav {{ 'on' if page == 'portfolio' }}" href="{{ url_for('portfolio_view') }}"><span class="ic">💼</span>Portfólio</a>
   <a class="gnav {{ 'on' if page == 'watchlist' }}" href="{{ url_for('watchlist_view') }}"><span class="ic">👁</span>Watchlist</a>
   <a class="gnav {{ 'on' if page == 'compare' }}" href="{{ url_for('compare_view') }}"><span class="ic">⚖</span>Porovnanie</a>

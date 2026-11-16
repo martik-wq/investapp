@@ -1,0 +1,7 @@
+<div data-fill="markets">{% for m in markets %}{% set q = m.q %}
+<a class="mkt {{ 'up' if m.up else 'down' if m.up is not none }}" href="{{ url_for('macro_view') if m.kind == 'yield' else '#' }}" onclick="{{ '' if m.kind == 'yield' else 'return false' }}">
+  <div class="mkt-l">{{ m.label }}</div>
+  <div class="mkt-v">{% if q %}{% if m.kind == 'fx' %}{{ q.price|num(4) }}{% elif m.kind == 'yield' %}{{ q.price|num(2) }} %{% else %}{{ q.price|num(2) }}{% endif %}{% else %}–{% endif %}</div>
+  <div class="mkt-c">{% if q and q.change_pct is not none %}{{ '▲' if q.change_pct >= 0 else '▼' }} {{ q.change_pct|spct(2) }}{% else %}&nbsp;{% endif %}</div>
+  {% if m.path %}<svg class="spark" viewBox="0 0 120 38" preserveAspectRatio="none"><path class="spark-a" d="{{ m.area }}"/><path class="spark-l" d="{{ m.path }}"/></svg>{% endif %}
+</a>{% endfor %}</div>

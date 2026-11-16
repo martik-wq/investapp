@@ -1,0 +1,28 @@
+{% if pf %}{% set s = pf.summary %}
+<div data-fill="portfolio-hero">
+  <div class="hp-l">Hodnota portfólia</div>
+  <div class="hp-v">{{ s.value|num(2) }} <span>{{ pf.base }}</span></div>
+  <div class="hp-row">
+    <div><div class="hp-l">Dnes</div><div class="hp-c {{ 'up' if pf.day >= 0 else 'down' }}">{{ pf.day|samt }} {{ pf.base }}{% if pf.day_pct is not none %} <small>{{ pf.day_pct|spct(2) }}</small>{% endif %}</div></div>
+    <div><div class="hp-l">Nerealizovaný zisk</div><div class="hp-c {{ 'up' if (s.unrealized or 0) >= 0 else 'down' }}">{{ s.unrealized|samt }} {{ pf.base }}</div></div>
+    <div><div class="hp-l">Celkový výsledok</div><div class="hp-c {{ 'up' if (s.total_return or 0) >= 0 else 'down' }}">{{ s.total_return|samt }} {{ pf.base }}</div></div>
+  </div>
+  <a class="hp-more" href="{{ url_for('portfolio_view') }}">Otvoriť portfólio →</a>
+</div>
+<div data-fill="portfolio">
+  <h2>Moje pozície dnes</h2>
+  {% set mx = (pf.positions|map(attribute='day_change_pct')|map('abs')|max) if pf.positions else 0 %}
+  <div class="mv">
+  {% for p in pf.positions %}{% set d = p.day_change_pct %}
+    <div class="mv-r">
+      <div class="mv-t">{% if p.symbol and us_symbol.match(p.symbol) %}<a href="{{ url_for('section_view', ticker=p.symbol, section='overview') }}">{{ p.ticker }}</a>{% else %}<span>{{ p.ticker or p.isin }}</span>{% endif %}<div class="mv-n">{{ p.name }}</div></div>
+      <div class="mv-bar"><i class="{{ 'up' if d >= 0 else 'down' }}" style="width:{{ (100 * (d|abs) / mx) if mx else 0 }}%"></i></div>
+      <div class="mv-p {{ 'up' if d >= 0 else 'down' }}">{{ d|spct(2) }}</div>
+      <div class="mv-a {{ 'up' if (p.day_b or 0) >= 0 else 'down' }}">{{ p.day_b|samt }}</div>
+    </div>
+  {% endfor %}
+  </div>
+  {% if pf.unpriced %}<p class="note">Bez dennej zmeny: {{ pf.unpriced|map(attribute='ticker')|join(', ') }}.</p>{% endif %}
+  <p class="note">Denná zmena v {{ pf.base }} je podľa zmeny ceny od včerajšieho zatvorenia (bez vplyvu kurzu).</p>
+</div>
+{% else %}<div data-fill="portfolio-hero"><div class="hero-empty">Portfólio je prázdne.</div></div><div data-fill="portfolio"><h2>Moje pozície dnes</h2><p class="note">Portfólio je prázdne.</p></div>{% endif %}
