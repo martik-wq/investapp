@@ -1,6 +1,6 @@
 """Zoznam dôležitých firiem, aby sa dali nájsť podľa názvu aj tickeru, aj keď nie sú v SEC.
 
-Symboly sú podľa Yahoo Finance (prípona = burza: .T Tokio, .KS Soul, .DE Xetra, .AS Amsterdam, .L Londýn, .TW Taiwan).
+Symboly sú podľa Yahoo Finance (prípona = burza: .T Tokio, .KS Soul, .DE Xetra, .AS Amsterdam, .PA Paríž, .L Londýn, .TW Taiwan).
 Firmy zo SEC (src = 'sec') sa tu len pripomínajú na úvodnej stránke, údaje pre ne ide priamo zo SEC.
 Chceš pridať ďalšiu? Pridaj riadok do FIRMS, formát: (symbol, názov, krajina, src, typ, aliasy)."""
 import re
@@ -28,6 +28,7 @@ FIRMS = [
     ("7203.T", "Toyota Motor", "Japonsko", "yahoo", None, ["toyota"]),
     ("BMW.DE", "BMW", "Nemecko", "yahoo", None, ["bmw", "bayerische motoren werke"]),
     ("SAP.DE", "SAP", "Nemecko", "yahoo", "tech", ["sap"]),
+    ("SU.PA", "Schneider Electric", "Francúzsko", "yahoo", None, ["schneider", "schneider electric", "schneider electric se"]),
     ("ADYEN.AS", "Adyen", "Holandsko", "yahoo", "tech", ["adyen"]),
     ("WISE.L", "Wise", "Veľká Británia", "yahoo", "tech", ["wise", "transferwise"]),
 ]
