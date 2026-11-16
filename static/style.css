@@ -571,3 +571,4 @@ body.loading::after,#updOverlay{background:rgba(248,243,235,.92);color:var(--acc
 .tipx{background:var(--navy)}
 .pftabs a:hover{color:var(--acc2)}
 .linkbtn,.danger,.gtab,.tabs button{box-shadow:none}
+.pfk .v.up,.kpi .v.up,.pfk .s.up{color:var(--pos)}.pfk .v.down,.kpi .v.down,.pfk .s.down{color:var(--neg)}
