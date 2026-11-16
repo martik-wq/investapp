@@ -5,8 +5,8 @@
   if (!el || !box) return;
   var D = JSON.parse(el.textContent);
   var NS = 'http://www.w3.org/2000/svg';
-  var COL = {rev: '#cf6f25', profit: '#3db07f', cost: '#94a3b8'};
-  var RIB = {rev: '#f1d0b2', profit: '#b9e0cd', cost: '#dfe3ea'};
+  var COL = {rev: '#f26a2e', profit: '#3db07f', cost: '#5b6f94'};
+  var RIB = {rev: '#fcd6bf', profit: '#b9e0cd', cost: '#dde3ee'};
   var NODE_W = 12;
   var byId = {};
   D.nodes.forEach(function (n, i) { n.idx = i; byId[n.id] = n; });
@@ -116,8 +116,8 @@
     var lines = [];
     var val = money(n.value);
     var yoy = n.yoy;
-    lines.push({t: n.label, w: 700, fs: 13, c: '#1c2430'});
-    var l2 = {parts: [{t: val, w: 700, c: '#1c2430'}], fs: 12.5};
+    lines.push({t: n.label, w: 700, fs: 13, c: '#0e1b33'});
+    var l2 = {parts: [{t: val, w: 700, c: '#0e1b33'}], fs: 12.5};
     if (yoy != null && D.has_prev) {
       var good = yoy >= 0;
       var col = n.type === 'cost' ? '#6b7585' : (good ? '#1b7a3d' : '#c62828');
