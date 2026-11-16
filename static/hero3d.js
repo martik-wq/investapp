@@ -31,7 +31,7 @@
     var camY = 3.2, camZ = -6.5, f = Math.min(W, H * 1.6) * 0.9;
     var zz = Z - camZ;
     if (zz < 0.5) return null;
-    return [W * 0.5 + (X / zz) * f, H * 0.18 + ((camY - y) / zz) * f * 0.55, zz];
+    return [W * 0.5 + (X / zz) * f, H * 0.40 + ((camY - y) / zz) * f * 0.5, zz];
   }
 
   function frame(now) {
@@ -92,7 +92,7 @@
       var u = i / (n - 1);
       var trend = u * 0.55;
       var noise = 0.06 * Math.sin(u * 23 + t * 1.6) + 0.04 * Math.sin(u * 57 - t * 2.3) + 0.03 * Math.cos(u * 11 + t);
-      pts.push([W * (0.05 + u * 0.95), H * (0.78 - trend - noise)]);
+      pts.push([W * (0.05 + u * 0.95), H * (0.95 - trend * 0.75 - noise)]);
     }
     var head = Math.floor(((t * 0.18) % 1.35) * n);
     var grad = ctx.createLinearGradient(0, 0, W, 0);
@@ -116,6 +116,7 @@
 
   size();
   window.addEventListener('resize', function () { size(); if (reduce) frame(performance.now()); });
+  if (window.ResizeObserver) new ResizeObserver(function () { size(); if (reduce) frame(performance.now()); }).observe(cv.parentNode);
   document.addEventListener('visibilitychange', function () {
     running = !document.hidden;
     cancelAnimationFrame(raf);

@@ -644,6 +644,6 @@ body.loading::after,#updOverlay{background:rgba(248,243,235,.92);color:var(--acc
 .chip b{color:var(--acc)}.chip i{font-style:normal;font-size:10.5px;color:var(--mute);background:#f3ece1;padding:1px 6px;border-radius:99px}
 .chip:hover{border-color:var(--acc);background:var(--tint)}
 #hero3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;
-  -webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 55%,rgba(0,0,0,.35) 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 55%,rgba(0,0,0,.35) 100%)}
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.45) 30%,#000 65%);mask-image:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.45) 30%,#000 65%)}
 .hero-l{position:relative;z-index:1}
 .hero-l .hero-h{text-shadow:0 2px 18px rgba(14,27,51,.6)}
