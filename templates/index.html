@@ -2,6 +2,7 @@
 {% block title %}Prehľad · mkej{% endblock %}
 {% block content %}
 <section class="hero">
+  <canvas id="hero3d" aria-hidden="true"></canvas>
   <div class="hero-l">
     <div class="hero-greet">{{ greet }}, Martin</div>
     <div class="hero-date">{{ today }}</div>
@@ -40,6 +41,7 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='hero3d.js') }}"></script>
 <script>
 (function () {
   function load(name, targets) {
