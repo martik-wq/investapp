@@ -40,14 +40,6 @@
   </div>
 </div>
 
-{% if firms %}
-<div class="card firms">
-  <h2>Moje firmy</h2>
-  <div class="chips">{% for f in firms %}<a class="chip" href="{{ url_for('section_view', ticker=f.symbol, section='overview') }}"><b>{{ f.symbol }}</b> {{ f.name }}{% if f.src != 'sec' %} <i>Yahoo</i>{% endif %}</a>{% endfor %}</div>
-  <p class="note">Firmy so značkou Yahoo nie sú v SEC, ich výkazy sú neoficiálne (cca 4 roky). Ukážkové firmy bez internetu: <a href="{{ url_for('section_view', ticker='DEMOCO', section='overview') }}">DEMOCO</a>, <a href="{{ url_for('section_view', ticker='DEMOBANK', section='overview') }}">DEMOBANK</a>.</p>
-</div>
-{% endif %}
-
 <script>
 (function () {
   function load(name, targets) {

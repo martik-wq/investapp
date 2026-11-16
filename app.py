@@ -1196,8 +1196,7 @@ def index():
     greet = "Dobré ráno" if hour < 10 else "Dobrý deň" if hour < 18 else "Dobrý večer"
     days = ["pondelok", "utorok", "streda", "štvrtok", "piatok", "sobota", "nedeľa"]
     t = date.today()
-    import directory
-    return render_template("index.html", page="home", section=None, greet=greet, firms=directory.entries(),
+    return render_template("index.html", page="home", section=None, greet=greet,
                            today=f"{days[t.weekday()]} {t.day}. {t.month}. {t.year}",
                            has_pf=bool(portfolio.load_store()["txns"]), has_watch=bool(watchlist.load()))
 

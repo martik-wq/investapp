@@ -1139,7 +1139,9 @@ _yf.fetch = lambda sym: _FAKE_YF
 _kb = edgar.load_company(*edgar.find_company("KakaoBank")[0])
 _kbb = statements.build(_kb, "annual", 8)
 check("zoznam: KakaoBank sa vyhodnotí ako banka aj bez SIC kódu", metrics.detect_type(_kb, _kbb) == "bank")
-check("zoznam: úvodná stránka ukazuje firmy", "KakaoBank" in cl.get("/").get_data(as_text=True) and "Disco Corporation" in cl.get("/").get_data(as_text=True))
+import directory as _dir  # noqa: E402
+check("zoznam: firmy sú v adresári (vyhľadávanie)", {"KakaoBank", "Disco Corporation"} <= {f["name"] for f in _dir.entries()}
+      and cl.get("/").status_code == 200)
 _yf.fetch = _orig_fetch
 edgar._get_json = _orig_gj2
 
