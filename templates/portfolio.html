@@ -64,7 +64,7 @@
     {% for p in summary.unpriced %}
       <form class="symfix" action="{{ url_for('portfolio_symbol') }}" method="post">
         <strong>{{ p.ticker or p.isin }}</strong> <span class="note">{{ p.name }} ({{ p.isin }}), skúšaný symbol: {{ p.symbol or '–' }}</span>
-        <input type="hidden" name="isin" value="{{ p.isin }}"><input name="symbol" placeholder="symbol z Yahoo"><button>Uložiť</button>
+        <input type="hidden" name="isin" value="{{ p.isin }}"><input name="symbol" placeholder="názov alebo symbol z Yahoo" data-suggest="fill" autocomplete="off"><button>Uložiť</button>
       </form>
     {% endfor %}
   </div>

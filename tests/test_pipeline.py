@@ -1142,6 +1142,19 @@ check("zoznam: KakaoBank sa vyhodnotí ako banka aj bez SIC kódu", metrics.dete
 import directory as _dir  # noqa: E402
 check("zoznam: firmy sú v adresári (vyhľadávanie)", {"KakaoBank", "Disco Corporation"} <= {f["name"] for f in _dir.entries()}
       and cl.get("/").status_code == 200)
+import suggest as _sg  # noqa: E402
+_orig_rows, _orig_y = _sg._sec_rows, _sg._yahoo
+_sg._sec_rows = lambda: [(t, n, _sg._norm(n), i) for i, (t, n) in enumerate(
+    [("MSFT", "MICROSOFT CORP"), ("GOOGL", "Alphabet Inc."), ("BRK-B", "BERKSHIRE HATHAWAY INC"), ("GT", "GOODYEAR TIRE"),
+     ("WRB", "BERKLEY W R CORP"), ("WRB-PE", "BERKLEY W R CORP"), ("GRAB", "Grab Holdings Ltd"), ("GRABW", "Grab Holdings Ltd"),
+     ("MLGO", "MicroAlgo Inc.")])]
+_sg._yahoo = lambda q: [{"symbol": "SIE.DE", "name": "Siemens AG", "ex": "XETRA", "kind": "", "src": "yahoo"}] if "sie" in q else []
+_s = lambda q: [x["symbol"] for x in _sg.suggest(q)]  # noqa: E731
+check("našepkávanie: podľa názvu, veľké firmy prvé, bez prioritných akcií a warrantov, Yahoo pre Európu",
+      _s("micro")[0] == "MSFT" and _s("berk")[0] == "BRK-B" and "WRB-PE" not in _s("berk") and _s("grab") == ["GRAB"]
+      and _s("schneider")[0] == "SU.PA" and "SIE.DE" in _s("siemens") and _s("x") == [], (_s("micro"), _s("berk"), _s("grab")))
+check("našepkávanie: endpoint vracia JSON", cl.get("/suggest?q=micro&y=0").get_json()["items"][0]["symbol"] == "MSFT")
+_sg._sec_rows, _sg._yahoo = _orig_rows, _orig_y
 _yf.fetch = _orig_fetch
 edgar._get_json = _orig_gj2
 

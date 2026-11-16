@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}mkej{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=asset_v) }}">
+<meta name="suggest-url" content="{{ url_for('suggest_view') }}">
+<meta name="company-url" content="{{ url_for('section_view', ticker='__', section='overview') }}">
 </head>
 <body>
 <div class="app">
 <aside class="side">
   <a class="brand" href="{{ url_for('index') }}">📊 mkej</a>
   <form action="{{ url_for('search') }}" method="get" class="sideSearch">
-    <input name="q" placeholder="Ticker alebo názov" required>
+    <input name="q" placeholder="Názov firmy alebo ticker" required data-suggest="go" autocomplete="off">
     <button aria-label="Hľadať">🔍</button>
   </form>
   <a class="gnav {{ 'on' if page == 'home' }}" href="{{ url_for('index') }}"><span class="ic">🏠</span>Prehľad</a>
@@ -66,5 +68,6 @@
 })();
 </script>
 <script src="{{ url_for('static', filename='ui.js', v=asset_v) }}" defer></script>
+<script src="{{ url_for('static', filename='suggest.js', v=asset_v) }}" defer></script>
 </body>
 </html>

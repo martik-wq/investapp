@@ -7,7 +7,7 @@
 <div class="card">
   <form method="get" class="controls">
     <label style="min-width:420px">Tickery (oddelené čiarkou)
-      <input name="t" value="{{ cmp.input }}" placeholder="napr. SOFI, NU, 323410.KS" autocomplete="off"></label>
+      <input name="t" value="{{ cmp.input }}" placeholder="píš názvy alebo tickery, napr. SoFi, Nu, KakaoBank" autocomplete="off" data-suggest="list"></label>
     <button>Porovnať</button>
   </form>
   {% if suggest %}<div class="note">Z watchlistu: {% for t in suggest %}<a href="#" onclick="var i=document.querySelector('[name=t]');i.value=(i.value?i.value+', ':'')+'{{ t }}';return false">{{ t }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}

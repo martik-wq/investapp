@@ -11,7 +11,7 @@
 <div class="card">
   <h2>Pridať akciu</h2>
   <form action="{{ url_for('watchlist_add') }}" method="post" class="wlform">
-    <input name="ticker" placeholder="Ticker (napr. NVDA, ASML.AS)" required maxlength="15" autocomplete="off">
+    <input name="ticker" placeholder="Názov firmy alebo ticker (napr. Nvidia, ASML)" required maxlength="40" autocomplete="off" data-suggest="fill">
     <input name="target" placeholder="Cieľová cena (nepovinné)" inputmode="decimal" maxlength="12">
     <button>Pridať</button>
   </form>

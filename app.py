@@ -974,9 +974,19 @@ def watchlist_add():
     t = re.split(r"[,\s;]+", raw.upper())[0]
     q = None
     try:
-        q = prices.get_price(t)
+        q = prices.get_price(t) if re.fullmatch(r"[A-Z0-9.\-^=]{1,15}", t) else None
     except Exception:  # noqa: BLE001
         q = None
+    if not q:
+        # napísaný názov firmy namiesto tickeru: vezmi najlepší návrh z našepkávania
+        try:
+            import suggest
+            best = suggest.suggest(raw, limit=1)
+            if best:
+                t = best[0]["symbol"]
+                q = prices.get_price(t)
+        except Exception:  # noqa: BLE001
+            q = None
     if not q:
         flash(f"Cenu pre „{t[:20]}“ som nenašiel. Skontroluj ticker (európske akcie majú príponu, napr. ASML.AS).", "warn")
         return redirect(url_for("watchlist_view"))
@@ -1239,6 +1249,19 @@ def home_part(name):
         app.logger.exception("Úvodná stránka: časť %s", name)
         return '<p class="note">Túto časť sa nepodarilo načítať.</p>'
     abort(404)
+
+
+@app.route("/suggest")
+def suggest_view():
+    """Návrhy firiem počas písania (JSON)."""
+    import suggest
+    q = request.args.get("q", "")[:60]
+    try:
+        items = suggest.suggest(q, use_yahoo=request.args.get("y", "1") != "0")
+    except Exception:  # noqa: BLE001 - našepkávanie nesmie zhodiť stránku
+        app.logger.exception("Našepkávanie")
+        items = []
+    return jsonify({"q": q, "items": items})
 
 
 @app.route("/search")
